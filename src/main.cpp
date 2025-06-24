@@ -1,3 +1,10 @@
+
+#include <cstdint>
+#include <cstdlib>
+#include <filesystem>
+#include <iostream>
+#include <string>
+
 #include <volk.h>
 
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
@@ -20,12 +27,9 @@
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include "tiny_gltf.h"
 
-#include <iostream>
-#include <string>
-
 static SDL_Window *window = NULL;
 
-int main()
+int main(int argc, char *argv[])
 {
     // --- SDL3 Init
     if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -177,6 +181,41 @@ int main()
     std::cout
         << "Vulkan + SDL3 + vk-bootstrap + Volk + VMA initialized successfully!\n";
 
+    tinygltf::Model    model;
+    tinygltf::TinyGLTF loader;
+    std::string        err;
+    std::string        warn;
+
+    if (argc < 2) {
+        std::cerr << "Ouchie, no .gltf file, oof owie\n";
+        return EXIT_FAILURE;
+    }
+
+    namespace fs = std::filesystem;
+
+    auto path = fs::path(argv[1]);
+
+    bool ret = false;
+    if (path.extension().string().ends_with("gltf")) {
+        ret = loader.LoadASCIIFromFile(&model, &err, &warn, argv[1]);
+    }
+
+    else if (path.extension().string().ends_with("glb")) {
+        ret = loader.LoadBinaryFromFile(&model, &err, &warn, argv[1]);
+    }
+
+    if (!warn.empty()) {
+        printf("Warn: %s\n", warn.c_str());
+    }
+
+    if (!err.empty()) {
+        printf("Err: %s\n", err.c_str());
+    }
+
+    if (!ret) {
+        printf("Failed to parse glTF\n");
+        return EXIT_FAILURE;
+    }
     // --- Main loop (minimal)
     bool      running = true;
     SDL_Event e;
