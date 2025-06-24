@@ -61,6 +61,12 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    for (auto &mesh : asset->meshes) {
+        for (auto it = mesh.primitives.begin(); it != mesh.primitives.end(); ++it) {
+            auto *positionIt = it->findAttribute("POSITION");
+        }
+    }
+
     // viewer->asset = std::move(asset.get());
 
     // --- SDL3 Init
