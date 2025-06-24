@@ -1,3 +1,4 @@
+#include "fastgltf/util.hpp"
 #include <volk.h>
 
 #include <fastgltf/core.hpp>
@@ -62,8 +63,31 @@ int main(int argc, char *argv[])
     }
 
     for (auto &mesh : asset->meshes) {
+        std::cerr << "Mesh is: <" << mesh.name << ">\n";
         for (auto it = mesh.primitives.begin(); it != mesh.primitives.end(); ++it) {
             auto *positionIt = it->findAttribute("POSITION");
+
+            std::cerr << std::boolalpha
+                      << "has indicesAccesor: " << it->indicesAccessor.has_value()
+                      << '\n';
+
+            if (it->indicesAccessor.has_value()) {
+                std::cerr << "indicesAccessor: " << it->indicesAccessor.value() << '\n';
+            }
+
+            std::cerr << "mappings.size(): " << it->mappings.size() << '\n';
+
+            if (!it->mappings.empty() && it->mappings.front().has_value()) {
+                std::cerr << "mappings[0]: " << it->mappings[0].value() << '\n';
+            }
+
+            std::cerr << "has materialIndex: " << it->materialIndex.has_value() << '\n';
+
+            if (it->materialIndex.has_value()) {
+                std::cerr << "materialIndex: " << it->materialIndex.value() << '\n';
+            }
+
+            std::cerr << "primitiveType: " << fastgltf::to_underlying(it->type) << '\n';
         }
     }
 
