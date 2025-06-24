@@ -1,11 +1,8 @@
-
-#include <cstdint>
-#include <cstdlib>
-#include <filesystem>
-#include <iostream>
-#include <string>
-
 #include <volk.h>
+
+#include <fastgltf/core.hpp>
+#include <fastgltf/tools.hpp>
+#include <fastgltf/types.hpp>
 
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
@@ -20,17 +17,52 @@
 
 #include <VkBootstrap.h>
 
-// Define these only in *one* .cc file.
-#define TINYGLTF_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-// #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
-#include "tiny_gltf.h"
+#include <cstdint>
+#include <cstdlib>
+#include <filesystem>
+#include <iostream>
+#include <string>
 
 static SDL_Window *window = NULL;
 
 int main(int argc, char *argv[])
 {
+    if (argc < 2) {
+        std::cerr << "Oof ouchie, need a gltf file, ouchie owie\n";
+        return EXIT_FAILURE;
+    }
+
+    auto path = std::filesystem::path(argv[1]);
+
+    auto gltfFile = fastgltf::GltfDataBuffer::FromPath(path);
+    if (!bool(gltfFile)) {
+        std::cerr << "Failed to open glTF file: "
+                  << fastgltf::getErrorMessage(gltfFile.error()) << '\n';
+        return EXIT_FAILURE;
+    }
+
+    static constexpr auto supportedExtensions =
+        fastgltf::Extensions::KHR_mesh_quantization
+        | fastgltf::Extensions::KHR_texture_transform
+        | fastgltf::Extensions::KHR_materials_variants;
+
+    fastgltf::Parser parser(supportedExtensions);
+
+    constexpr auto gltfOptions =
+        fastgltf::Options::DontRequireValidAssetMember | fastgltf::Options::AllowDouble
+        | fastgltf::Options::LoadExternalBuffers | fastgltf::Options::LoadExternalImages
+        | fastgltf::Options::GenerateMeshIndices;
+
+    auto asset = parser.loadGltf(gltfFile.get(), path.parent_path(), gltfOptions);
+
+    if (fastgltf::getErrorName(asset.error()) != "None") {
+        std::cerr << "Failed to load glTF: " << fastgltf::getErrorMessage(asset.error())
+                  << '\n';
+        return EXIT_FAILURE;
+    }
+
+    // viewer->asset = std::move(asset.get());
+
     // --- SDL3 Init
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << "\n";
@@ -181,41 +213,6 @@ int main(int argc, char *argv[])
     std::cout
         << "Vulkan + SDL3 + vk-bootstrap + Volk + VMA initialized successfully!\n";
 
-    tinygltf::Model    model;
-    tinygltf::TinyGLTF loader;
-    std::string        err;
-    std::string        warn;
-
-    if (argc < 2) {
-        std::cerr << "Ouchie, no .gltf file, oof owie\n";
-        return EXIT_FAILURE;
-    }
-
-    namespace fs = std::filesystem;
-
-    auto path = fs::path(argv[1]);
-
-    bool ret = false;
-    if (path.extension().string().ends_with("gltf")) {
-        ret = loader.LoadASCIIFromFile(&model, &err, &warn, argv[1]);
-    }
-
-    else if (path.extension().string().ends_with("glb")) {
-        ret = loader.LoadBinaryFromFile(&model, &err, &warn, argv[1]);
-    }
-
-    if (!warn.empty()) {
-        printf("Warn: %s\n", warn.c_str());
-    }
-
-    if (!err.empty()) {
-        printf("Err: %s\n", err.c_str());
-    }
-
-    if (!ret) {
-        printf("Failed to parse glTF\n");
-        return EXIT_FAILURE;
-    }
     // --- Main loop (minimal)
     bool      running = true;
     SDL_Event e;

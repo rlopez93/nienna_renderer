@@ -13,9 +13,7 @@ add_executable(nienna
 
 add_subdirectory(third_party/vk-bootstrap)
 
-set(TINYGLTF_HEADER_ONLY ON)
-set(TINYGLTF_INSTALL OFF)
-add_subdirectory(third_party/tinygltf)
+add_subdirectory(third_party/fastgltf)
 
-target_include_directories(nienna PRIVATE third_party/tinygltf)
 target_link_libraries(nienna PRIVATE SDL3::SDL3 volk::volk vk-bootstrap::vk-bootstrap)
+target_link_libraries(nienna PRIVATE fastgltf::fastgltf)
