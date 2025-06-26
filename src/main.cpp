@@ -8,10 +8,15 @@
 #include <slang/slang-com-ptr.h>
 #include <slang/slang.h>
 
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_raii.hpp>
+
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
 #define VMA_IMPLEMENTATION
 #include <vma/vk_mem_alloc.h>
+
+#include <VkBootstrap.h>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_error.h>
@@ -19,13 +24,10 @@
 #include <SDL3/SDL_video.h>
 #include <SDL3/SDL_vulkan.h>
 
-#include <VkBootstrap.h>
-
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
-#include <string>
 
 static SDL_Window *window = NULL;
 
@@ -124,6 +126,12 @@ int main(int argc, char *argv[])
                 });
         }
     }
+
+    std::vector<vk::raii::DescriptorSetLayout>  descriptorSetLayouts;
+    std::vector<vk::PushConstantRange>          pushConstantRanges;
+    std::vector<vk::DescriptorSetLayoutBinding> descriptorRanges;
+
+    vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
 
     using Slang::ComPtr;
 
