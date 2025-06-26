@@ -5,6 +5,9 @@
 #include <fastgltf/tools.hpp>
 #include <fastgltf/types.hpp>
 
+#include <slang/slang-com-ptr.h>
+#include <slang/slang.h>
+
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
 #define VMA_IMPLEMENTATION
@@ -120,6 +123,14 @@ int main(int argc, char *argv[])
                     vertices[idx].texCoord = texCoord;
                 });
         }
+    }
+
+    using Slang::ComPtr;
+
+    ComPtr<slang::IGlobalSession> slangGlobalSession;
+    if (SLANG_FAILED(slang::createGlobalSession(slangGlobalSession.writeRef()))) {
+        std::cerr << "slang failed createGlobalSession\n";
+        return -1;
     }
 
     // --- SDL3 Init
