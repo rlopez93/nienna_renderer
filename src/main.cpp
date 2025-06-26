@@ -1,7 +1,7 @@
-#include "fastgltf/util.hpp"
 #include <volk.h>
 
 #include <fastgltf/core.hpp>
+#include <fastgltf/math.hpp>
 #include <fastgltf/tools.hpp>
 #include <fastgltf/types.hpp>
 
@@ -62,36 +62,65 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    struct Vertex {
+        fastgltf::math::fvec3 pos{};
+        fastgltf::math::fvec3 normal{};
+        fastgltf::math::fvec2 texCoord{};
+    };
+
+    std::vector<std::uint16_t> indices;
+    std::vector<Vertex>        vertices;
+
     for (auto &mesh : asset->meshes) {
         std::cerr << "Mesh is: <" << mesh.name << ">\n";
-        for (auto it = mesh.primitives.begin(); it != mesh.primitives.end(); ++it) {
-            auto *positionIt = it->findAttribute("POSITION");
+        for (auto primitiveIt = mesh.primitives.begin();
+             primitiveIt != mesh.primitives.end(); ++primitiveIt) {
 
-            std::cerr << std::boolalpha
-                      << "has indicesAccesor: " << it->indicesAccessor.has_value()
-                      << '\n';
+            if (primitiveIt->indicesAccessor.has_value()) {
+                auto &indexAccessor =
+                    asset->accessors[primitiveIt->indicesAccessor.value()];
+                indices.resize(indexAccessor.count);
 
-            if (it->indicesAccessor.has_value()) {
-                std::cerr << "indicesAccessor: " << it->indicesAccessor.value() << '\n';
+                fastgltf::iterateAccessorWithIndex<std::uint16_t>(
+                    asset.get(), indexAccessor,
+                    [&](std::uint16_t index, std::size_t idx) {
+                        indices[idx] = index;
+                    });
             }
 
-            std::cerr << "mappings.size(): " << it->mappings.size() << '\n';
+            auto positionIt = primitiveIt->findAttribute("POSITION");
+            auto normalIt   = primitiveIt->findAttribute("NORMAL");
+            auto texCoordIt = primitiveIt->findAttribute("TEXCOORD_0");
 
-            if (!it->mappings.empty() && it->mappings.front().has_value()) {
-                std::cerr << "mappings[0]: " << it->mappings[0].value() << '\n';
-            }
+            assert(positionIt != primitiveIt->attributes.end());
+            assert(normalIt != primitiveIt->attributes.end());
+            assert(texCoordIt != primitiveIt->attributes.end());
 
-            std::cerr << "has materialIndex: " << it->materialIndex.has_value() << '\n';
+            auto &positionAccessor = asset->accessors[positionIt->accessorIndex];
+            auto &normalAccessor   = asset->accessors[normalIt->accessorIndex];
+            auto &texCoordAccessor = asset->accessors[texCoordIt->accessorIndex];
 
-            if (it->materialIndex.has_value()) {
-                std::cerr << "materialIndex: " << it->materialIndex.value() << '\n';
-            }
+            vertices.resize(positionAccessor.count);
 
-            std::cerr << "primitiveType: " << fastgltf::to_underlying(it->type) << '\n';
+            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+                asset.get(), positionAccessor,
+                [&](fastgltf::math::fvec3 pos, std::size_t idx) {
+                    vertices[idx].pos = pos;
+                });
+
+            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+                asset.get(), normalAccessor,
+                [&](fastgltf::math::fvec3 normal, std::size_t idx) {
+                    vertices[idx].normal = normal;
+                });
+
+            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
+                asset.get(), texCoordAccessor,
+                [&](fastgltf::math::fvec2 texCoord, std::size_t idx) {
+                    vertices[idx].texCoord = texCoord;
+                });
         }
     }
-
-    // viewer->asset = std::move(asset.get());
 
     // --- SDL3 Init
     if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -239,6 +268,9 @@ int main(int argc, char *argv[])
         std::cerr << "Failed to create VMA allocator\n";
         return -1;
     }
+
+    auto swapchain_builder = vkb::SwapchainBuilder{vkb_device};
+    auto swap_ret          = swapchain_builder.build();
 
     std::cout
         << "Vulkan + SDL3 + vk-bootstrap + Volk + VMA initialized successfully!\n";
