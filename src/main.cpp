@@ -1,5 +1,3 @@
-#include <volk.h>
-
 #include <fastgltf/core.hpp>
 #include <fastgltf/math.hpp>
 #include <fastgltf/tools.hpp>
@@ -8,12 +6,29 @@
 #include <slang/slang-com-ptr.h>
 #include <slang/slang.h>
 
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
+// #include <vulkan/vulkan_enums.hpp>
+#include <vulkan/vulkan_extension_inspection.hpp>
+// #include <vulkan/vulkan_format_traits.hpp>
+// #include <vulkan/vulkan_funcs.hpp>
+// #include <vulkan/vulkan_handles.hpp>
+// #include <vulkan/vulkan_hash.hpp>
+// #include <vulkan/vulkan_hpp_macros.hpp>
+// #include <vulkan/vulkan_profiles.hpp>
+// #include <vulkan/vulkan_shared.hpp>
+// #include <vulkan/vulkan_static_assertions.hpp>
+// #include <vulkan/vulkan_structs.hpp>
+// #include <vulkan/vulkan_to_string.hpp>
+// #include <vulkan/vulkan_video.hpp>
 
-#define VMA_STATIC_VULKAN_FUNCTIONS 0
-#define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
+VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
+
 #define VMA_IMPLEMENTATION
+#define VMA_STATIC_VULKAN_FUNCTIONS 0
+#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
+#define VMA_USE_STL_CONTAINERS 1
 #include <vma/vk_mem_alloc.h>
 
 #include <VkBootstrap.h>
@@ -29,116 +44,13 @@
 #include <filesystem>
 #include <iostream>
 
-static SDL_Window *window = NULL;
+static SDL_Window *window = nullptr;
 
-int main(int argc, char *argv[])
+auto main(int argc, char *argv[]) -> int
 {
     if (argc < 2) {
         std::cerr << "Oof ouchie, need a gltf file, ouchie owie\n";
         return EXIT_FAILURE;
-    }
-
-    auto path = std::filesystem::path(argv[1]);
-
-    auto gltfFile = fastgltf::GltfDataBuffer::FromPath(path);
-    if (!bool(gltfFile)) {
-        std::cerr << "Failed to open glTF file: "
-                  << fastgltf::getErrorMessage(gltfFile.error()) << '\n';
-        return EXIT_FAILURE;
-    }
-
-    static constexpr auto supportedExtensions =
-        fastgltf::Extensions::KHR_mesh_quantization
-        | fastgltf::Extensions::KHR_texture_transform
-        | fastgltf::Extensions::KHR_materials_variants;
-
-    fastgltf::Parser parser(supportedExtensions);
-
-    constexpr auto gltfOptions =
-        fastgltf::Options::DontRequireValidAssetMember | fastgltf::Options::AllowDouble
-        | fastgltf::Options::LoadExternalBuffers | fastgltf::Options::LoadExternalImages
-        | fastgltf::Options::GenerateMeshIndices;
-
-    auto asset = parser.loadGltf(gltfFile.get(), path.parent_path(), gltfOptions);
-
-    if (fastgltf::getErrorName(asset.error()) != "None") {
-        std::cerr << "Failed to load glTF: " << fastgltf::getErrorMessage(asset.error())
-                  << '\n';
-        return EXIT_FAILURE;
-    }
-
-    struct Vertex {
-        fastgltf::math::fvec3 pos{};
-        fastgltf::math::fvec3 normal{};
-        fastgltf::math::fvec2 texCoord{};
-    };
-
-    std::vector<std::uint16_t> indices;
-    std::vector<Vertex>        vertices;
-
-    for (auto &mesh : asset->meshes) {
-        std::cerr << "Mesh is: <" << mesh.name << ">\n";
-        for (auto primitiveIt = mesh.primitives.begin();
-             primitiveIt != mesh.primitives.end(); ++primitiveIt) {
-
-            if (primitiveIt->indicesAccessor.has_value()) {
-                auto &indexAccessor =
-                    asset->accessors[primitiveIt->indicesAccessor.value()];
-                indices.resize(indexAccessor.count);
-
-                fastgltf::iterateAccessorWithIndex<std::uint16_t>(
-                    asset.get(), indexAccessor,
-                    [&](std::uint16_t index, std::size_t idx) {
-                        indices[idx] = index;
-                    });
-            }
-
-            auto positionIt = primitiveIt->findAttribute("POSITION");
-            auto normalIt   = primitiveIt->findAttribute("NORMAL");
-            auto texCoordIt = primitiveIt->findAttribute("TEXCOORD_0");
-
-            assert(positionIt != primitiveIt->attributes.end());
-            assert(normalIt != primitiveIt->attributes.end());
-            assert(texCoordIt != primitiveIt->attributes.end());
-
-            auto &positionAccessor = asset->accessors[positionIt->accessorIndex];
-            auto &normalAccessor   = asset->accessors[normalIt->accessorIndex];
-            auto &texCoordAccessor = asset->accessors[texCoordIt->accessorIndex];
-
-            vertices.resize(positionAccessor.count);
-
-            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
-                asset.get(), positionAccessor,
-                [&](fastgltf::math::fvec3 pos, std::size_t idx) {
-                    vertices[idx].pos = pos;
-                });
-
-            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
-                asset.get(), normalAccessor,
-                [&](fastgltf::math::fvec3 normal, std::size_t idx) {
-                    vertices[idx].normal = normal;
-                });
-
-            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
-                asset.get(), texCoordAccessor,
-                [&](fastgltf::math::fvec2 texCoord, std::size_t idx) {
-                    vertices[idx].texCoord = texCoord;
-                });
-        }
-    }
-
-    std::vector<vk::raii::DescriptorSetLayout>  descriptorSetLayouts;
-    std::vector<vk::PushConstantRange>          pushConstantRanges;
-    std::vector<vk::DescriptorSetLayoutBinding> descriptorRanges;
-
-    vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
-
-    using Slang::ComPtr;
-
-    ComPtr<slang::IGlobalSession> slangGlobalSession;
-    if (SLANG_FAILED(slang::createGlobalSession(slangGlobalSession.writeRef()))) {
-        std::cerr << "slang failed createGlobalSession\n";
-        return -1;
     }
 
     // --- SDL3 Init
@@ -164,22 +76,27 @@ int main(int argc, char *argv[])
 #define VK_EXT_DEBUG_REPORT_EXTENSION_NAME "VK_EXT_debug_report"
 #endif
 
-    Uint32             count_instance_extensions;
-    const char *const *instance_extensions =
-        SDL_Vulkan_GetInstanceExtensions(&count_instance_extensions);
+    std::vector<const char *> instance_extensions{
+        VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+        VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
+        VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME};
 
-    if (instance_extensions == NULL) {
-        std::cerr << "SDL_Vulkan_GetInstanceExtensions failed:" << SDL_GetError()
-                  << "\n";
-        return -1;
+    {
+        Uint32             sdl_extensions_count;
+        const char *const *sdl_instance_extensions =
+            SDL_Vulkan_GetInstanceExtensions(&sdl_extensions_count);
+
+        if (sdl_instance_extensions == nullptr) {
+            std::cerr << "SDL_Vulkan_GetInstanceExtensions failed:" << SDL_GetError()
+                      << "\n";
+            return -1;
+        }
+        instance_extensions.insert(
+            instance_extensions.end(),
+            sdl_instance_extensions,
+            sdl_instance_extensions + sdl_extensions_count);
     }
-
-    int          count_extensions = count_instance_extensions + 1;
-    const char **extensions =
-        (const char **)SDL_malloc(count_extensions * sizeof(const char *));
-    extensions[0] = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
-    SDL_memcpy(&extensions[1], instance_extensions,
-               count_instance_extensions * sizeof(const char *));
 
     // --- Create Vulkan instance using vk-bootstrap
     vkb::InstanceBuilder builder;
@@ -187,10 +104,8 @@ int main(int argc, char *argv[])
                         .require_api_version(1, 4)
                         .use_default_debug_messenger()
                         .enable_validation_layers(true)
-                        .enable_extensions(count_extensions, extensions)
+                        .enable_extensions(instance_extensions)
                         .build();
-
-    SDL_free(extensions);
 
     if (!inst_ret) {
         std::cerr << "vk-bootstrap instance creation failed: "
@@ -199,25 +114,35 @@ int main(int argc, char *argv[])
     }
 
     vkb::Instance vkb_inst = inst_ret.value();
-    VkInstance    instance = vkb_inst.instance;
+    vk::Instance  instance = vkb_inst.instance;
 
-    // --- Initialize volk
-    if (volkInitialize() != VK_SUCCESS) {
-        std::cerr << "Failed to initialize volk\n";
-        return -1;
-    }
-    volkLoadInstance(instance);
+    VULKAN_HPP_DEFAULT_DISPATCHER.init();
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
 
+    vk::SurfaceKHR surface;
     // --- Create Vulkan surface with SDL3
-    VkSurfaceKHR surface;
-    if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface)) {
-        std::cerr << "SDL_Vulkan_CreateSurface failed\n";
-        return -1;
+    {
+        VkSurfaceKHR surface_vk;
+        if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface_vk)) {
+            std::cerr << "SDL_Vulkan_CreateSurface failed\n";
+            return -1;
+        }
+        surface = surface_vk;
     }
 
     // --- Pick physical device and create logical device using vk-bootstrap
     vkb::PhysicalDeviceSelector selector{vkb_inst};
-    auto phys_ret = selector.set_surface(surface).require_present().select();
+
+    auto phys_ret =
+        selector.set_surface(surface)
+            .add_required_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)
+            .add_required_extension(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME)
+            .add_required_extension(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME)
+            .add_required_extension(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME)
+            .add_required_extension(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
+            .add_required_extension(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME)
+            .require_present()
+            .select();
 
     if (!phys_ret) {
         std::cerr << "Failed to select physical device: " << phys_ret.error().message()
@@ -235,46 +160,44 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    vkb::Device      vkb_device = dev_ret.value();
-    VkDevice         device     = vkb_device.device;
-    VkPhysicalDevice gpu        = vkb_phys.physical_device;
+    vkb::Device        vkb_device     = dev_ret.value();
+    vk::Device         device         = vkb_device.device;
+    vk::PhysicalDevice physicalDevice = vkb_phys.physical_device;
 
-    volkLoadDevice(device);
-
-    VmaVulkanFunctions vulkanFunctions            = {};
-    vulkanFunctions.vkGetInstanceProcAddr         = vkGetInstanceProcAddr;
-    vulkanFunctions.vkGetDeviceProcAddr           = vkGetDeviceProcAddr;
-    vulkanFunctions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
-    vulkanFunctions.vkGetPhysicalDeviceMemoryProperties =
-        vkGetPhysicalDeviceMemoryProperties;
-    vulkanFunctions.vkAllocateMemory                  = vkAllocateMemory;
-    vulkanFunctions.vkFreeMemory                      = vkFreeMemory;
-    vulkanFunctions.vkMapMemory                       = vkMapMemory;
-    vulkanFunctions.vkUnmapMemory                     = vkUnmapMemory;
-    vulkanFunctions.vkFlushMappedMemoryRanges         = vkFlushMappedMemoryRanges;
-    vulkanFunctions.vkInvalidateMappedMemoryRanges    = vkInvalidateMappedMemoryRanges;
-    vulkanFunctions.vkBindBufferMemory                = vkBindBufferMemory;
-    vulkanFunctions.vkBindImageMemory                 = vkBindImageMemory;
-    vulkanFunctions.vkGetBufferMemoryRequirements     = vkGetBufferMemoryRequirements;
-    vulkanFunctions.vkGetImageMemoryRequirements      = vkGetImageMemoryRequirements;
-    vulkanFunctions.vkCreateBuffer                    = vkCreateBuffer;
-    vulkanFunctions.vkDestroyBuffer                   = vkDestroyBuffer;
-    vulkanFunctions.vkCreateImage                     = vkCreateImage;
-    vulkanFunctions.vkDestroyImage                    = vkDestroyImage;
-    vulkanFunctions.vkCmdCopyBuffer                   = vkCmdCopyBuffer;
-    vulkanFunctions.vkGetBufferMemoryRequirements2KHR = vkGetBufferMemoryRequirements2;
-    vulkanFunctions.vkGetImageMemoryRequirements2KHR  = vkGetImageMemoryRequirements2;
-    vulkanFunctions.vkBindBufferMemory2KHR            = vkBindBufferMemory2;
-    vulkanFunctions.vkBindImageMemory2KHR             = vkBindImageMemory2;
-    vulkanFunctions.vkGetPhysicalDeviceMemoryProperties2KHR =
-        vkGetPhysicalDeviceMemoryProperties2;
-    vulkanFunctions.vkGetDeviceBufferMemoryRequirements =
-        vkGetDeviceBufferMemoryRequirements;
-    vulkanFunctions.vkGetDeviceImageMemoryRequirements =
-        vkGetDeviceImageMemoryRequirements;
+    VmaVulkanFunctions vulkanFunctions    = {};
+    vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+    vulkanFunctions.vkGetDeviceProcAddr   = vkGetDeviceProcAddr;
+    // vulkanFunctions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
+    // vulkanFunctions.vkGetPhysicalDeviceMemoryProperties =
+    //     vkGetPhysicalDeviceMemoryProperties;
+    // vulkanFunctions.vkAllocateMemory                  = vkAllocateMemory;
+    // vulkanFunctions.vkFreeMemory                      = vkFreeMemory;
+    // vulkanFunctions.vkMapMemory                       = vkMapMemory;
+    // vulkanFunctions.vkUnmapMemory                     = vkUnmapMemory;
+    // vulkanFunctions.vkFlushMappedMemoryRanges         = vkFlushMappedMemoryRanges;
+    // vulkanFunctions.vkInvalidateMappedMemoryRanges    =
+    // vkInvalidateMappedMemoryRanges; vulkanFunctions.vkBindBufferMemory =
+    // vkBindBufferMemory; vulkanFunctions.vkBindImageMemory                 =
+    // vkBindImageMemory; vulkanFunctions.vkGetBufferMemoryRequirements     =
+    // vkGetBufferMemoryRequirements; vulkanFunctions.vkGetImageMemoryRequirements =
+    // vkGetImageMemoryRequirements; vulkanFunctions.vkCreateBuffer                    =
+    // vkCreateBuffer; vulkanFunctions.vkDestroyBuffer                   =
+    // vkDestroyBuffer; vulkanFunctions.vkCreateImage                     =
+    // vkCreateImage; vulkanFunctions.vkDestroyImage                    =
+    // vkDestroyImage; vulkanFunctions.vkCmdCopyBuffer                   =
+    // vkCmdCopyBuffer; vulkanFunctions.vkGetBufferMemoryRequirements2KHR =
+    // vkGetBufferMemoryRequirements2; vulkanFunctions.vkGetImageMemoryRequirements2KHR
+    // = vkGetImageMemoryRequirements2; vulkanFunctions.vkBindBufferMemory2KHR =
+    // vkBindBufferMemory2; vulkanFunctions.vkBindImageMemory2KHR             =
+    // vkBindImageMemory2; vulkanFunctions.vkGetPhysicalDeviceMemoryProperties2KHR =
+    //     vkGetPhysicalDeviceMemoryProperties2;
+    // vulkanFunctions.vkGetDeviceBufferMemoryRequirements =
+    //     vkGetDeviceBufferMemoryRequirements;
+    // vulkanFunctions.vkGetDeviceImageMemoryRequirements =
+    //     vkGetDeviceImageMemoryRequirements;
 
     VmaAllocatorCreateInfo allocatorCreateInfo = {};
-    allocatorCreateInfo.physicalDevice         = gpu;
+    allocatorCreateInfo.physicalDevice         = physicalDevice;
     allocatorCreateInfo.device                 = device;
     allocatorCreateInfo.instance               = instance;
     allocatorCreateInfo.vulkanApiVersion       = VK_API_VERSION_1_4;
@@ -288,12 +211,381 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    auto swapchain_builder = vkb::SwapchainBuilder{vkb_device};
-    auto swap_ret          = swapchain_builder.build();
+    int w, h;
+    SDL_GetWindowSize(window, &w, &h);
+    vk::Extent2D outWindowSize;
 
-    std::cout
-        << "Vulkan + SDL3 + vk-bootstrap + Volk + VMA initialized successfully!\n";
+    const auto surfaceCapabilities = physicalDevice.getSurfaceCapabilities2KHR(
+        vk::PhysicalDeviceSurfaceInfo2KHR{surface});
 
+    const auto availableSurfaceFormats = physicalDevice.getSurfaceFormats2KHR(
+        vk::PhysicalDeviceSurfaceInfo2KHR{surface});
+
+    const auto availablePresentModes =
+        physicalDevice.getSurfacePresentModesKHR(surface);
+
+    const auto swapSurfaceFormat = [&] -> vk::SurfaceFormat2KHR {
+        if (availableSurfaceFormats.size() == 1
+            && availableSurfaceFormats[0].surfaceFormat.format
+                   == vk::Format::eUndefined) {
+            return vk::SurfaceFormat2KHR{
+                {vk::Format::eB8G8R8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear}};
+        }
+
+        const auto preferredSurfaceFormats = std::array{
+            vk::SurfaceFormat2KHR{
+                {vk::Format::eB8G8R8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear}},
+            vk::SurfaceFormat2KHR{
+                {vk::Format::eR8G8B8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear}}};
+
+        for (const auto &preferredSurfaceFormat : preferredSurfaceFormats) {
+            for (const auto &availableSurfaceFormat : availableSurfaceFormats) {
+                if (preferredSurfaceFormat == availableSurfaceFormat) {
+                    return availableSurfaceFormat;
+                }
+            }
+        }
+        return availableSurfaceFormats.front();
+    }();
+
+    auto vSync = false;
+
+    const auto swapPresentMode = [&] {
+        if (vSync) {
+            return vk::PresentModeKHR::eFifo;
+        }
+
+        auto mailboxSupported   = false;
+        auto immediateSupported = false;
+
+        for (vk::PresentModeKHR mode : availablePresentModes) {
+            if (mode == vk::PresentModeKHR::eMailbox) {
+                mailboxSupported = true;
+            }
+
+            if (mode == vk::PresentModeKHR::eImmediate) {
+                immediateSupported = true;
+            }
+        }
+
+        if (mailboxSupported) {
+            return vk::PresentModeKHR::eMailbox;
+        }
+
+        if (immediateSupported) {
+            return vk::PresentModeKHR::eImmediate;
+        }
+
+        return vk::PresentModeKHR::eFifo;
+    }();
+
+    auto windowSize          = surfaceCapabilities.surfaceCapabilities.currentExtent;
+    auto minImageCount       = surfaceCapabilities.surfaceCapabilities.minImageCount;
+    auto preferredImageCount = std::max(3u, minImageCount);
+
+    // Handle the maxImageCount case where 0 means "no upper limit"
+    auto maxImageCount = (surfaceCapabilities.surfaceCapabilities.maxImageCount == 0)
+                           ? preferredImageCount
+                           : // No upper limit, use preferred
+                             surfaceCapabilities.surfaceCapabilities.maxImageCount;
+
+    // Clamp preferredImageCount to valid range [minImageCount, maxImageCount]
+    auto maxFramesInFlight =
+        std::clamp(preferredImageCount, minImageCount, maxImageCount);
+
+    // Store the chosen image format
+    auto imageFormat = swapSurfaceFormat.surfaceFormat.format;
+
+    // auto swapchain = device.createSwapchainKHR(
+    //     vk::SwapchainCreateInfoKHR{
+    //         {},
+    //         surface,
+    //         maxFramesInFlight,
+    //         imageFormat,
+    //         swapSurfaceFormat.surfaceFormat.colorSpace,
+    //         outWindowSize,
+    //         1,
+    //         vk::SharingMode::eExclusive});
+
+    static constexpr auto supportedExtensions =
+        fastgltf::Extensions::KHR_mesh_quantization
+        | fastgltf::Extensions::KHR_texture_transform
+        | fastgltf::Extensions::KHR_materials_variants;
+
+    fastgltf::Parser parser(supportedExtensions);
+
+    constexpr auto gltfOptions =
+        fastgltf::Options::DontRequireValidAssetMember | fastgltf::Options::AllowDouble
+        | fastgltf::Options::LoadExternalBuffers | fastgltf::Options::LoadExternalImages
+        | fastgltf::Options::GenerateMeshIndices;
+
+    auto path = std::filesystem::path(argv[1]);
+
+    auto gltfFile = fastgltf::GltfDataBuffer::FromPath(path);
+    if (!bool(gltfFile)) {
+        std::cerr << "Failed to open glTF file: "
+                  << fastgltf::getErrorMessage(gltfFile.error()) << '\n';
+        return EXIT_FAILURE;
+    }
+
+    auto asset = parser.loadGltf(gltfFile.get(), path.parent_path(), gltfOptions);
+
+    if (fastgltf::getErrorName(asset.error()) != "None") {
+        std::cerr << "Failed to load glTF: " << fastgltf::getErrorMessage(asset.error())
+                  << '\n';
+        return EXIT_FAILURE;
+    }
+
+    const auto descriptorSetLayoutBindings = std::array{
+        vk::DescriptorSetLayoutBinding{
+            0,
+            vk::DescriptorType::eUniformBuffer,
+            1,
+            vk::ShaderStageFlagBits::eVertex},
+        vk::DescriptorSetLayoutBinding{
+            1,
+            vk::DescriptorType::eCombinedImageSampler,
+            1,
+            vk::ShaderStageFlagBits::eFragment}};
+
+    auto descriptorSetLayout = device.createDescriptorSetLayout(
+        vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings});
+
+    // The stages used by this pipeline
+    const auto shaderStages = std::array{
+        vk::PipelineShaderStageCreateInfo{
+            {},
+            vk::ShaderStageFlagBits::eVertex,
+            {},
+            {},
+            {}},
+        vk::PipelineShaderStageCreateInfo{
+            {},
+            vk::ShaderStageFlagBits::eFragment,
+            {},
+            {},
+            {}},
+    };
+
+    struct Vertex {
+        fastgltf::math::fvec3 pos{};
+        fastgltf::math::fvec3 normal{};
+        fastgltf::math::fvec2 texCoord{};
+    };
+
+    const auto vertexBindingDescriptions =
+        std::array{vk::VertexInputBindingDescription{0, sizeof(Vertex)}};
+
+    const auto vertexAttributeDescriptions = std::array{
+        vk::VertexInputAttributeDescription{
+            0,
+            0,
+            vk::Format::eR32G32B32Sfloat,
+            offsetof(Vertex, pos)},
+        vk::VertexInputAttributeDescription{
+            1,
+            0,
+            vk::Format::eR32G32B32Sfloat,
+            offsetof(Vertex, normal)},
+        vk::VertexInputAttributeDescription{
+            2,
+            0,
+            vk::Format::eR32G32Sfloat,
+            offsetof(Vertex, texCoord)}};
+
+    const auto inputAssemblyCreateInfo = vk::PipelineInputAssemblyStateCreateInfo{
+        {},
+        vk::PrimitiveTopology::eTriangleList,
+        vk::Bool32{false}};
+
+    const auto dynamicStates = std::array{
+        vk::DynamicState::eViewportWithCount,
+        vk::DynamicState::eScissorWithCount};
+
+    const auto rasterizerStateCreateInfo = vk::PipelineRasterizationStateCreateInfo{
+        {},
+        {},
+        {},
+        vk::PolygonMode::eFill,
+        vk::CullModeFlags::BitsType::eNone,
+        vk::FrontFace::eCounterClockwise,
+        {},
+        {},
+        {},
+        {},
+        1.0f};
+
+    const auto colorBlendAttachmentState = vk::PipelineColorBlendAttachmentState{
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
+            | vk::ColorComponentFlagBits::eB};
+
+    const auto pipelineColorBlendStateCreateInfo =
+        vk::PipelineColorBlendStateCreateInfo{
+            {},
+            {},
+            vk::LogicOp::eCopy,
+            1,
+            &colorBlendAttachmentState};
+
+    auto pipelineLayout = device.createPipelineLayout(
+        vk::PipelineLayoutCreateInfo{{}, descriptorSetLayout});
+
+    std::vector<std::uint16_t> indices;
+    std::vector<Vertex>        vertices;
+
+    for (auto &mesh : asset->meshes) {
+        std::cerr << "Mesh is: <" << mesh.name << ">\n";
+        for (auto primitiveIt = mesh.primitives.begin();
+             primitiveIt != mesh.primitives.end();
+             ++primitiveIt) {
+
+            if (primitiveIt->indicesAccessor.has_value()) {
+                auto &indexAccessor =
+                    asset->accessors[primitiveIt->indicesAccessor.value()];
+                indices.resize(indexAccessor.count);
+
+                fastgltf::iterateAccessorWithIndex<std::uint16_t>(
+                    asset.get(),
+                    indexAccessor,
+                    [&](std::uint16_t index, std::size_t idx) {
+                        indices[idx] = index;
+                    });
+            }
+
+            auto positionIt = primitiveIt->findAttribute("POSITION");
+            auto normalIt   = primitiveIt->findAttribute("NORMAL");
+            auto texCoordIt = primitiveIt->findAttribute("TEXCOORD_0");
+
+            assert(positionIt != primitiveIt->attributes.end());
+            assert(normalIt != primitiveIt->attributes.end());
+            assert(texCoordIt != primitiveIt->attributes.end());
+
+            auto &positionAccessor = asset->accessors[positionIt->accessorIndex];
+            auto &normalAccessor   = asset->accessors[normalIt->accessorIndex];
+            auto &texCoordAccessor = asset->accessors[texCoordIt->accessorIndex];
+
+            vertices.resize(positionAccessor.count);
+
+            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+                asset.get(),
+                positionAccessor,
+                [&](fastgltf::math::fvec3 pos, std::size_t idx) {
+                    vertices[idx].pos = pos;
+                });
+
+            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+                asset.get(),
+                normalAccessor,
+                [&](fastgltf::math::fvec3 normal, std::size_t idx) {
+                    vertices[idx].normal = normal;
+                });
+
+            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
+                asset.get(),
+                texCoordAccessor,
+                [&](fastgltf::math::fvec2 texCoord, std::size_t idx) {
+                    vertices[idx].texCoord = texCoord;
+                });
+        }
+
+        break;
+    }
+
+    // std::vector<vk::raii::DescriptorSetLayout>  descriptorSetLayouts;
+    // std::vector<vk::PushConstantRange>          pushConstantRanges;
+    // std::vector<vk::DescriptorSetLayoutBinding> descriptorRanges;
+
+    // vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
+
+    // {
+    //     auto poolSizes               = std::array<vk::DescriptorPoolSize, 2>{};
+    //     poolSizes[0].type            = vk::DescriptorType::eUniformBuffer;
+    //     poolSizes[0].descriptorCount =
+    //     static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT); poolSizes[1].type =
+    //     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; poolSizes[1].descriptorCount =
+    //     static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    //
+    //     auto descriptorPoolInfo  = VkDescriptorPoolCreateInfo{};
+    //     descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    //     descriptorPoolInfo.poolSizeCount =
+    //     static_cast<uint32_t>(poolSizes.size()); descriptorPoolInfo.pPoolSizes =
+    //     poolSizes.data(); descriptorPoolInfo.maxSets       =
+    //     static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT); descriptorPoolInfo.flags =
+    //     0;
+    //
+    //     auto descriptorPool = VkDescriptorPool{};
+    //     if (vkCreateDescriptorPool(logicalDevice, &descriptorPoolInfo, nullptr,
+    //                                &descriptorPool)
+    //         != VK_SUCCESS) {
+    //         throw std::runtime_error("failed to create descriptor pool.");
+    //     }
+    //
+    //     return descriptorPool;
+    // }
+    // ();
+    //
+    // auto descriptorSetLayout = [logicalDevice] -> VkDescriptorSetLayout {
+    //     auto uboLayoutBinding               = VkDescriptorSetLayoutBinding{};
+    //     uboLayoutBinding.binding            = 0;
+    //     uboLayoutBinding.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    //     uboLayoutBinding.descriptorCount    = 1;
+    //     uboLayoutBinding.pImmutableSamplers = nullptr;
+    //     uboLayoutBinding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;
+    //
+    //     auto samplerLayoutBinding            = VkDescriptorSetLayoutBinding{};
+    //     samplerLayoutBinding.binding         = 1;
+    //     samplerLayoutBinding.descriptorCount = 1;
+    //     samplerLayoutBinding.descriptorType =
+    //     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    //     samplerLayoutBinding.pImmutableSamplers = nullptr;
+    //     samplerLayoutBinding.stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT;
+    //
+    //     auto bindings = std::vector{uboLayoutBinding, samplerLayoutBinding};
+    //
+    //     auto layoutInfo         = VkDescriptorSetLayoutCreateInfo{};
+    //     layoutInfo.sType        =
+    //     VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    //     layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    //     layoutInfo.pBindings    = bindings.data();
+    //
+    //     auto descriptorSetLayout = VkDescriptorSetLayout{};
+    //     if (vkCreateDescriptorSetLayout(logicalDevice, &layoutInfo, nullptr,
+    //                                     &descriptorSetLayout)
+    //         != VK_SUCCESS) {
+    //         throw std::runtime_error("failed to create descriptor set layout.");
+    //     }
+    //
+    //     return descriptorSetLayout;
+    // }();
+    //
+    // auto descriptorSets = [logicalDevice, descriptorPool,
+    //                        descriptorSetLayout] -> std::vector<VkDescriptorSet> {
+    //     auto layouts       = std::vector(MAX_FRAMES_IN_FLIGHT,
+    //     descriptorSetLayout); auto allocateInfo  = VkDescriptorSetAllocateInfo{};
+    //     allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    //     allocateInfo.descriptorPool     = descriptorPool;
+    //     allocateInfo.descriptorSetCount =
+    //     static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT); allocateInfo.pSetLayouts =
+    //     layouts.data();
+    //
+    //     auto descriptorSets = std::vector<VkDescriptorSet>{};
+    //     descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+    //     if (vkAllocateDescriptorSets(logicalDevice, &allocateInfo,
+    //                                  descriptorSets.data())
+    //         != VK_SUCCESS) {
+    //         throw std::runtime_error("failed to allocate descriptors.");
+    //     }
+    //
+    //     return descriptorSets;
+    // }();
+    //
     // --- Main loop (minimal)
     bool      running = true;
     SDL_Event e;
