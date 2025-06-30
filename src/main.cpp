@@ -318,9 +318,7 @@ auto main(int argc, char *argv[]) -> int
             1,
             &colorBlendAttachmentState};
 
-    vk::PipelineLayoutCreateInfo ppll = {{}, descriptorSetLayout};
-
-    auto pipelineLayout = vk::raii::PipelineLayout{device, {{}, descriptorSetLayout}};
+    auto pipelineLayout = vk::raii::PipelineLayout{device, {{}, *descriptorSetLayout}};
 
     std::vector<std::uint16_t> indices;
     std::vector<Vertex>        vertices;
