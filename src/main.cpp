@@ -15,8 +15,6 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #include <fastgltf/tools.hpp>
 #include <fastgltf/types.hpp>
 
-#include <SPIRV-Reflect/spirv_reflect.h>
-
 #include <VkBootstrap.h>
 
 #include <SDL3/SDL.h>
@@ -182,8 +180,6 @@ auto main(int argc, char *argv[]) -> int
                 .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
         .set_desired_min_image_count(3)
         .build();
-
-    SpvReflectShaderModule reflectModule;
 
     static constexpr auto supportedExtensions =
         fastgltf::Extensions::KHR_mesh_quantization
