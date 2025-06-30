@@ -236,7 +236,7 @@ auto main(int argc, char *argv[]) -> int
         return EXIT_FAILURE;
     }
 
-    auto shader_spv = readShaders("vk_min.spv");
+    auto shader_spv = readShaders(argv[2]);
     auto module     = SpvReflectShaderModule{};
 
     auto result =
