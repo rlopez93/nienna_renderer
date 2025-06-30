@@ -1,27 +1,6 @@
-#include <fastgltf/core.hpp>
-#include <fastgltf/math.hpp>
-#include <fastgltf/tools.hpp>
-#include <fastgltf/types.hpp>
-
-#include <slang/slang-com-ptr.h>
-#include <slang/slang.h>
-
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
-// #include <vulkan/vulkan_enums.hpp>
-#include <vulkan/vulkan_extension_inspection.hpp>
-// #include <vulkan/vulkan_format_traits.hpp>
-// #include <vulkan/vulkan_funcs.hpp>
-// #include <vulkan/vulkan_handles.hpp>
-// #include <vulkan/vulkan_hash.hpp>
-// #include <vulkan/vulkan_hpp_macros.hpp>
-// #include <vulkan/vulkan_profiles.hpp>
-// #include <vulkan/vulkan_shared.hpp>
-// #include <vulkan/vulkan_static_assertions.hpp>
-// #include <vulkan/vulkan_structs.hpp>
-// #include <vulkan/vulkan_to_string.hpp>
-// #include <vulkan/vulkan_video.hpp>
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 
@@ -30,6 +9,13 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
 #define VMA_USE_STL_CONTAINERS 1
 #include <vma/vk_mem_alloc.h>
+
+#include <fastgltf/core.hpp>
+#include <fastgltf/math.hpp>
+#include <fastgltf/tools.hpp>
+#include <fastgltf/types.hpp>
+
+#include <SPIRV-Reflect/spirv_reflect.h>
 
 #include <VkBootstrap.h>
 
@@ -43,8 +29,6 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
-
-static SDL_Window *window = nullptr;
 
 auto main(int argc, char *argv[]) -> int
 {
@@ -119,16 +103,14 @@ auto main(int argc, char *argv[]) -> int
     VULKAN_HPP_DEFAULT_DISPATCHER.init();
     VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
 
-    vk::SurfaceKHR surface;
-    // --- Create Vulkan surface with SDL3
-    {
+    auto surface = [&] -> vk::SurfaceKHR {
         VkSurfaceKHR surface_vk;
         if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface_vk)) {
             std::cerr << "SDL_Vulkan_CreateSurface failed\n";
-            return -1;
+            return nullptr;
         }
-        surface = surface_vk;
-    }
+        return surface_vk;
+    }();
 
     // --- Pick physical device and create logical device using vk-bootstrap
     vkb::PhysicalDeviceSelector selector{vkb_inst};
@@ -167,34 +149,6 @@ auto main(int argc, char *argv[]) -> int
     VmaVulkanFunctions vulkanFunctions    = {};
     vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
     vulkanFunctions.vkGetDeviceProcAddr   = vkGetDeviceProcAddr;
-    // vulkanFunctions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
-    // vulkanFunctions.vkGetPhysicalDeviceMemoryProperties =
-    //     vkGetPhysicalDeviceMemoryProperties;
-    // vulkanFunctions.vkAllocateMemory                  = vkAllocateMemory;
-    // vulkanFunctions.vkFreeMemory                      = vkFreeMemory;
-    // vulkanFunctions.vkMapMemory                       = vkMapMemory;
-    // vulkanFunctions.vkUnmapMemory                     = vkUnmapMemory;
-    // vulkanFunctions.vkFlushMappedMemoryRanges         = vkFlushMappedMemoryRanges;
-    // vulkanFunctions.vkInvalidateMappedMemoryRanges    =
-    // vkInvalidateMappedMemoryRanges; vulkanFunctions.vkBindBufferMemory =
-    // vkBindBufferMemory; vulkanFunctions.vkBindImageMemory                 =
-    // vkBindImageMemory; vulkanFunctions.vkGetBufferMemoryRequirements     =
-    // vkGetBufferMemoryRequirements; vulkanFunctions.vkGetImageMemoryRequirements =
-    // vkGetImageMemoryRequirements; vulkanFunctions.vkCreateBuffer                    =
-    // vkCreateBuffer; vulkanFunctions.vkDestroyBuffer                   =
-    // vkDestroyBuffer; vulkanFunctions.vkCreateImage                     =
-    // vkCreateImage; vulkanFunctions.vkDestroyImage                    =
-    // vkDestroyImage; vulkanFunctions.vkCmdCopyBuffer                   =
-    // vkCmdCopyBuffer; vulkanFunctions.vkGetBufferMemoryRequirements2KHR =
-    // vkGetBufferMemoryRequirements2; vulkanFunctions.vkGetImageMemoryRequirements2KHR
-    // = vkGetImageMemoryRequirements2; vulkanFunctions.vkBindBufferMemory2KHR =
-    // vkBindBufferMemory2; vulkanFunctions.vkBindImageMemory2KHR             =
-    // vkBindImageMemory2; vulkanFunctions.vkGetPhysicalDeviceMemoryProperties2KHR =
-    //     vkGetPhysicalDeviceMemoryProperties2;
-    // vulkanFunctions.vkGetDeviceBufferMemoryRequirements =
-    //     vkGetDeviceBufferMemoryRequirements;
-    // vulkanFunctions.vkGetDeviceImageMemoryRequirements =
-    //     vkGetDeviceImageMemoryRequirements;
 
     VmaAllocatorCreateInfo allocatorCreateInfo = {};
     allocatorCreateInfo.physicalDevice         = physicalDevice;
@@ -211,101 +165,25 @@ auto main(int argc, char *argv[]) -> int
         return -1;
     }
 
-    int w, h;
-    SDL_GetWindowSize(window, &w, &h);
-    vk::Extent2D outWindowSize;
+    vkb::SwapchainBuilder swap_builder{vkb_device};
+    swap_builder
+        .set_image_usage_flags(
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+        .set_desired_present_mode(VK_PRESENT_MODE_MAILBOX_KHR)
+        .add_fallback_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR)
+        .add_fallback_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+        .set_desired_format(
+            VkSurfaceFormatKHR{
+                .format     = VK_FORMAT_B8G8R8A8_UNORM,
+                .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
+        .add_fallback_format(
+            VkSurfaceFormatKHR{
+                .format     = VK_FORMAT_R8G8B8A8_SNORM,
+                .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
+        .set_desired_min_image_count(3)
+        .build();
 
-    const auto surfaceCapabilities = physicalDevice.getSurfaceCapabilities2KHR(
-        vk::PhysicalDeviceSurfaceInfo2KHR{surface});
-
-    const auto availableSurfaceFormats = physicalDevice.getSurfaceFormats2KHR(
-        vk::PhysicalDeviceSurfaceInfo2KHR{surface});
-
-    const auto availablePresentModes =
-        physicalDevice.getSurfacePresentModesKHR(surface);
-
-    const auto swapSurfaceFormat = [&] -> vk::SurfaceFormat2KHR {
-        if (availableSurfaceFormats.size() == 1
-            && availableSurfaceFormats[0].surfaceFormat.format
-                   == vk::Format::eUndefined) {
-            return vk::SurfaceFormat2KHR{
-                {vk::Format::eB8G8R8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear}};
-        }
-
-        const auto preferredSurfaceFormats = std::array{
-            vk::SurfaceFormat2KHR{
-                {vk::Format::eB8G8R8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear}},
-            vk::SurfaceFormat2KHR{
-                {vk::Format::eR8G8B8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear}}};
-
-        for (const auto &preferredSurfaceFormat : preferredSurfaceFormats) {
-            for (const auto &availableSurfaceFormat : availableSurfaceFormats) {
-                if (preferredSurfaceFormat == availableSurfaceFormat) {
-                    return availableSurfaceFormat;
-                }
-            }
-        }
-        return availableSurfaceFormats.front();
-    }();
-
-    auto vSync = false;
-
-    const auto swapPresentMode = [&] {
-        if (vSync) {
-            return vk::PresentModeKHR::eFifo;
-        }
-
-        auto mailboxSupported   = false;
-        auto immediateSupported = false;
-
-        for (vk::PresentModeKHR mode : availablePresentModes) {
-            if (mode == vk::PresentModeKHR::eMailbox) {
-                mailboxSupported = true;
-            }
-
-            if (mode == vk::PresentModeKHR::eImmediate) {
-                immediateSupported = true;
-            }
-        }
-
-        if (mailboxSupported) {
-            return vk::PresentModeKHR::eMailbox;
-        }
-
-        if (immediateSupported) {
-            return vk::PresentModeKHR::eImmediate;
-        }
-
-        return vk::PresentModeKHR::eFifo;
-    }();
-
-    auto windowSize          = surfaceCapabilities.surfaceCapabilities.currentExtent;
-    auto minImageCount       = surfaceCapabilities.surfaceCapabilities.minImageCount;
-    auto preferredImageCount = std::max(3u, minImageCount);
-
-    // Handle the maxImageCount case where 0 means "no upper limit"
-    auto maxImageCount = (surfaceCapabilities.surfaceCapabilities.maxImageCount == 0)
-                           ? preferredImageCount
-                           : // No upper limit, use preferred
-                             surfaceCapabilities.surfaceCapabilities.maxImageCount;
-
-    // Clamp preferredImageCount to valid range [minImageCount, maxImageCount]
-    auto maxFramesInFlight =
-        std::clamp(preferredImageCount, minImageCount, maxImageCount);
-
-    // Store the chosen image format
-    auto imageFormat = swapSurfaceFormat.surfaceFormat.format;
-
-    // auto swapchain = device.createSwapchainKHR(
-    //     vk::SwapchainCreateInfoKHR{
-    //         {},
-    //         surface,
-    //         maxFramesInFlight,
-    //         imageFormat,
-    //         swapSurfaceFormat.surfaceFormat.colorSpace,
-    //         outWindowSize,
-    //         1,
-    //         vk::SharingMode::eExclusive});
+    SpvReflectShaderModule reflectModule;
 
     static constexpr auto supportedExtensions =
         fastgltf::Extensions::KHR_mesh_quantization
