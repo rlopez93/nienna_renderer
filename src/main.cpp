@@ -30,11 +30,35 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #include <filesystem>
 #include <iostream>
 
+auto readShaders(const std::string &filename) -> std::vector<char>;
+
+auto readShaders(const std::string &filename) -> std::vector<char>
+{
+    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+    if (!file.is_open()) {
+        throw std::runtime_error("failed to open file.");
+    }
+
+    auto fileSize = file.tellg();
+    auto buffer   = std::vector<char>(fileSize);
+
+    file.seekg(0);
+    file.read(buffer.data(), fileSize);
+    file.close();
+
+    return buffer;
+}
+
 auto main(int argc, char *argv[]) -> int
 {
+    std::string filename;
     if (argc < 2) {
-        std::cerr << "Oof ouchie, need a gltf file, ouchie owie\n";
-        return EXIT_FAILURE;
+        filename = "resources/Duck/glTF/Duck.gltf";
+    }
+
+    else {
+        filename = argv[1];
     }
 
     // --- SDL3 Init
@@ -183,8 +207,6 @@ auto main(int argc, char *argv[]) -> int
         .set_desired_min_image_count(3)
         .build();
 
-    SpvReflectShaderModule reflectModule;
-
     static constexpr auto supportedExtensions =
         fastgltf::Extensions::KHR_mesh_quantization
         | fastgltf::Extensions::KHR_texture_transform
@@ -197,7 +219,7 @@ auto main(int argc, char *argv[]) -> int
         | fastgltf::Options::LoadExternalBuffers | fastgltf::Options::LoadExternalImages
         | fastgltf::Options::GenerateMeshIndices;
 
-    auto path = std::filesystem::path(argv[1]);
+    auto path = std::filesystem::path(filename);
 
     auto gltfFile = fastgltf::GltfDataBuffer::FromPath(path);
     if (!bool(gltfFile)) {
@@ -213,6 +235,14 @@ auto main(int argc, char *argv[]) -> int
                   << '\n';
         return EXIT_FAILURE;
     }
+
+    auto shader_spv = readShaders("vk_min.spv");
+    auto module     = SpvReflectShaderModule{};
+
+    auto result =
+        spvReflectCreateShaderModule(sizeof(shader_spv), shader_spv.data(), &module);
+
+    assert(result == SPV_REFLECT_RESULT_SUCCESS);
 
     const auto descriptorSetLayoutBindings = std::array{
         vk::DescriptorSetLayoutBinding{
