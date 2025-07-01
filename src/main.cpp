@@ -60,6 +60,10 @@ auto main(int argc, char *argv[]) -> int
     else {
         filename = argv[1];
     }
+    vk::raii::Context context;
+
+    auto gltf_path = (argc < 2) ? std::filesystem::path{"resources/Duck/glTF/Duck.gltf"}
+                                : std::filesystem::path{argv[1]};
 
     // --- SDL3 Init
     if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -121,26 +125,28 @@ auto main(int argc, char *argv[]) -> int
         return -1;
     }
 
-    vkb::Instance vkb_inst = inst_ret.value();
-    vk::Instance  instance = vkb_inst.instance;
+    auto vkb_inst = vkb::Instance{inst_ret.value()};
+    auto instance = vk::raii::Instance{context, vkb_inst.instance};
+    auto debugUtils =
+        vk::raii::DebugUtilsMessengerEXT{instance, vkb_inst.debug_messenger};
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init();
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
+    // VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
 
-    auto surface = [&] -> vk::SurfaceKHR {
+    auto surface = [&] -> vk::raii::SurfaceKHR {
         VkSurfaceKHR surface_vk;
-        if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface_vk)) {
+        if (!SDL_Vulkan_CreateSurface(window, *instance, nullptr, &surface_vk)) {
             std::cerr << "SDL_Vulkan_CreateSurface failed\n";
             return nullptr;
         }
-        return surface_vk;
+        return {instance, surface_vk};
     }();
 
     // --- Pick physical device and create logical device using vk-bootstrap
     vkb::PhysicalDeviceSelector selector{vkb_inst};
 
     auto phys_ret =
-        selector.set_surface(surface)
+        selector.set_surface(*surface)
             .add_required_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)
             .add_required_extension(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME)
             .add_required_extension(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME)
@@ -156,7 +162,8 @@ auto main(int argc, char *argv[]) -> int
         return -1;
     }
 
-    vkb::PhysicalDevice vkb_phys = phys_ret.value();
+    auto vkb_phys       = phys_ret.value();
+    auto physicalDevice = vk::raii::PhysicalDevice(instance, vkb_phys.physical_device);
 
     vkb::DeviceBuilder dev_builder{vkb_phys};
     auto               dev_ret = dev_builder.build();
@@ -166,18 +173,17 @@ auto main(int argc, char *argv[]) -> int
         return -1;
     }
 
-    vkb::Device        vkb_device     = dev_ret.value();
-    vk::Device         device         = vkb_device.device;
-    vk::PhysicalDevice physicalDevice = vkb_phys.physical_device;
+    auto vkb_device = dev_ret.value();
+    auto device     = vk::raii::Device(physicalDevice, vkb_device.device);
 
     VmaVulkanFunctions vulkanFunctions    = {};
     vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
     vulkanFunctions.vkGetDeviceProcAddr   = vkGetDeviceProcAddr;
 
     VmaAllocatorCreateInfo allocatorCreateInfo = {};
-    allocatorCreateInfo.physicalDevice         = physicalDevice;
-    allocatorCreateInfo.device                 = device;
-    allocatorCreateInfo.instance               = instance;
+    allocatorCreateInfo.physicalDevice         = *physicalDevice;
+    allocatorCreateInfo.device                 = *device;
+    allocatorCreateInfo.instance               = *instance;
     allocatorCreateInfo.vulkanApiVersion       = VK_API_VERSION_1_4;
     allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT
                               | VMA_ALLOCATOR_CREATE_EXT_MEMORY_PRIORITY_BIT;
@@ -190,22 +196,32 @@ auto main(int argc, char *argv[]) -> int
     }
 
     vkb::SwapchainBuilder swap_builder{vkb_device};
-    swap_builder
-        .set_image_usage_flags(
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-        .set_desired_present_mode(VK_PRESENT_MODE_MAILBOX_KHR)
-        .add_fallback_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR)
-        .add_fallback_present_mode(VK_PRESENT_MODE_FIFO_KHR)
-        .set_desired_format(
-            VkSurfaceFormatKHR{
-                .format     = VK_FORMAT_B8G8R8A8_UNORM,
-                .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
-        .add_fallback_format(
-            VkSurfaceFormatKHR{
-                .format     = VK_FORMAT_R8G8B8A8_SNORM,
-                .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
-        .set_desired_min_image_count(3)
-        .build();
+    auto                  swap_ret =
+        swap_builder
+            .set_image_usage_flags(
+                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+            .set_desired_present_mode(VK_PRESENT_MODE_MAILBOX_KHR)
+            .add_fallback_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR)
+            .add_fallback_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+            .set_desired_format(
+                VkSurfaceFormatKHR{
+                    .format     = VK_FORMAT_B8G8R8A8_UNORM,
+                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
+            .add_fallback_format(
+                VkSurfaceFormatKHR{
+                    .format     = VK_FORMAT_R8G8B8A8_SNORM,
+                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
+            .set_desired_min_image_count(3)
+            .build();
+
+    if (!swap_ret) {
+        std::cerr << "Failed to create swapchain: " << swap_ret.error().message()
+                  << "\n";
+        return -1;
+    }
+
+    auto vkb_swapchain = swap_ret.value();
+    auto swapchain     = vk::raii::SwapchainKHR(device, vkb_swapchain.swapchain);
 
     static constexpr auto supportedExtensions =
         fastgltf::Extensions::KHR_mesh_quantization
@@ -221,14 +237,14 @@ auto main(int argc, char *argv[]) -> int
 
     auto path = std::filesystem::path(filename);
 
-    auto gltfFile = fastgltf::GltfDataBuffer::FromPath(path);
+    auto gltfFile = fastgltf::GltfDataBuffer::FromPath(gltf_path);
     if (!bool(gltfFile)) {
         std::cerr << "Failed to open glTF file: "
                   << fastgltf::getErrorMessage(gltfFile.error()) << '\n';
         return EXIT_FAILURE;
     }
 
-    auto asset = parser.loadGltf(gltfFile.get(), path.parent_path(), gltfOptions);
+    auto asset = parser.loadGltf(gltfFile.get(), gltf_path.parent_path(), gltfOptions);
 
     if (fastgltf::getErrorName(asset.error()) != "None") {
         std::cerr << "Failed to load glTF: " << fastgltf::getErrorMessage(asset.error())
@@ -343,8 +359,8 @@ auto main(int argc, char *argv[]) -> int
             1,
             vk::ShaderStageFlagBits::eFragment}};
 
-    auto descriptorSetLayout = device.createDescriptorSetLayout(
-        vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings});
+    auto descriptorSetLayout =
+        vk::raii::DescriptorSetLayout{device, vk::DescriptorSetLayoutCreateInfo{}};
 
     // The stages used by this pipeline
     const auto shaderStages = std::array{
@@ -429,8 +445,7 @@ auto main(int argc, char *argv[]) -> int
             1,
             &colorBlendAttachmentState};
 
-    auto pipelineLayout = device.createPipelineLayout(
-        vk::PipelineLayoutCreateInfo{{}, descriptorSetLayout});
+    auto pipelineLayout = vk::raii::PipelineLayout{device, {{}, *descriptorSetLayout}};
 
     std::vector<std::uint16_t> indices;
     std::vector<Vertex>        vertices;
@@ -595,7 +610,6 @@ auto main(int argc, char *argv[]) -> int
 
     // --- Cleanup
     vmaDestroyAllocator(allocator);
-    vkDestroySurfaceKHR(instance, surface, nullptr);
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;
