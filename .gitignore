@@ -2,4 +2,4 @@ Debug/
 .cache/
 compile_commands.json
 vk_minimal_latest.txt
-Debug-FastGLTF/
+build/
