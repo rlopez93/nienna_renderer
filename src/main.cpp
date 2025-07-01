@@ -237,12 +237,99 @@ auto main(int argc, char *argv[]) -> int
     }
 
     auto shader_spv = readShaders(argv[2]);
-    auto module     = SpvReflectShaderModule{};
 
-    auto result =
-        spvReflectCreateShaderModule(sizeof(shader_spv), shader_spv.data(), &module);
+    spv_reflect::ShaderModule reflection(shader_spv.size(), shader_spv.data());
 
+    if (reflection.GetResult() != SPV_REFLECT_RESULT_SUCCESS) {
+        std::cerr << "ERROR: could not process '" << argv[2]
+                  << "' (is it a valid SPIR-V bytecode?)" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    auto &shaderModule = reflection.GetShaderModule();
+
+    const auto entry_point_name = std::string{shaderModule.entry_point_name};
+
+    auto result = SPV_REFLECT_RESULT_NOT_READY;
+    auto count  = uint32_t{0};
+
+    auto variables = std::vector<SpvReflectInterfaceVariable *>{};
+    auto bindings  = std::vector<SpvReflectDescriptorBinding *>{};
+    auto sets      = std::vector<SpvReflectDescriptorSet *>{};
+
+    result = reflection.EnumerateDescriptorBindings(&count, nullptr);
     assert(result == SPV_REFLECT_RESULT_SUCCESS);
+    bindings.resize(count);
+
+    result = reflection.EnumerateDescriptorBindings(&count, bindings.data());
+    assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+    auto ToStringDescriptorType = [](SpvReflectDescriptorType value) -> std::string {
+        switch (value) {
+        case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
+            return "VK_DESCRIPTOR_TYPE_SAMPLER";
+        case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+            return "VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER";
+        case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+            return "VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE";
+        case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+            return "VK_DESCRIPTOR_TYPE_STORAGE_IMAGE";
+        case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+            return "VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER";
+        case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
+            return "VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER";
+        case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+            return "VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER";
+        case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+            return "VK_DESCRIPTOR_TYPE_STORAGE_BUFFER";
+        case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
+            return "VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC";
+        case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
+            return "VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC";
+        case SPV_REFLECT_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+            return "VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT";
+        case SPV_REFLECT_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
+            return "VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR";
+        }
+        // unhandled SpvReflectDescriptorType enum value
+        return "VK_DESCRIPTOR_TYPE_???";
+    };
+
+    auto ToStringResourceType = [](SpvReflectResourceType res_type) -> std::string {
+        switch (res_type) {
+        case SPV_REFLECT_RESOURCE_FLAG_UNDEFINED:
+            return "UNDEFINED";
+        case SPV_REFLECT_RESOURCE_FLAG_SAMPLER:
+            return "SAMPLER";
+        case SPV_REFLECT_RESOURCE_FLAG_CBV:
+            return "CBV";
+        case SPV_REFLECT_RESOURCE_FLAG_SRV:
+            return "SRV";
+        case SPV_REFLECT_RESOURCE_FLAG_UAV:
+            return "UAV";
+        }
+        // unhandled SpvReflectResourceType enum value
+        return "???";
+    };
+
+    for (auto p_binding : bindings) {
+        assert(result == SPV_REFLECT_RESULT_SUCCESS);
+        auto binding_name    = p_binding->name;
+        auto descriptor_type = ToStringDescriptorType(p_binding->descriptor_type);
+        auto resource_type   = ToStringResourceType(p_binding->resource_type);
+        if ((p_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+            || (p_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+            || (p_binding->descriptor_type
+                == SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER)
+            || (p_binding->descriptor_type
+                == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)) {
+            auto dim     = p_binding->image.dim;
+            auto depth   = p_binding->image.depth;
+            auto arrayed = p_binding->image.arrayed;
+            auto ms      = p_binding->image.ms;
+            auto sampled = p_binding->image.sampled;
+        }
+    }
 
     const auto descriptorSetLayoutBindings = std::array{
         vk::DescriptorSetLayoutBinding{
