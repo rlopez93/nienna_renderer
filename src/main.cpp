@@ -69,20 +69,20 @@ auto main(int argc, char *argv[]) -> int
 
     // --- SDL3 Init
     if (!SDL_Init(SDL_INIT_VIDEO)) {
-        std::cerr << "SDL_Init Error: " << SDL_GetError() << "\n";
+        fmt::print(stderr, "SDL_Init Error: {}\n", SDL_GetError());
         return -1;
     }
 
     // --- Create Window with Vulkan flag
     SDL_Window *window = SDL_CreateWindow("Vulkan + SDL3", 800, 600, SDL_WINDOW_VULKAN);
     if (!window) {
-        std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << "\n";
+        fmt::print(stderr, "SDL_CreateWindow Error: {}\n", SDL_GetError());
         return -1;
     }
 
     // --- Load Vulkan library
     if (!SDL_Vulkan_LoadLibrary(nullptr)) {
-        std::cerr << "SDL_Vulkan_LoadLibrary Error: " << SDL_GetError() << "\n";
+        fmt::print(stderr, "SDL_Vulkan_LoadLibrary Error: {}\n", SDL_GetError());
         return -1;
     }
 
@@ -102,8 +102,10 @@ auto main(int argc, char *argv[]) -> int
             SDL_Vulkan_GetInstanceExtensions(&sdl_extensions_count);
 
         if (sdl_instance_extensions == nullptr) {
-            std::cerr << "SDL_Vulkan_GetInstanceExtensions failed:" << SDL_GetError()
-                      << "\n";
+            fmt::print(
+                stderr,
+                "SDL_Vulkan_GetInstanceExtensions Error: {}\n",
+                SDL_GetError());
             return -1;
         }
         instance_extensions.insert(
@@ -122,8 +124,10 @@ auto main(int argc, char *argv[]) -> int
                         .build();
 
     if (!inst_ret) {
-        std::cerr << "vk-bootstrap instance creation failed: "
-                  << inst_ret.error().message() << "\n";
+        fmt::print(
+            stderr,
+            "vk-bootstrap instance creation failed: {}\n",
+            inst_ret.error().message());
         return -1;
     }
 
@@ -138,7 +142,7 @@ auto main(int argc, char *argv[]) -> int
     auto surface = [&] -> vk::raii::SurfaceKHR {
         VkSurfaceKHR surface_vk;
         if (!SDL_Vulkan_CreateSurface(window, *instance, nullptr, &surface_vk)) {
-            std::cerr << "SDL_Vulkan_CreateSurface failed\n";
+            fmt::print(stderr, "SDL_Vulkan_CreateSurface failed: {}\n", SDL_GetError());
             return nullptr;
         }
         return {instance, surface_vk};
@@ -159,8 +163,10 @@ auto main(int argc, char *argv[]) -> int
             .select();
 
     if (!phys_ret) {
-        std::cerr << "Failed to select physical device: " << phys_ret.error().message()
-                  << "\n";
+        fmt::print(
+            stderr,
+            "vk-bootstrap failed to select physical device: {}\n",
+            phys_ret.error().message());
         return -1;
     }
 
@@ -170,8 +176,10 @@ auto main(int argc, char *argv[]) -> int
     vkb::DeviceBuilder dev_builder{vkb_phys};
     auto               dev_ret = dev_builder.build();
     if (!dev_ret) {
-        std::cerr << "Failed to create logical device: " << dev_ret.error().message()
-                  << "\n";
+        fmt::print(
+            stderr,
+            "vk-bootstrap failed to create logical device: {}\n",
+            dev_ret.error().message());
         return -1;
     }
 
@@ -193,7 +201,7 @@ auto main(int argc, char *argv[]) -> int
 
     VmaAllocator allocator;
     if (vmaCreateAllocator(&allocatorCreateInfo, &allocator) != VK_SUCCESS) {
-        std::cerr << "Failed to create VMA allocator\n";
+        fmt::print(stderr, "Failed to create VMA allocator\n");
         return -1;
     }
 
@@ -217,8 +225,10 @@ auto main(int argc, char *argv[]) -> int
             .build();
 
     if (!swap_ret) {
-        std::cerr << "Failed to create swapchain: " << swap_ret.error().message()
-                  << "\n";
+        fmt::print(
+            stderr,
+            "vk-bootstrap failed to create swapchain: {}",
+            swap_ret.error().message());
         return -1;
     }
 
@@ -241,16 +251,20 @@ auto main(int argc, char *argv[]) -> int
 
     auto gltfFile = fastgltf::GltfDataBuffer::FromPath(gltf_path);
     if (!bool(gltfFile)) {
-        std::cerr << "Failed to open glTF file: "
-                  << fastgltf::getErrorMessage(gltfFile.error()) << '\n';
+        fmt::print(
+            stderr,
+            "Failed to open glTF file: {}\n",
+            fastgltf::getErrorMessage(gltfFile.error()));
         return EXIT_FAILURE;
     }
 
     auto asset = parser.loadGltf(gltfFile.get(), gltf_path.parent_path(), gltfOptions);
 
     if (fastgltf::getErrorName(asset.error()) != "None") {
-        std::cerr << "Failed to load glTF: " << fastgltf::getErrorMessage(asset.error())
-                  << '\n';
+        fmt::print(
+            stderr,
+            "Failed to open glTF file: {}\n",
+            fastgltf::getErrorMessage(gltfFile.error()));
         return EXIT_FAILURE;
     }
 
@@ -259,8 +273,10 @@ auto main(int argc, char *argv[]) -> int
     spv_reflect::ShaderModule reflection(shader_spv.size(), shader_spv.data());
 
     if (reflection.GetResult() != SPV_REFLECT_RESULT_SUCCESS) {
-        std::cerr << "ERROR: could not process '" << argv[2]
-                  << "' (is it a valid SPIR-V bytecode?)" << std::endl;
+        fmt::print(
+            stderr,
+            "ERROR: could not process '{}' (is it a valid SPIR-V bytecode?)\n",
+            argv[2]);
         return EXIT_FAILURE;
     }
 
@@ -453,7 +469,7 @@ auto main(int argc, char *argv[]) -> int
     std::vector<Vertex>        vertices;
 
     for (auto &mesh : asset->meshes) {
-        std::cerr << "Mesh is: <" << mesh.name << ">\n";
+        fmt::print(stderr, "Mesh is: <{}>\n", mesh.name);
         for (auto primitiveIt = mesh.primitives.begin();
              primitiveIt != mesh.primitives.end();
              ++primitiveIt) {
