@@ -8,6 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(Vulkan REQUIRED)
 find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
+find_package(fmt REQUIRED)
 
 add_executable(nienna src/main.cpp)
 
@@ -33,6 +34,7 @@ target_link_libraries(nienna PRIVATE
     Vulkan::Vulkan
     vk-bootstrap::vk-bootstrap
     fastgltf::fastgltf
+    fmt::fmt
     spirv_reflect
 )
 
@@ -44,7 +46,7 @@ if(NOT Vulkan_SLANGC_EXECUTABLE)
     )
 endif()
 
-if( Vulkan_SLANGC_EXECUTABLE)
+if(Vulkan_SLANGC_EXECUTABLE)
 
     set(SLANG_FLAGS
         -profile sm_6_6+spirv_1_6
