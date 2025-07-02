@@ -173,8 +173,8 @@ auto main(int argc, char *argv[]) -> int
     auto vkb_phys       = phys_ret.value();
     auto physicalDevice = vk::raii::PhysicalDevice(instance, vkb_phys.physical_device);
 
-    vkb::DeviceBuilder dev_builder{vkb_phys};
-    auto               dev_ret = dev_builder.build();
+    auto dev_builder = vkb::DeviceBuilder{vkb_phys};
+    auto dev_ret     = dev_builder.build();
     if (!dev_ret) {
         fmt::print(
             stderr,
@@ -205,8 +205,8 @@ auto main(int argc, char *argv[]) -> int
         return -1;
     }
 
-    vkb::SwapchainBuilder swap_builder{vkb_device};
-    auto                  swap_ret =
+    auto swap_builder = vkb::SwapchainBuilder{vkb_device};
+    auto swap_ret =
         swap_builder
             .set_image_usage_flags(
                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
@@ -234,6 +234,25 @@ auto main(int argc, char *argv[]) -> int
 
     auto vkb_swapchain = swap_ret.value();
     auto swapchain     = vk::raii::SwapchainKHR(device, vkb_swapchain.swapchain);
+
+    fmt::print(stderr, "swapchain image count: {}\n", vkb_swapchain.image_count);
+
+    // get swapchain images
+
+    auto images         = swapchain.getImages();
+    auto imageViews     = std::vector<vk::raii::ImageView>{};
+    auto imageAvailable = std::vector<vk::raii::Semaphore>{};
+    auto renderFinished = std::vector<vk::raii::Semaphore>{};
+
+    for (auto image : images) {
+        imageViews.emplace_back(device, vk::ImageViewCreateInfo{{}, image});
+        imageAvailable.emplace_back(device, vk::SemaphoreCreateInfo{});
+        renderFinished.emplace_back(device, vk::SemaphoreCreateInfo{});
+    }
+
+    auto maxFramesInFlight = images.size();
+
+    // Transition image layout
 
     static constexpr auto supportedExtensions =
         fastgltf::Extensions::KHR_mesh_quantization
