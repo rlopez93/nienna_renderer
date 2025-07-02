@@ -31,8 +31,120 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <memory>
+
+struct Vertex;
 
 auto readShaders(const std::string &filename) -> std::vector<char>;
+auto getGltfAsset(const std::filesystem::path &gltfPath)
+    -> fastgltf::Expected<fastgltf::Asset>;
+auto getGltfAssetData(fastgltf::Asset &asset)
+    -> std::pair<std::vector<uint16_t>, std::vector<Vertex>>;
+
+struct Vertex {
+    fastgltf::math::fvec3 pos{};
+    fastgltf::math::fvec3 normal{};
+    fastgltf::math::fvec2 texCoord{};
+};
+
+auto getGltfAsset(const std::filesystem::path &gltfPath)
+    -> fastgltf::Expected<fastgltf::Asset>
+{
+    constexpr auto supportedExtensions = fastgltf::Extensions::KHR_mesh_quantization
+                                       | fastgltf::Extensions::KHR_texture_transform
+                                       | fastgltf::Extensions::KHR_materials_variants;
+
+    fastgltf::Parser parser(supportedExtensions);
+
+    constexpr auto gltfOptions =
+        fastgltf::Options::DontRequireValidAssetMember | fastgltf::Options::AllowDouble
+        | fastgltf::Options::LoadExternalBuffers | fastgltf::Options::LoadExternalImages
+        | fastgltf::Options::GenerateMeshIndices;
+
+    auto gltfFile = fastgltf::GltfDataBuffer::FromPath(gltfPath);
+    if (!bool(gltfFile)) {
+        fmt::print(
+            stderr,
+            "Failed to open glTF file: {}\n",
+            fastgltf::getErrorMessage(gltfFile.error()));
+        return fastgltf::Error{};
+    }
+
+    auto asset = parser.loadGltf(gltfFile.get(), gltfPath.parent_path(), gltfOptions);
+
+    if (fastgltf::getErrorName(asset.error()) != "None") {
+        fmt::print(
+            stderr,
+            "Failed to open glTF file: {}\n",
+            fastgltf::getErrorMessage(gltfFile.error()));
+    }
+
+    return asset;
+}
+
+auto getGltfAssetData(fastgltf::Asset &asset)
+    -> std::pair<std::vector<uint16_t>, std::vector<Vertex>>
+{
+    auto indices  = std::vector<uint16_t>{};
+    auto vertices = std::vector<Vertex>{};
+    for (auto &mesh : asset.meshes) {
+        fmt::print(stderr, "Mesh is: <{}>\n", mesh.name);
+        for (auto primitiveIt = mesh.primitives.begin();
+             primitiveIt != mesh.primitives.end();
+             ++primitiveIt) {
+
+            if (primitiveIt->indicesAccessor.has_value()) {
+                auto &indexAccessor =
+                    asset.accessors[primitiveIt->indicesAccessor.value()];
+                indices.resize(indexAccessor.count);
+
+                fastgltf::iterateAccessorWithIndex<std::uint16_t>(
+                    asset,
+                    indexAccessor,
+                    [&](std::uint16_t index, std::size_t idx) {
+                        indices[idx] = index;
+                    });
+            }
+
+            auto positionIt = primitiveIt->findAttribute("POSITION");
+            auto normalIt   = primitiveIt->findAttribute("NORMAL");
+            auto texCoordIt = primitiveIt->findAttribute("TEXCOORD_0");
+
+            assert(positionIt != primitiveIt->attributes.end());
+            assert(normalIt != primitiveIt->attributes.end());
+            assert(texCoordIt != primitiveIt->attributes.end());
+
+            auto &positionAccessor = asset.accessors[positionIt->accessorIndex];
+            auto &normalAccessor   = asset.accessors[normalIt->accessorIndex];
+            auto &texCoordAccessor = asset.accessors[texCoordIt->accessorIndex];
+
+            vertices.resize(positionAccessor.count);
+
+            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+                asset,
+                positionAccessor,
+                [&](fastgltf::math::fvec3 pos, std::size_t idx) {
+                    vertices[idx].pos = pos;
+                });
+
+            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+                asset,
+                normalAccessor,
+                [&](fastgltf::math::fvec3 normal, std::size_t idx) {
+                    vertices[idx].normal = normal;
+                });
+
+            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
+                asset,
+                texCoordAccessor,
+                [&](fastgltf::math::fvec2 texCoord, std::size_t idx) {
+                    vertices[idx].texCoord = texCoord;
+                });
+        }
+    }
+
+    return {indices, vertices};
+}
 
 auto readShaders(const std::string &filename) -> std::vector<char>
 {
@@ -54,36 +166,59 @@ auto readShaders(const std::string &filename) -> std::vector<char>
 
 auto main(int argc, char *argv[]) -> int
 {
-    std::string filename;
-    if (argc < 2) {
-        filename = "resources/Duck/glTF/Duck.gltf";
-    }
+    auto gltfPath = [&] -> std::filesystem::path {
+        if (argc < 2) {
+            return "resources/Duck/glTF/Duck.gltf";
+        }
 
-    else {
-        filename = argv[1];
-    }
-    vk::raii::Context context;
+        else {
+            return std::string{argv[1]};
+        }
+    }();
 
-    auto gltf_path = (argc < 2) ? std::filesystem::path{"resources/Duck/glTF/Duck.gltf"}
-                                : std::filesystem::path{argv[1]};
+    auto shaderPath = [&] -> std::filesystem::path {
+        if (argc < 3) {
+            return "shaders/shader.spv";
+        }
 
-    // --- SDL3 Init
-    if (!SDL_Init(SDL_INIT_VIDEO)) {
-        fmt::print(stderr, "SDL_Init Error: {}\n", SDL_GetError());
-        return -1;
-    }
+        else {
+            return std::string{argv[2]};
+        }
+    }();
 
-    // --- Create Window with Vulkan flag
-    SDL_Window *window = SDL_CreateWindow("Vulkan + SDL3", 800, 600, SDL_WINDOW_VULKAN);
+    // init vk::raii::Context necessary for vulkan.hpp RAII functionality
+    auto context = vk::raii::Context{};
+
+    // create custom deleter for SDL_Window
+    auto SDL_WindowDeleter = [](SDL_Window *window) { SDL_DestroyWindow(window); };
+
+    // init SDL3 and create window
+    auto window = [&SDL_WindowDeleter]
+        -> std::unique_ptr<SDL_Window, decltype(SDL_WindowDeleter)> {
+        // init SDL3
+        if (!SDL_Init(SDL_INIT_VIDEO)) {
+            fmt::print(stderr, "SDL_Init Error: {}\n", SDL_GetError());
+            return {};
+        }
+
+        // Dynamically load Vulkan loader library
+        if (!SDL_Vulkan_LoadLibrary(nullptr)) {
+            fmt::print(stderr, "SDL_Vulkan_LoadLibrary Error: {}\n", SDL_GetError());
+            return {};
+        }
+
+        // create Vulkan window
+        auto window = SDL_CreateWindow("Vulkan + SDL3", 800, 600, SDL_WINDOW_VULKAN);
+        if (!window) {
+            fmt::print(stderr, "SDL_CreateWindow Error: {}\n", SDL_GetError());
+            return {};
+        }
+
+        return std::unique_ptr<SDL_Window, decltype(SDL_WindowDeleter)>(window);
+    }();
+
     if (!window) {
-        fmt::print(stderr, "SDL_CreateWindow Error: {}\n", SDL_GetError());
-        return -1;
-    }
-
-    // --- Load Vulkan library
-    if (!SDL_Vulkan_LoadLibrary(nullptr)) {
-        fmt::print(stderr, "SDL_Vulkan_LoadLibrary Error: {}\n", SDL_GetError());
-        return -1;
+        return EXIT_FAILURE;
     }
 
 #ifndef VK_EXT_DEBUG_REPORT_EXTENSION_NAME
@@ -141,7 +276,7 @@ auto main(int argc, char *argv[]) -> int
 
     auto surface = [&] -> vk::raii::SurfaceKHR {
         VkSurfaceKHR surface_vk;
-        if (!SDL_Vulkan_CreateSurface(window, *instance, nullptr, &surface_vk)) {
+        if (!SDL_Vulkan_CreateSurface(window.get(), *instance, nullptr, &surface_vk)) {
             fmt::print(stderr, "SDL_Vulkan_CreateSurface failed: {}\n", SDL_GetError());
             return nullptr;
         }
@@ -254,40 +389,7 @@ auto main(int argc, char *argv[]) -> int
 
     // Transition image layout
 
-    static constexpr auto supportedExtensions =
-        fastgltf::Extensions::KHR_mesh_quantization
-        | fastgltf::Extensions::KHR_texture_transform
-        | fastgltf::Extensions::KHR_materials_variants;
-
-    fastgltf::Parser parser(supportedExtensions);
-
-    constexpr auto gltfOptions =
-        fastgltf::Options::DontRequireValidAssetMember | fastgltf::Options::AllowDouble
-        | fastgltf::Options::LoadExternalBuffers | fastgltf::Options::LoadExternalImages
-        | fastgltf::Options::GenerateMeshIndices;
-
-    auto path = std::filesystem::path(filename);
-
-    auto gltfFile = fastgltf::GltfDataBuffer::FromPath(gltf_path);
-    if (!bool(gltfFile)) {
-        fmt::print(
-            stderr,
-            "Failed to open glTF file: {}\n",
-            fastgltf::getErrorMessage(gltfFile.error()));
-        return EXIT_FAILURE;
-    }
-
-    auto asset = parser.loadGltf(gltfFile.get(), gltf_path.parent_path(), gltfOptions);
-
-    if (fastgltf::getErrorName(asset.error()) != "None") {
-        fmt::print(
-            stderr,
-            "Failed to open glTF file: {}\n",
-            fastgltf::getErrorMessage(gltfFile.error()));
-        return EXIT_FAILURE;
-    }
-
-    auto shader_spv = readShaders(argv[2]);
+    auto shader_spv = readShaders(shaderPath);
 
     spv_reflect::ShaderModule reflection(shader_spv.size(), shader_spv.data());
 
@@ -415,12 +517,6 @@ auto main(int argc, char *argv[]) -> int
             {}},
     };
 
-    struct Vertex {
-        fastgltf::math::fvec3 pos{};
-        fastgltf::math::fvec3 normal{};
-        fastgltf::math::fvec2 texCoord{};
-    };
-
     const auto vertexBindingDescriptions =
         std::array{vk::VertexInputBindingDescription{0, sizeof(Vertex)}};
 
@@ -484,66 +580,9 @@ auto main(int argc, char *argv[]) -> int
 
     auto pipelineLayout = vk::raii::PipelineLayout{device, {{}, *descriptorSetLayout}};
 
-    std::vector<std::uint16_t> indices;
-    std::vector<Vertex>        vertices;
+    auto asset = getGltfAsset(gltfPath);
 
-    for (auto &mesh : asset->meshes) {
-        fmt::print(stderr, "Mesh is: <{}>\n", mesh.name);
-        for (auto primitiveIt = mesh.primitives.begin();
-             primitiveIt != mesh.primitives.end();
-             ++primitiveIt) {
-
-            if (primitiveIt->indicesAccessor.has_value()) {
-                auto &indexAccessor =
-                    asset->accessors[primitiveIt->indicesAccessor.value()];
-                indices.resize(indexAccessor.count);
-
-                fastgltf::iterateAccessorWithIndex<std::uint16_t>(
-                    asset.get(),
-                    indexAccessor,
-                    [&](std::uint16_t index, std::size_t idx) {
-                        indices[idx] = index;
-                    });
-            }
-
-            auto positionIt = primitiveIt->findAttribute("POSITION");
-            auto normalIt   = primitiveIt->findAttribute("NORMAL");
-            auto texCoordIt = primitiveIt->findAttribute("TEXCOORD_0");
-
-            assert(positionIt != primitiveIt->attributes.end());
-            assert(normalIt != primitiveIt->attributes.end());
-            assert(texCoordIt != primitiveIt->attributes.end());
-
-            auto &positionAccessor = asset->accessors[positionIt->accessorIndex];
-            auto &normalAccessor   = asset->accessors[normalIt->accessorIndex];
-            auto &texCoordAccessor = asset->accessors[texCoordIt->accessorIndex];
-
-            vertices.resize(positionAccessor.count);
-
-            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
-                asset.get(),
-                positionAccessor,
-                [&](fastgltf::math::fvec3 pos, std::size_t idx) {
-                    vertices[idx].pos = pos;
-                });
-
-            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
-                asset.get(),
-                normalAccessor,
-                [&](fastgltf::math::fvec3 normal, std::size_t idx) {
-                    vertices[idx].normal = normal;
-                });
-
-            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
-                asset.get(),
-                texCoordAccessor,
-                [&](fastgltf::math::fvec2 texCoord, std::size_t idx) {
-                    vertices[idx].texCoord = texCoord;
-                });
-        }
-
-        break;
-    }
+    auto [indices, vertices] = getGltfAssetData(asset.get());
 
     // std::vector<vk::raii::DescriptorSetLayout>  descriptorSetLayouts;
     // std::vector<vk::PushConstantRange>          pushConstantRanges;
@@ -647,7 +686,6 @@ auto main(int argc, char *argv[]) -> int
 
     // --- Cleanup
     vmaDestroyAllocator(allocator);
-    SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;
 }
