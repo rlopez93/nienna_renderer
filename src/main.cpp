@@ -387,8 +387,14 @@ auto main(int argc, char *argv[]) -> int
 
     auto maxFramesInFlight = images.size();
 
-    // Transition image layout
+    // create transient command pool for single-time commands
+    auto commandPool = vk::raii::CommandPool{
+        device,
+        vk::CommandPoolCreateInfo{
+            vk::CommandPoolCreateFlagBits::eTransient,
+            vkb_device.get_queue_index(vkb::QueueType::graphics).value()}};
 
+    // Transition image layout
     auto shader_spv = readShaders(shaderPath);
 
     spv_reflect::ShaderModule reflection(shader_spv.size(), shader_spv.data());
