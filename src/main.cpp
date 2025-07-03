@@ -41,6 +41,47 @@ auto getGltfAsset(const std::filesystem::path &gltfPath)
 auto getGltfAssetData(fastgltf::Asset &asset)
     -> std::pair<std::vector<uint16_t>, std::vector<Vertex>>;
 
+auto beginSingleTimeCommands(
+    vk::raii::Device &device, vk::raii::CommandPool &commandPool)
+    -> vk::raii::CommandBuffer;
+auto endSingleTimeCommands(
+    vk::raii::Device &device, vk::raii::CommandPool &commandPool,
+    vk::CommandBuffer &commandBuffer, vk::Queue &queue);
+
+auto endSingleTimeCommands(
+    vk::raii::Device &device, vk::raii::CommandPool &commandPool,
+    vk::CommandBuffer &commandBuffer, vk::raii::Queue &queue)
+{
+    // submit command buffer
+    commandBuffer.end();
+
+    // create fence for synchronization
+    auto fence                   = vk::raii::Fence{device, {}};
+    auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{commandBuffer};
+
+    queue.submit2(vk::SubmitInfo2{{}, {}, commandBufferSubmitInfo}, fence);
+    auto result =
+        device.waitForFences({fence}, true, std::numeric_limits<uint64_t>::max());
+
+    assert(result == vk::Result::eSuccess);
+}
+
+auto beginSingleTimeCommands(
+    vk::raii::Device &device, vk::raii::CommandPool &commandPool)
+    -> vk::raii::CommandBuffer
+{
+    auto commandBuffers = vk::raii::CommandBuffers{
+        device,
+        vk::CommandBufferAllocateInfo{
+            commandPool,
+            vk::CommandBufferLevel::ePrimary,
+            1}};
+    commandBuffers.front().begin(
+        vk::CommandBufferBeginInfo{vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+
+    return std::move(commandBuffers.front());
+};
+
 struct Vertex {
     fastgltf::math::fvec3 pos{};
     fastgltf::math::fvec3 normal{};
@@ -319,7 +360,11 @@ auto main(int argc, char *argv[]) -> int
     }
 
     auto vkb_device = dev_ret.value();
-    auto device     = vk::raii::Device(physicalDevice, vkb_device.device);
+    auto device     = vk::raii::Device{physicalDevice, vkb_device.device};
+
+    auto graphicsQueue = vkb_device.get_queue(vkb::QueueType::graphics).value();
+    auto graphicsQueueIndex =
+        vkb_device.get_queue_index(vkb::QueueType::graphics).value();
 
     VmaVulkanFunctions vulkanFunctions    = {};
     vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
@@ -388,12 +433,15 @@ auto main(int argc, char *argv[]) -> int
     auto maxFramesInFlight = images.size();
 
     // create transient command pool for single-time commands
-    auto commandPool = vk::raii::CommandPool{
+    auto transientCommandPool = vk::raii::CommandPool{
         device,
         vk::CommandPoolCreateInfo{
             vk::CommandPoolCreateFlagBits::eTransient,
-            vkb_device.get_queue_index(vkb::QueueType::graphics).value()}};
+            graphicsQueueIndex}};
 
+    auto commandBuffer = beginSingleTimeCommands(device, transientCommandPool);
+
+    endSingleTimeCommands(device, transientCommandPool, commandBuffer, vk::Queue{});
     // Transition image layout
     auto shader_spv = readShaders(shaderPath);
 
