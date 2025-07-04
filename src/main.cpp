@@ -524,8 +524,9 @@ auto main(int argc, char **argv) -> int
         vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT>();
 
     auto phys_ret =
-        selector.set_surface(*surface)
-            .set_required_features(features.get<vk::PhysicalDeviceFeatures2>().features)
+        selector
+            .set_surface(*surface)
+            // .set_required_features(features.get<vk::PhysicalDeviceFeatures2>().features)
             .require_present()
             .select();
 
@@ -552,10 +553,10 @@ auto main(int argc, char **argv) -> int
 
     auto physicalDevice = vk::raii::PhysicalDevice(instance, vkb_phys.physical_device);
 
-    // vkb_phys.enable_extension_features_if_present(
-    //     features.get<vk::PhysicalDeviceFeatures2>());
     vkb_phys.enable_extension_features_if_present(
-        features.get<vk::PhysicalDeviceVulkan11Features>());
+        features.get<vk::PhysicalDeviceFeatures2>());
+    // vkb_phys.enable_extension_features_if_present(
+    //     features.get<vk::PhysicalDeviceVulkan11Features>());
     // vkb_phys.enable_extension_features_if_present(
     //     features.get<vk::PhysicalDeviceVulkan12Features>());
     // vkb_phys.enable_extension_features_if_present(
