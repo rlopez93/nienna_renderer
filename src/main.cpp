@@ -1,5 +1,6 @@
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_extension_inspection.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
@@ -36,32 +37,108 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 struct Vertex;
 
 auto readShaders(const std::string &filename) -> std::vector<char>;
+
 auto getGltfAsset(const std::filesystem::path &gltfPath)
     -> fastgltf::Expected<fastgltf::Asset>;
+
 auto getGltfAssetData(fastgltf::Asset &asset)
     -> std::pair<std::vector<uint16_t>, std::vector<Vertex>>;
+
+void cmdTransitionImageLayout(
+    vk::raii::CommandBuffer &cmd, VkImage image, vk::ImageLayout oldLayout,
+    vk::ImageLayout newLayout, vk::ImageAspectFlags aspectMask);
+
+auto makePipelineStageAccessTuple(vk::ImageLayout state)
+    -> std::tuple<vk::PipelineStageFlags2, vk::AccessFlags2>;
+
+auto makePipelineStageAccessTuple(vk::ImageLayout state)
+    -> std::tuple<vk::PipelineStageFlags2, vk::AccessFlags2>
+{
+    switch (state) {
+    case vk::ImageLayout::eUndefined:
+        return std::make_tuple(
+            vk::PipelineStageFlagBits2::eTopOfPipe,
+            vk::AccessFlagBits2::eNone);
+    case vk::ImageLayout::eColorAttachmentOptimal:
+        return std::make_tuple(
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+            vk::AccessFlagBits2::eColorAttachmentRead
+                | vk::AccessFlagBits2::eColorAttachmentWrite);
+    case vk::ImageLayout::eShaderReadOnlyOptimal:
+        return std::make_tuple(
+            vk::PipelineStageFlagBits2::eFragmentShader
+                | vk::PipelineStageFlagBits2::eComputeShader
+                | vk::PipelineStageFlagBits2::ePreRasterizationShaders,
+            vk::AccessFlagBits2::eShaderRead);
+    case vk::ImageLayout::eTransferDstOptimal:
+        return std::make_tuple(
+            vk::PipelineStageFlagBits2::eTransfer,
+            vk::AccessFlagBits2::eTransferWrite);
+    case vk::ImageLayout::eGeneral:
+        return std::make_tuple(
+            vk::PipelineStageFlagBits2::eComputeShader
+                | vk::PipelineStageFlagBits2::eTransfer,
+            vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite
+                | vk::AccessFlagBits2::eTransferWrite);
+    case vk::ImageLayout::ePresentSrcKHR:
+        return std::make_tuple(
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+            vk::AccessFlagBits2::eNone);
+    default: {
+        assert(false && "Unsupported layout transition!");
+        return std::make_tuple(
+            vk::PipelineStageFlagBits2::eAllCommands,
+            vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite);
+    }
+    }
+}
+
+void cmdTransitionImageLayout(
+    vk::raii::CommandBuffer &cmd, VkImage image, vk::ImageLayout oldLayout,
+    vk::ImageLayout newLayout, vk::ImageAspectFlags aspectMask)
+
+{
+    const auto [srcStage, srcAccess] = makePipelineStageAccessTuple(oldLayout);
+    const auto [dstStage, dstAccess] = makePipelineStageAccessTuple(newLayout);
+
+    auto barrier = vk::ImageMemoryBarrier2{
+        srcStage,
+        srcAccess,
+        dstStage,
+        dstAccess,
+        oldLayout,
+        newLayout,
+        vk::QueueFamilyIgnored,
+        vk::QueueFamilyIgnored,
+        image,
+        {aspectMask, 0, 1, 0, 1}};
+
+    cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, {}, barrier});
+}
 
 auto beginSingleTimeCommands(
     vk::raii::Device &device, vk::raii::CommandPool &commandPool)
     -> vk::raii::CommandBuffer;
+
 auto endSingleTimeCommands(
     vk::raii::Device &device, vk::raii::CommandPool &commandPool,
     vk::CommandBuffer &commandBuffer, vk::Queue &queue);
 
 auto endSingleTimeCommands(
     vk::raii::Device &device, vk::raii::CommandPool &commandPool,
-    vk::CommandBuffer &commandBuffer, vk::raii::Queue &queue)
+    vk::raii::CommandBuffer &commandBuffer, vk::raii::Queue &queue)
 {
     // submit command buffer
     commandBuffer.end();
 
     // create fence for synchronization
-    auto fence                   = vk::raii::Fence{device, {}};
+    auto fenceCreateInfo         = vk::FenceCreateInfo{};
+    auto fence                   = vk::raii::Fence{device, fenceCreateInfo};
     auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{commandBuffer};
 
     queue.submit2(vk::SubmitInfo2{{}, {}, commandBufferSubmitInfo}, fence);
     auto result =
-        device.waitForFences({fence}, true, std::numeric_limits<uint64_t>::max());
+        device.waitForFences(*fence, true, std::numeric_limits<uint64_t>::max());
 
     assert(result == vk::Result::eSuccess);
 }
@@ -327,14 +404,21 @@ auto main(int argc, char *argv[]) -> int
     // --- Pick physical device and create logical device using vk-bootstrap
     vkb::PhysicalDeviceSelector selector{vkb_inst};
 
+    auto _physicalDevice = instance.enumeratePhysicalDevices().front();
+
+    auto features = _physicalDevice.getFeatures2<
+        vk::PhysicalDeviceFeatures2,
+        vk::PhysicalDeviceVulkan12Features,
+        vk::PhysicalDeviceVulkan13Features,
+        vk::PhysicalDeviceVulkan14Features,
+        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
+        vk::PhysicalDeviceExtendedDynamicState2FeaturesEXT,
+        vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT,
+        vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT>();
+
     auto phys_ret =
         selector.set_surface(*surface)
-            .add_required_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)
-            .add_required_extension(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME)
-            .add_required_extension(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME)
-            .add_required_extension(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME)
-            .add_required_extension(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
-            .add_required_extension(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME)
+            .set_required_features(features.get<vk::PhysicalDeviceFeatures2>().features)
             .require_present()
             .select();
 
@@ -346,8 +430,31 @@ auto main(int argc, char *argv[]) -> int
         return -1;
     }
 
-    auto vkb_phys       = phys_ret.value();
+    auto vkb_phys = phys_ret.value();
+    // auto deviceExtensions = vk::getDeviceExtensions();
+    //
+    // fmt::print(stderr, "device extensions: {}\n", deviceExtensions.size());
+    //
+    // for (const auto &extension : deviceExtensions) {
+    //     std::vector<const char *> enabledExtensions;
+    //     enabledExtensions.push_back(extension.c_str());
+    //     bool enabled = vkb_phys.enable_extensions_if_present(enabledExtensions);
+    //
+    //     fmt::print(stderr, "<{}> enabled: {}\n", extension, enabled);
+    // }
+
     auto physicalDevice = vk::raii::PhysicalDevice(instance, vkb_phys.physical_device);
+
+    vkb_phys.enable_extension_features_if_present(
+        features.get<vk::PhysicalDeviceFeatures2>());
+    // vkb_phys.enable_extension_features_if_present(
+    //     features.get<vk::PhysicalDeviceVulkan11Features>());
+    // vkb_phys.enable_extension_features_if_present(
+    //     features.get<vk::PhysicalDeviceVulkan12Features>());
+    // vkb_phys.enable_extension_features_if_present(
+    //     features.get<vk::PhysicalDeviceVulkan13Features>());
+    // vkb_phys.enable_extension_features_if_present(
+    //     features.get<vk::PhysicalDeviceVulkan14Features>());
 
     auto dev_builder = vkb::DeviceBuilder{vkb_phys};
     auto dev_ret     = dev_builder.build();
@@ -362,9 +469,14 @@ auto main(int argc, char *argv[]) -> int
     auto vkb_device = dev_ret.value();
     auto device     = vk::raii::Device{physicalDevice, vkb_device.device};
 
-    auto graphicsQueue = vkb_device.get_queue(vkb::QueueType::graphics).value();
+    auto vkb_graphicsQueue = vkb_device.get_queue(vkb::QueueType::graphics).value();
+    auto graphicsQueue     = vk::raii::Queue{device, vkb_graphicsQueue};
     auto graphicsQueueIndex =
         vkb_device.get_queue_index(vkb::QueueType::graphics).value();
+    auto vkb_presentQueue = vkb_device.get_queue(vkb::QueueType::graphics).value();
+    auto presentQueue     = vk::raii::Queue{device, vkb_presentQueue};
+    auto presentQueueIndex =
+        vkb_device.get_queue_index(vkb::QueueType::present).value();
 
     VmaVulkanFunctions vulkanFunctions    = {};
     vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
@@ -414,23 +526,32 @@ auto main(int argc, char *argv[]) -> int
 
     auto vkb_swapchain = swap_ret.value();
     auto swapchain     = vk::raii::SwapchainKHR(device, vkb_swapchain.swapchain);
+    auto imageFormat   = vk::Format(vkb_swapchain.image_format);
 
     fmt::print(stderr, "swapchain image count: {}\n", vkb_swapchain.image_count);
 
     // get swapchain images
 
-    auto images         = swapchain.getImages();
+    auto images            = swapchain.getImages();
+    auto maxFramesInFlight = images.size();
+
     auto imageViews     = std::vector<vk::raii::ImageView>{};
     auto imageAvailable = std::vector<vk::raii::Semaphore>{};
     auto renderFinished = std::vector<vk::raii::Semaphore>{};
 
     for (auto image : images) {
-        imageViews.emplace_back(device, vk::ImageViewCreateInfo{{}, image});
+        imageViews.emplace_back(
+            device,
+            vk::ImageViewCreateInfo{
+                {},
+                image,
+                vk::ImageViewType::e2D,
+                imageFormat,
+                {},
+                {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
         imageAvailable.emplace_back(device, vk::SemaphoreCreateInfo{});
         renderFinished.emplace_back(device, vk::SemaphoreCreateInfo{});
     }
-
-    auto maxFramesInFlight = images.size();
 
     // create transient command pool for single-time commands
     auto transientCommandPool = vk::raii::CommandPool{
@@ -439,10 +560,20 @@ auto main(int argc, char *argv[]) -> int
             vk::CommandPoolCreateFlagBits::eTransient,
             graphicsQueueIndex}};
 
+    // Transition image layout
     auto commandBuffer = beginSingleTimeCommands(device, transientCommandPool);
 
-    endSingleTimeCommands(device, transientCommandPool, commandBuffer, vk::Queue{});
-    // Transition image layout
+    for (auto image : images) {
+        cmdTransitionImageLayout(
+            commandBuffer,
+            image,
+            vk::ImageLayout::eUndefined,
+            vk::ImageLayout::ePresentSrcKHR,
+            vk::ImageAspectFlagBits::eColor);
+    }
+
+    endSingleTimeCommands(device, transientCommandPool, commandBuffer, graphicsQueue);
+
     auto shader_spv = readShaders(shaderPath);
 
     spv_reflect::ShaderModule reflection(shader_spv.size(), shader_spv.data());
