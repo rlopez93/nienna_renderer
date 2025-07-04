@@ -33,6 +33,8 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <numeric>
+#include <ranges>
 
 struct Vertex;
 struct VertexReflectionData;
@@ -512,6 +514,7 @@ auto main(int argc, char **argv) -> int
 
     auto features = _physicalDevice.getFeatures2<
         vk::PhysicalDeviceFeatures2,
+        vk::PhysicalDeviceVulkan11Features,
         vk::PhysicalDeviceVulkan12Features,
         vk::PhysicalDeviceVulkan13Features,
         vk::PhysicalDeviceVulkan14Features,
@@ -549,10 +552,10 @@ auto main(int argc, char **argv) -> int
 
     auto physicalDevice = vk::raii::PhysicalDevice(instance, vkb_phys.physical_device);
 
-    vkb_phys.enable_extension_features_if_present(
-        features.get<vk::PhysicalDeviceFeatures2>());
     // vkb_phys.enable_extension_features_if_present(
-    //     features.get<vk::PhysicalDeviceVulkan11Features>());
+    //     features.get<vk::PhysicalDeviceFeatures2>());
+    vkb_phys.enable_extension_features_if_present(
+        features.get<vk::PhysicalDeviceVulkan11Features>());
     // vkb_phys.enable_extension_features_if_present(
     //     features.get<vk::PhysicalDeviceVulkan12Features>());
     // vkb_phys.enable_extension_features_if_present(
@@ -679,6 +682,40 @@ auto main(int argc, char **argv) -> int
     endSingleTimeCommands(device, transientCommandPool, commandBuffer, graphicsQueue);
 
     // create frame submission
+    auto commandPools   = std::vector<vk::raii::CommandPool>{};
+    auto commandBuffers = std::vector<vk::raii::CommandBuffer>{};
+    auto frameNumbers   = std::vector<uint64_t>{maxFramesInFlight, 0};
+    std::ranges::iota(frameNumbers, 0);
+
+    uint64_t initialValue = maxFramesInFlight - 1;
+
+    auto timelineSemaphoreCreateInfo =
+        vk::SemaphoreTypeCreateInfo{vk::SemaphoreType::eTimeline, initialValue};
+    auto frameTimelineSemaphore =
+        vk::raii::Semaphore{device, {{}, &timelineSemaphoreCreateInfo}};
+
+    for (auto n : std::views::iota(0u, maxFramesInFlight)) {
+
+        commandPools.emplace_back(
+            device,
+            vk::CommandPoolCreateInfo{{}, graphicsQueueIndex});
+
+        commandBuffers.emplace_back(
+            std::move(
+                vk::raii::CommandBuffers{
+                    device,
+                    vk::CommandBufferAllocateInfo{
+                        commandPools.back(),
+                        vk::CommandBufferLevel::ePrimary,
+                        1}}
+                    .front()));
+    }
+
+    // create descriptor pool for ImGui (?)
+
+    // init ImGui
+
+    // create GBuffer
 
     auto vertexData = reflectShader(shaderPath);
 
