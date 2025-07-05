@@ -12,9 +12,13 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #include <vma/vk_mem_alloc.h>
 
 #include <fastgltf/core.hpp>
+#include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/math.hpp>
 #include <fastgltf/tools.hpp>
 #include <fastgltf/types.hpp>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 #include <SPIRV-Reflect/spirv_reflect.h>
 
@@ -35,6 +39,7 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 #include <memory>
 #include <numeric>
 #include <ranges>
+#include <variant>
 
 struct Vertex;
 struct VertexReflectionData;
@@ -178,10 +183,10 @@ auto getGltfAsset(const std::filesystem::path &gltfPath)
 
     fastgltf::Parser parser(supportedExtensions);
 
-    constexpr auto gltfOptions =
-        fastgltf::Options::DontRequireValidAssetMember | fastgltf::Options::AllowDouble
-        | fastgltf::Options::LoadExternalBuffers | fastgltf::Options::LoadExternalImages
-        | fastgltf::Options::GenerateMeshIndices;
+    constexpr auto gltfOptions = fastgltf::Options::DontRequireValidAssetMember
+                               | fastgltf::Options::AllowDouble
+                               | fastgltf::Options::LoadExternalBuffers
+                               | fastgltf::Options::GenerateMeshIndices;
 
     auto gltfFile = fastgltf::GltfDataBuffer::FromPath(gltfPath);
     if (!bool(gltfFile)) {
@@ -262,6 +267,35 @@ auto getGltfAssetData(fastgltf::Asset &asset)
                 [&](fastgltf::math::fvec2 texCoord, std::size_t idx) {
                     vertices[idx].texCoord = texCoord;
                 });
+
+            assert(primitiveIt->materialIndex.has_value());
+
+            fastgltf::Material &material =
+                asset.materials[primitiveIt->materialIndex.value()];
+            assert(material.pbrData.baseColorTexture.has_value());
+
+            fastgltf::TextureInfo &textureInfo =
+                material.pbrData.baseColorTexture.value();
+
+            assert(textureInfo.texCoordIndex == 0);
+            fastgltf::Texture &texture = asset.textures[textureInfo.textureIndex];
+
+            assert(texture.imageIndex.has_value());
+            fastgltf::Image &image = asset.images[texture.imageIndex.value()];
+
+            auto &imageURI = std::get<fastgltf::sources::URI>(image.data).uri;
+
+            auto image_data = std::vector<unsigned char>{};
+            {
+                int  x, y, n;
+                auto stbi_data = stbi_load(imageURI.c_str(), &x, &y, &n, 0);
+
+                image_data.assign(stbi_data, stbi_data + (x * y));
+
+                stbi_image_free(stbi_data);
+
+                // MapMemory -> copy to GPU -> UnmapMemory
+            }
         }
     }
 
@@ -580,6 +614,7 @@ auto main(int argc, char **argv) -> int
     auto graphicsQueue     = vk::raii::Queue{device, vkb_graphicsQueue};
     auto graphicsQueueIndex =
         vkb_device.get_queue_index(vkb::QueueType::graphics).value();
+
     auto vkb_presentQueue = vkb_device.get_queue(vkb::QueueType::graphics).value();
     auto presentQueue     = vk::raii::Queue{device, vkb_presentQueue};
     auto presentQueueIndex =
