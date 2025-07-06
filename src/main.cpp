@@ -44,6 +44,29 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE;
 struct Vertex;
 struct VertexReflectionData;
 
+auto findDepthFormat(vk::raii::PhysicalDevice &physicalDevice) -> vk::Format;
+
+auto findDepthFormat(vk::raii::PhysicalDevice &physicalDevice) -> vk::Format
+{
+    auto candidateFormats = std::array{
+        vk::Format::eD16Unorm,        // depth only
+        vk::Format::eD32Sfloat,       // depth only
+        vk::Format::eD32SfloatS8Uint, // depth-stencil
+        vk::Format::eD24UnormS8Uint   // depth-stencil
+    };
+
+    for (auto format : candidateFormats) {
+        auto properties = physicalDevice.getFormatProperties(format);
+
+        if ((properties.optimalTilingFeatures
+             | vk::FormatFeatureFlagBits::eDepthStencilAttachment)
+            == vk::FormatFeatureFlagBits::eDepthStencilAttachment) {
+            return format;
+        }
+    }
+
+    return vk::Format::eUndefined;
+}
 auto readShaders(const std::string &filename) -> std::vector<char>;
 auto reflectShader(const std::filesystem::path &path) -> VertexReflectionData;
 
@@ -276,14 +299,14 @@ auto getGltfAssetData(fastgltf::Asset &asset)
 
             fastgltf::TextureInfo &textureInfo =
                 material.pbrData.baseColorTexture.value();
-
             assert(textureInfo.texCoordIndex == 0);
-            fastgltf::Texture &texture = asset.textures[textureInfo.textureIndex];
 
+            fastgltf::Texture &texture = asset.textures[textureInfo.textureIndex];
             assert(texture.imageIndex.has_value());
+
             fastgltf::Image &image = asset.images[texture.imageIndex.value()];
 
-            auto &imageURI = std::get<fastgltf::sources::URI>(image.data).uri;
+            fastgltf::URI &imageURI = std::get<fastgltf::sources::URI>(image.data).uri;
 
             auto image_data = std::vector<unsigned char>{};
             {
@@ -327,22 +350,22 @@ struct VertexReflectionData {
     std::vector<SpvReflectDescriptorSet *>     sets;
 };
 
-auto reflectShader(const std::filesystem::path &path) -> VertexReflectionData
+auto reflectShader(const std::vector<char> &code) -> VertexReflectionData
 {
-    auto shader_spv = readShaders(path);
-    auto reflection = spv_reflect::ShaderModule(shader_spv.size(), shader_spv.data());
+    auto reflection = spv_reflect::ShaderModule(code.size(), code.data());
 
     if (reflection.GetResult() != SPV_REFLECT_RESULT_SUCCESS) {
         fmt::print(
             stderr,
-            "ERROR: could not process '{}' (is it a valid SPIR-V bytecode?)\n",
-            path.string());
+            "ERROR: could not process shader code (is it a valid SPIR-V bytecode?)\n");
         throw std::exception{};
     }
 
     auto &shaderModule = reflection.GetShaderModule();
 
     const auto entry_point_name = std::string{shaderModule.entry_point_name};
+
+    fmt::print(stderr, "{}\n", entry_point_name);
 
     auto result = SPV_REFLECT_RESULT_NOT_READY;
     auto count  = uint32_t{0};
@@ -409,6 +432,8 @@ auto reflectShader(const std::filesystem::path &path) -> VertexReflectionData
         auto binding_name    = p_binding->name;
         auto descriptor_type = ToStringDescriptorType(p_binding->descriptor_type);
         auto resource_type   = ToStringResourceType(p_binding->resource_type);
+
+        fmt::print(stderr, "{} {} {}\n", binding_name, descriptor_type, resource_type);
         if ((p_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
             || (p_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE)
             || (p_binding->descriptor_type
@@ -420,6 +445,15 @@ auto reflectShader(const std::filesystem::path &path) -> VertexReflectionData
             auto arrayed = p_binding->image.arrayed;
             auto ms      = p_binding->image.ms;
             auto sampled = p_binding->image.sampled;
+
+            fmt::print(
+                stderr,
+                "dim {} depth {} arrayed {} ms {} sampled {}\n",
+                (int)dim,
+                depth,
+                arrayed,
+                ms,
+                sampled);
         }
     }
 
@@ -438,7 +472,7 @@ auto main(int argc, char **argv) -> int
 
     auto shaderPath = [&] -> std::filesystem::path {
         if (argc < 3) {
-            return "shaders/shader.spv";
+            return "shaders/shader.vert.spv";
         } else {
             return std::string{argv[2]};
         }
@@ -669,6 +703,7 @@ auto main(int argc, char **argv) -> int
     auto vkb_swapchain = swap_ret.value();
     auto swapchain     = vk::raii::SwapchainKHR(device, vkb_swapchain.swapchain);
     auto imageFormat   = vk::Format(vkb_swapchain.image_format);
+    auto depthFormat   = findDepthFormat(physicalDevice);
 
     fmt::print(stderr, "swapchain image count: {}\n", vkb_swapchain.image_count);
 
@@ -752,8 +787,24 @@ auto main(int argc, char **argv) -> int
 
     // create GBuffer
 
-    auto vertexData = reflectShader(shaderPath);
+    auto vertShaderCode = readShaders("shaders/shader.vert.spv");
+    auto fragShaderCode = readShaders("shaders/shader.frag.spv");
 
+    // auto vertexData = reflectShader(vertShaderCode);
+
+    auto vertShaderModule = vk::raii::ShaderModule{
+        device,
+        vk::ShaderModuleCreateInfo{
+            {},
+            vertShaderCode.size(),
+            reinterpret_cast<const uint32_t *>(vertShaderCode.data())}};
+
+    auto fragShaderModule = vk::raii::ShaderModule{
+        device,
+        vk::ShaderModuleCreateInfo{
+            {},
+            fragShaderCode.size(),
+            reinterpret_cast<const uint32_t *>(fragShaderCode.data())}};
     const auto descriptorSetLayoutBindings = std::array{
         vk::DescriptorSetLayoutBinding{
             0,
@@ -766,22 +817,23 @@ auto main(int argc, char **argv) -> int
             1,
             vk::ShaderStageFlagBits::eFragment}};
 
-    auto descriptorSetLayout =
-        vk::raii::DescriptorSetLayout{device, vk::DescriptorSetLayoutCreateInfo{}};
+    auto descriptorSetLayout = vk::raii::DescriptorSetLayout{
+        device,
+        vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
 
     // The stages used by this pipeline
     const auto shaderStages = std::array{
         vk::PipelineShaderStageCreateInfo{
             {},
             vk::ShaderStageFlagBits::eVertex,
-            {},
-            {},
+            vertShaderModule,
+            "main",
             {}},
         vk::PipelineShaderStageCreateInfo{
             {},
             vk::ShaderStageFlagBits::eFragment,
-            {},
-            {},
+            fragShaderModule,
+            "main",
             {}},
     };
 
@@ -805,27 +857,34 @@ auto main(int argc, char **argv) -> int
             vk::Format::eR32G32Sfloat,
             offsetof(Vertex, texCoord)}};
 
+    const auto vertexInputStateCreateInfo = vk::PipelineVertexInputStateCreateInfo{
+        {},
+        vertexBindingDescriptions,
+        vertexAttributeDescriptions};
+
     const auto inputAssemblyCreateInfo = vk::PipelineInputAssemblyStateCreateInfo{
         {},
         vk::PrimitiveTopology::eTriangleList,
         false};
 
-    const auto dynamicStates = std::array{
-        vk::DynamicState::eViewportWithCount,
-        vk::DynamicState::eScissorWithCount};
+    const auto pipelineViewportStateCreateInfo = vk::PipelineViewportStateCreateInfo{};
 
-    const auto rasterizerStateCreateInfo = vk::PipelineRasterizationStateCreateInfo{
-        {},
-        {},
-        {},
-        vk::PolygonMode::eFill,
-        vk::CullModeFlags::BitsType::eNone,
-        vk::FrontFace::eCounterClockwise,
-        {},
-        {},
-        {},
-        {},
-        1.0f};
+    const auto pipelineRasterizationStateCreateInfo =
+        vk::PipelineRasterizationStateCreateInfo{
+            {},
+            {},
+            {},
+            vk::PolygonMode::eFill,
+            vk::CullModeFlags::BitsType::eBack,
+            vk::FrontFace::eCounterClockwise,
+            {},
+            {},
+            {},
+            {},
+            1.0f};
+
+    const auto pipelineMultisampleStateCreateInfo =
+        vk::PipelineMultisampleStateCreateInfo{};
 
     const auto colorBlendAttachmentState = vk::PipelineColorBlendAttachmentState{
         {},
@@ -836,7 +895,7 @@ auto main(int argc, char **argv) -> int
         {},
         {},
         vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
-            | vk::ColorComponentFlagBits::eB};
+            | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA};
 
     const auto pipelineColorBlendStateCreateInfo =
         vk::PipelineColorBlendStateCreateInfo{
@@ -846,101 +905,47 @@ auto main(int argc, char **argv) -> int
             1,
             &colorBlendAttachmentState};
 
+    const auto dynamicStates = std::array{
+        vk::DynamicState::eViewportWithCount,
+        vk::DynamicState::eScissorWithCount};
+
+    const auto pipelineDynamicStateCreateInfo =
+        vk::PipelineDynamicStateCreateInfo{{}, dynamicStates};
+
     auto pipelineLayout = vk::raii::PipelineLayout{device, {{}, *descriptorSetLayout}};
 
     auto asset = getGltfAsset(gltfPath);
 
     auto [indices, vertices] = getGltfAssetData(asset.get());
 
+    auto pipelineRenderingCreateInfo =
+        vk::PipelineRenderingCreateInfo{{}, imageFormat, depthFormat};
+
+    auto graphicsPipelineCreateInfo = vk::GraphicsPipelineCreateInfo{
+        {},
+        shaderStages,
+        &vertexInputStateCreateInfo,
+        &inputAssemblyCreateInfo,
+        {},
+        &pipelineViewportStateCreateInfo,
+        &pipelineRasterizationStateCreateInfo,
+        &pipelineMultisampleStateCreateInfo,
+        {},
+        &pipelineColorBlendStateCreateInfo,
+        &pipelineDynamicStateCreateInfo,
+        *pipelineLayout,
+        {},
+        {},
+        {},
+        {},
+        &pipelineRenderingCreateInfo};
+
+    auto p = vk::raii::Pipeline{device, nullptr, graphicsPipelineCreateInfo};
+
     // std::vector<vk::raii::DescriptorSetLayout>  descriptorSetLayouts;
     // std::vector<vk::PushConstantRange>          pushConstantRanges;
     // std::vector<vk::DescriptorSetLayoutBinding> descriptorRanges;
 
-    // vk::PipelineLayoutCreateInfo pipelineLayoutInfo;
-
-    // {
-    //     auto poolSizes               = std::array<vk::DescriptorPoolSize, 2>{};
-    //     poolSizes[0].type            = vk::DescriptorType::eUniformBuffer;
-    //     poolSizes[0].descriptorCount =
-    //     static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT); poolSizes[1].type =
-    //     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; poolSizes[1].descriptorCount =
-    //     static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-    //
-    //     auto descriptorPoolInfo  = VkDescriptorPoolCreateInfo{};
-    //     descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    //     descriptorPoolInfo.poolSizeCount =
-    //     static_cast<uint32_t>(poolSizes.size()); descriptorPoolInfo.pPoolSizes =
-    //     poolSizes.data(); descriptorPoolInfo.maxSets       =
-    //     static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT); descriptorPoolInfo.flags =
-    //     0;
-    //
-    //     auto descriptorPool = VkDescriptorPool{};
-    //     if (vkCreateDescriptorPool(logicalDevice, &descriptorPoolInfo, nullptr,
-    //                                &descriptorPool)
-    //         != VK_SUCCESS) {
-    //         throw std::runtime_error("failed to create descriptor pool.");
-    //     }
-    //
-    //     return descriptorPool;
-    // }
-    // ();
-    //
-    // auto descriptorSetLayout = [logicalDevice] -> VkDescriptorSetLayout {
-    //     auto uboLayoutBinding               = VkDescriptorSetLayoutBinding{};
-    //     uboLayoutBinding.binding            = 0;
-    //     uboLayoutBinding.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    //     uboLayoutBinding.descriptorCount    = 1;
-    //     uboLayoutBinding.pImmutableSamplers = nullptr;
-    //     uboLayoutBinding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;
-    //
-    //     auto samplerLayoutBinding            = VkDescriptorSetLayoutBinding{};
-    //     samplerLayoutBinding.binding         = 1;
-    //     samplerLayoutBinding.descriptorCount = 1;
-    //     samplerLayoutBinding.descriptorType =
-    //     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    //     samplerLayoutBinding.pImmutableSamplers = nullptr;
-    //     samplerLayoutBinding.stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT;
-    //
-    //     auto bindings = std::vector{uboLayoutBinding, samplerLayoutBinding};
-    //
-    //     auto layoutInfo         = VkDescriptorSetLayoutCreateInfo{};
-    //     layoutInfo.sType        =
-    //     VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    //     layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    //     layoutInfo.pBindings    = bindings.data();
-    //
-    //     auto descriptorSetLayout = VkDescriptorSetLayout{};
-    //     if (vkCreateDescriptorSetLayout(logicalDevice, &layoutInfo, nullptr,
-    //                                     &descriptorSetLayout)
-    //         != VK_SUCCESS) {
-    //         throw std::runtime_error("failed to create descriptor set layout.");
-    //     }
-    //
-    //     return descriptorSetLayout;
-    // }();
-    //
-    // auto descriptorSets = [logicalDevice, descriptorPool,
-    //                        descriptorSetLayout] -> std::vector<VkDescriptorSet> {
-    //     auto layouts       = std::vector(MAX_FRAMES_IN_FLIGHT,
-    //     descriptorSetLayout); auto allocateInfo  = VkDescriptorSetAllocateInfo{};
-    //     allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    //     allocateInfo.descriptorPool     = descriptorPool;
-    //     allocateInfo.descriptorSetCount =
-    //     static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT); allocateInfo.pSetLayouts =
-    //     layouts.data();
-    //
-    //     auto descriptorSets = std::vector<VkDescriptorSet>{};
-    //     descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-    //     if (vkAllocateDescriptorSets(logicalDevice, &allocateInfo,
-    //                                  descriptorSets.data())
-    //         != VK_SUCCESS) {
-    //         throw std::runtime_error("failed to allocate descriptors.");
-    //     }
-    //
-    //     return descriptorSets;
-    // }();
-    //
-    // --- Main loop (minimal)
     bool      running = true;
     SDL_Event e;
     while (running) {
