@@ -73,18 +73,24 @@ auto reflectShader(const std::filesystem::path &path) -> VertexReflectionData;
 auto getGltfAsset(const std::filesystem::path &gltfPath)
     -> fastgltf::Expected<fastgltf::Asset>;
 
-auto getGltfAssetData(fastgltf::Asset &asset)
-    -> std::pair<std::vector<uint16_t>, std::vector<Vertex>>;
+auto getGltfAssetData(fastgltf::Asset &asset) -> std::pair<
+    std::vector<uint16_t>,
+    std::vector<Vertex>>;
 
 void cmdTransitionImageLayout(
-    vk::raii::CommandBuffer &cmd, VkImage image, vk::ImageLayout oldLayout,
-    vk::ImageLayout newLayout, vk::ImageAspectFlags aspectMask);
+    vk::raii::CommandBuffer &cmd,
+    VkImage                  image,
+    vk::ImageLayout          oldLayout,
+    vk::ImageLayout          newLayout,
+    vk::ImageAspectFlags     aspectMask);
 
-auto makePipelineStageAccessTuple(vk::ImageLayout state)
-    -> std::tuple<vk::PipelineStageFlags2, vk::AccessFlags2>;
+auto makePipelineStageAccessTuple(vk::ImageLayout state) -> std::tuple<
+    vk::PipelineStageFlags2,
+    vk::AccessFlags2>;
 
-auto makePipelineStageAccessTuple(vk::ImageLayout state)
-    -> std::tuple<vk::PipelineStageFlags2, vk::AccessFlags2>
+auto makePipelineStageAccessTuple(vk::ImageLayout state) -> std::tuple<
+    vk::PipelineStageFlags2,
+    vk::AccessFlags2>
 {
     switch (state) {
     case vk::ImageLayout::eUndefined:
@@ -126,8 +132,11 @@ auto makePipelineStageAccessTuple(vk::ImageLayout state)
 }
 
 void cmdTransitionImageLayout(
-    vk::raii::CommandBuffer &cmd, VkImage image, vk::ImageLayout oldLayout,
-    vk::ImageLayout newLayout, vk::ImageAspectFlags aspectMask)
+    vk::raii::CommandBuffer &cmd,
+    VkImage                  image,
+    vk::ImageLayout          oldLayout,
+    vk::ImageLayout          newLayout,
+    vk::ImageAspectFlags     aspectMask)
 
 {
     const auto [srcStage, srcAccess] = makePipelineStageAccessTuple(oldLayout);
@@ -149,16 +158,20 @@ void cmdTransitionImageLayout(
 }
 
 auto beginSingleTimeCommands(
-    vk::raii::Device &device, vk::raii::CommandPool &commandPool)
-    -> vk::raii::CommandBuffer;
+    vk::raii::Device      &device,
+    vk::raii::CommandPool &commandPool) -> vk::raii::CommandBuffer;
 
 auto endSingleTimeCommands(
-    vk::raii::Device &device, vk::raii::CommandPool &commandPool,
-    vk::CommandBuffer &commandBuffer, vk::Queue &queue);
+    vk::raii::Device      &device,
+    vk::raii::CommandPool &commandPool,
+    vk::CommandBuffer     &commandBuffer,
+    vk::Queue             &queue);
 
 auto endSingleTimeCommands(
-    vk::raii::Device &device, vk::raii::CommandPool &commandPool,
-    vk::raii::CommandBuffer &commandBuffer, vk::raii::Queue &queue)
+    vk::raii::Device        &device,
+    vk::raii::CommandPool   &commandPool,
+    vk::raii::CommandBuffer &commandBuffer,
+    vk::raii::Queue         &queue)
 {
     // submit command buffer
     commandBuffer.end();
@@ -176,8 +189,8 @@ auto endSingleTimeCommands(
 }
 
 auto beginSingleTimeCommands(
-    vk::raii::Device &device, vk::raii::CommandPool &commandPool)
-    -> vk::raii::CommandBuffer
+    vk::raii::Device      &device,
+    vk::raii::CommandPool &commandPool) -> vk::raii::CommandBuffer
 {
     auto commandBuffers = vk::raii::CommandBuffers{
         device,
@@ -232,8 +245,9 @@ auto getGltfAsset(const std::filesystem::path &gltfPath)
     return asset;
 }
 
-auto getGltfAssetData(fastgltf::Asset &asset)
-    -> std::pair<std::vector<uint16_t>, std::vector<Vertex>>
+auto getGltfAssetData(fastgltf::Asset &asset) -> std::pair<
+    std::vector<uint16_t>,
+    std::vector<Vertex>>
 {
     auto indices  = std::vector<uint16_t>{};
     auto vertices = std::vector<Vertex>{};
@@ -460,367 +474,14 @@ auto reflectShader(const std::vector<char> &code) -> VertexReflectionData
     return data;
 }
 
-auto main(int argc, char **argv) -> int
+auto create_pipeline(
+    vk::raii::Device         &device,
+    vk::Format                imageFormat,
+    vk::Format                depthFormat,
+    vk::raii::ShaderModule   &vertShaderModule,
+    vk::raii::ShaderModule   &fragShaderModule,
+    vk::raii::PipelineLayout &pipelineLayout) -> vk::raii::Pipeline
 {
-    auto gltfPath = [&] -> std::filesystem::path {
-        if (argc < 2) {
-            return "resources/Duck/glTF/Duck.gltf";
-        } else {
-            return std::string{argv[1]};
-        }
-    }();
-
-    auto shaderPath = [&] -> std::filesystem::path {
-        if (argc < 3) {
-            return "shaders/shader.vert.spv";
-        } else {
-            return std::string{argv[2]};
-        }
-    }();
-
-    // init vk::raii::Context necessary for vulkan.hpp RAII functionality
-    auto context = vk::raii::Context{};
-
-    // create custom deleter for SDL_Window
-    auto SDL_WindowDeleter = [](SDL_Window *window) { SDL_DestroyWindow(window); };
-
-    // init SDL3 and create window
-    auto window = [&SDL_WindowDeleter]
-        -> std::unique_ptr<SDL_Window, decltype(SDL_WindowDeleter)> {
-        // init SDL3
-        if (!SDL_Init(SDL_INIT_VIDEO)) {
-            fmt::print(stderr, "SDL_Init Error: {}\n", SDL_GetError());
-            return {};
-        }
-
-        // Dynamically load Vulkan loader library
-        if (!SDL_Vulkan_LoadLibrary(nullptr)) {
-            fmt::print(stderr, "SDL_Vulkan_LoadLibrary Error: {}\n", SDL_GetError());
-            return {};
-        }
-
-        // create Vulkan window
-        auto window = SDL_CreateWindow("Vulkan + SDL3", 800, 600, SDL_WINDOW_VULKAN);
-        if (!window) {
-            fmt::print(stderr, "SDL_CreateWindow Error: {}\n", SDL_GetError());
-            return {};
-        }
-
-        return std::unique_ptr<SDL_Window, decltype(SDL_WindowDeleter)>(window);
-    }();
-
-    if (!window) {
-        return EXIT_FAILURE;
-    }
-
-#ifndef VK_EXT_DEBUG_REPORT_EXTENSION_NAME
-#define VK_EXT_DEBUG_REPORT_EXTENSION_NAME "VK_EXT_debug_report"
-#endif
-
-    std::vector<const char *> instance_extensions{
-        VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
-        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-        VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
-        VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME};
-
-    {
-        Uint32             sdl_extensions_count;
-        const char *const *sdl_instance_extensions =
-            SDL_Vulkan_GetInstanceExtensions(&sdl_extensions_count);
-
-        if (sdl_instance_extensions == nullptr) {
-            fmt::print(
-                stderr,
-                "SDL_Vulkan_GetInstanceExtensions Error: {}\n",
-                SDL_GetError());
-            return -1;
-        }
-        instance_extensions.insert(
-            instance_extensions.end(),
-            sdl_instance_extensions,
-            sdl_instance_extensions + sdl_extensions_count);
-    }
-
-    // --- Create Vulkan instance using vk-bootstrap
-    vkb::InstanceBuilder builder;
-    auto                 inst_ret = builder.set_app_name("Vulkan SDL3 App")
-                        .require_api_version(1, 4)
-                        .use_default_debug_messenger()
-                        .enable_validation_layers(true)
-                        .enable_extensions(instance_extensions)
-                        .build();
-
-    if (!inst_ret) {
-        fmt::print(
-            stderr,
-            "vk-bootstrap instance creation failed: {}\n",
-            inst_ret.error().message());
-        return -1;
-    }
-
-    auto vkb_inst = vkb::Instance{inst_ret.value()};
-    auto instance = vk::raii::Instance{context, vkb_inst.instance};
-    auto debugUtils =
-        vk::raii::DebugUtilsMessengerEXT{instance, vkb_inst.debug_messenger};
-
-    VULKAN_HPP_DEFAULT_DISPATCHER.init();
-    // VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
-
-    auto surface = [&] -> vk::raii::SurfaceKHR {
-        VkSurfaceKHR surface_vk;
-        if (!SDL_Vulkan_CreateSurface(window.get(), *instance, nullptr, &surface_vk)) {
-            fmt::print(stderr, "SDL_Vulkan_CreateSurface failed: {}\n", SDL_GetError());
-            return nullptr;
-        }
-        return {instance, surface_vk};
-    }();
-
-    // --- Pick physical device and create logical device using vk-bootstrap
-    vkb::PhysicalDeviceSelector selector{vkb_inst};
-
-    auto _physicalDevice = instance.enumeratePhysicalDevices().front();
-
-    auto features = _physicalDevice.getFeatures2<
-        vk::PhysicalDeviceFeatures2,
-        vk::PhysicalDeviceVulkan11Features,
-        vk::PhysicalDeviceVulkan12Features,
-        vk::PhysicalDeviceVulkan13Features,
-        vk::PhysicalDeviceVulkan14Features,
-        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
-        vk::PhysicalDeviceExtendedDynamicState2FeaturesEXT,
-        vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT,
-        vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT>();
-
-    auto phys_ret =
-        selector.set_surface(*surface)
-            .set_required_features(features.get<vk::PhysicalDeviceFeatures2>().features)
-            .require_present()
-            .select();
-
-    if (!phys_ret) {
-        fmt::print(
-            stderr,
-            "vk-bootstrap failed to select physical device: {}\n",
-            phys_ret.error().message());
-        throw std::exception{};
-    }
-
-    auto vkb_phys = phys_ret.value();
-    // auto deviceExtensions = vk::getDeviceExtensions();
-    //
-    // fmt::print(stderr, "device extensions: {}\n", deviceExtensions.size());
-    //
-    // for (const auto &extension : deviceExtensions) {
-    //     std::vector<const char *> enabledExtensions;
-    //     enabledExtensions.push_back(extension.c_str());
-    //     bool enabled = vkb_phys.enable_extensions_if_present(enabledExtensions);
-    //
-    //     fmt::print(stderr, "<{}> enabled: {}\n", extension, enabled);
-    // }
-
-    auto physicalDevice = vk::raii::PhysicalDevice(instance, vkb_phys.physical_device);
-
-    // vkb_phys.enable_extension_features_if_present(
-    //     features.get<vk::PhysicalDeviceFeatures2>());
-    vkb_phys.enable_extension_features_if_present(
-        features.get<vk::PhysicalDeviceVulkan11Features>());
-    // vkb_phys.enable_extension_features_if_present(
-    //     features.get<vk::PhysicalDeviceVulkan12Features>());
-    // vkb_phys.enable_extension_features_if_present(
-    //     features.get<vk::PhysicalDeviceVulkan13Features>());
-    // vkb_phys.enable_extension_features_if_present(
-    //     features.get<vk::PhysicalDeviceVulkan14Features>());
-
-    auto dev_builder = vkb::DeviceBuilder{vkb_phys};
-    auto dev_ret     = dev_builder.build();
-    if (!dev_ret) {
-        fmt::print(
-            stderr,
-            "vk-bootstrap failed to create logical device: {}\n",
-            dev_ret.error().message());
-        return -1;
-    }
-
-    auto vkb_device = dev_ret.value();
-    auto device     = vk::raii::Device{physicalDevice, vkb_device.device};
-
-    auto vkb_graphicsQueue = vkb_device.get_queue(vkb::QueueType::graphics).value();
-    auto graphicsQueue     = vk::raii::Queue{device, vkb_graphicsQueue};
-    auto graphicsQueueIndex =
-        vkb_device.get_queue_index(vkb::QueueType::graphics).value();
-
-    auto vkb_presentQueue = vkb_device.get_queue(vkb::QueueType::graphics).value();
-    auto presentQueue     = vk::raii::Queue{device, vkb_presentQueue};
-    auto presentQueueIndex =
-        vkb_device.get_queue_index(vkb::QueueType::present).value();
-
-    VmaVulkanFunctions vulkanFunctions    = {};
-    vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
-    vulkanFunctions.vkGetDeviceProcAddr   = vkGetDeviceProcAddr;
-
-    VmaAllocatorCreateInfo allocatorCreateInfo = {};
-    allocatorCreateInfo.physicalDevice         = *physicalDevice;
-    allocatorCreateInfo.device                 = *device;
-    allocatorCreateInfo.instance               = *instance;
-    allocatorCreateInfo.vulkanApiVersion       = VK_API_VERSION_1_4;
-    allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT
-                              | VMA_ALLOCATOR_CREATE_EXT_MEMORY_PRIORITY_BIT;
-    allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
-
-    VmaAllocator allocator;
-    if (vmaCreateAllocator(&allocatorCreateInfo, &allocator) != VK_SUCCESS) {
-        fmt::print(stderr, "Failed to create VMA allocator\n");
-        return -1;
-    }
-
-    auto swap_builder = vkb::SwapchainBuilder{vkb_device};
-    auto swap_ret =
-        swap_builder
-            .set_image_usage_flags(
-                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-            .set_desired_present_mode(VK_PRESENT_MODE_MAILBOX_KHR)
-            .add_fallback_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR)
-            .add_fallback_present_mode(VK_PRESENT_MODE_FIFO_KHR)
-            .set_desired_format(
-                VkSurfaceFormatKHR{
-                    .format     = VK_FORMAT_B8G8R8A8_UNORM,
-                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
-            .add_fallback_format(
-                VkSurfaceFormatKHR{
-                    .format     = VK_FORMAT_R8G8B8A8_SNORM,
-                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
-            .set_desired_min_image_count(3)
-            .build();
-
-    if (!swap_ret) {
-        fmt::print(
-            stderr,
-            "vk-bootstrap failed to create swapchain: {}",
-            swap_ret.error().message());
-        return -1;
-    }
-
-    auto vkb_swapchain = swap_ret.value();
-    auto swapchain     = vk::raii::SwapchainKHR(device, vkb_swapchain.swapchain);
-    auto imageFormat   = vk::Format(vkb_swapchain.image_format);
-    auto depthFormat   = findDepthFormat(physicalDevice);
-
-    fmt::print(stderr, "swapchain image count: {}\n", vkb_swapchain.image_count);
-
-    // get swapchain images
-
-    auto images            = swapchain.getImages();
-    auto maxFramesInFlight = images.size();
-
-    auto imageViews     = std::vector<vk::raii::ImageView>{};
-    auto imageAvailable = std::vector<vk::raii::Semaphore>{};
-    auto renderFinished = std::vector<vk::raii::Semaphore>{};
-
-    for (auto image : images) {
-        imageViews.emplace_back(
-            device,
-            vk::ImageViewCreateInfo{
-                {},
-                image,
-                vk::ImageViewType::e2D,
-                imageFormat,
-                {},
-                {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
-        imageAvailable.emplace_back(device, vk::SemaphoreCreateInfo{});
-        renderFinished.emplace_back(device, vk::SemaphoreCreateInfo{});
-    }
-
-    // create transient command pool for single-time commands
-    auto transientCommandPool = vk::raii::CommandPool{
-        device,
-        vk::CommandPoolCreateInfo{
-            vk::CommandPoolCreateFlagBits::eTransient,
-            graphicsQueueIndex}};
-
-    // Transition image layout
-    auto commandBuffer = beginSingleTimeCommands(device, transientCommandPool);
-
-    for (auto image : images) {
-        cmdTransitionImageLayout(
-            commandBuffer,
-            image,
-            vk::ImageLayout::eUndefined,
-            vk::ImageLayout::ePresentSrcKHR,
-            vk::ImageAspectFlagBits::eColor);
-    }
-
-    endSingleTimeCommands(device, transientCommandPool, commandBuffer, graphicsQueue);
-
-    // create frame submission
-    auto commandPools   = std::vector<vk::raii::CommandPool>{};
-    auto commandBuffers = std::vector<vk::raii::CommandBuffer>{};
-    auto frameNumbers   = std::vector<uint64_t>{maxFramesInFlight, 0};
-    std::ranges::iota(frameNumbers, 0);
-
-    uint64_t initialValue = maxFramesInFlight - 1;
-
-    auto timelineSemaphoreCreateInfo =
-        vk::SemaphoreTypeCreateInfo{vk::SemaphoreType::eTimeline, initialValue};
-    auto frameTimelineSemaphore =
-        vk::raii::Semaphore{device, {{}, &timelineSemaphoreCreateInfo}};
-
-    for (auto n : std::views::iota(0u, maxFramesInFlight)) {
-
-        commandPools.emplace_back(
-            device,
-            vk::CommandPoolCreateInfo{{}, graphicsQueueIndex});
-
-        commandBuffers.emplace_back(
-            std::move(
-                vk::raii::CommandBuffers{
-                    device,
-                    vk::CommandBufferAllocateInfo{
-                        commandPools.back(),
-                        vk::CommandBufferLevel::ePrimary,
-                        1}}
-                    .front()));
-    }
-
-    // create descriptor pool for ImGui (?)
-
-    // init ImGui
-
-    // create GBuffer
-
-    auto vertShaderCode = readShaders("shaders/shader.vert.spv");
-    auto fragShaderCode = readShaders("shaders/shader.frag.spv");
-
-    // auto vertexData = reflectShader(vertShaderCode);
-
-    auto vertShaderModule = vk::raii::ShaderModule{
-        device,
-        vk::ShaderModuleCreateInfo{
-            {},
-            vertShaderCode.size(),
-            reinterpret_cast<const uint32_t *>(vertShaderCode.data())}};
-
-    auto fragShaderModule = vk::raii::ShaderModule{
-        device,
-        vk::ShaderModuleCreateInfo{
-            {},
-            fragShaderCode.size(),
-            reinterpret_cast<const uint32_t *>(fragShaderCode.data())}};
-    const auto descriptorSetLayoutBindings = std::array{
-        vk::DescriptorSetLayoutBinding{
-            0,
-            vk::DescriptorType::eUniformBuffer,
-            1,
-            vk::ShaderStageFlagBits::eVertex},
-        vk::DescriptorSetLayoutBinding{
-            1,
-            vk::DescriptorType::eCombinedImageSampler,
-            1,
-            vk::ShaderStageFlagBits::eFragment}};
-
-    auto descriptorSetLayout = vk::raii::DescriptorSetLayout{
-        device,
-        vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
-
     // The stages used by this pipeline
     const auto shaderStages = std::array{
         vk::PipelineShaderStageCreateInfo{
@@ -912,12 +573,6 @@ auto main(int argc, char **argv) -> int
     const auto pipelineDynamicStateCreateInfo =
         vk::PipelineDynamicStateCreateInfo{{}, dynamicStates};
 
-    auto pipelineLayout = vk::raii::PipelineLayout{device, {{}, *descriptorSetLayout}};
-
-    auto asset = getGltfAsset(gltfPath);
-
-    auto [indices, vertices] = getGltfAssetData(asset.get());
-
     auto pipelineRenderingCreateInfo =
         vk::PipelineRenderingCreateInfo{{}, imageFormat, depthFormat};
 
@@ -940,7 +595,516 @@ auto main(int argc, char **argv) -> int
         {},
         &pipelineRenderingCreateInfo};
 
-    auto p = vk::raii::Pipeline{device, nullptr, graphicsPipelineCreateInfo};
+    return vk::raii::Pipeline{device, nullptr, graphicsPipelineCreateInfo};
+}
+
+auto createShaderModules(vk::raii::Device &device) -> std::tuple<
+    vk::raii::ShaderModule,
+    vk::raii::ShaderModule>
+{
+
+    auto vertShaderCode = readShaders("shaders/shader.vert.spv");
+    auto fragShaderCode = readShaders("shaders/shader.frag.spv");
+
+    // auto vertexData = reflectShader(vertShaderCode);
+
+    auto vertShaderModule = vk::raii::ShaderModule{
+        device,
+        vk::ShaderModuleCreateInfo{
+            {},
+            vertShaderCode.size(),
+            reinterpret_cast<const uint32_t *>(vertShaderCode.data())}};
+
+    auto fragShaderModule = vk::raii::ShaderModule{
+        device,
+        vk::ShaderModuleCreateInfo{
+            {},
+            fragShaderCode.size(),
+            reinterpret_cast<const uint32_t *>(fragShaderCode.data())}};
+
+    return {std::move(vertShaderModule), std::move(fragShaderModule)};
+}
+
+auto createFrameSubmission(
+    vk::raii::Device &device,
+    uint32_t          graphicsQueueIndex,
+    uint32_t          maxFramesInFlight)
+    -> std::tuple<
+        std::vector<vk::raii::CommandPool>,
+        std::vector<vk::raii::CommandBuffer>,
+        std::vector<uint64_t>>
+{
+    // create frame submission
+    auto commandPools   = std::vector<vk::raii::CommandPool>{};
+    auto commandBuffers = std::vector<vk::raii::CommandBuffer>{};
+    auto frameNumbers   = std::vector<uint64_t>{maxFramesInFlight, 0};
+    std::ranges::iota(frameNumbers, 0);
+
+    uint64_t initialValue = maxFramesInFlight - 1;
+
+    auto timelineSemaphoreCreateInfo =
+        vk::SemaphoreTypeCreateInfo{vk::SemaphoreType::eTimeline, initialValue};
+    auto frameTimelineSemaphore =
+        vk::raii::Semaphore{device, {{}, &timelineSemaphoreCreateInfo}};
+
+    for (auto n : std::views::iota(0u, maxFramesInFlight)) {
+
+        commandPools.emplace_back(
+            device,
+            vk::CommandPoolCreateInfo{{}, graphicsQueueIndex});
+
+        commandBuffers.emplace_back(
+            std::move(
+                vk::raii::CommandBuffers{
+                    device,
+                    vk::CommandBufferAllocateInfo{
+                        commandPools.back(),
+                        vk::CommandBufferLevel::ePrimary,
+                        1}}
+                    .front()));
+    }
+
+    return {
+        std::move(commandPools),
+        std::move(commandBuffers),
+        std::move(frameNumbers)};
+}
+
+struct RenderContext {
+
+    static constexpr auto SDL_WindowDeleter = [](SDL_Window *window) {
+        SDL_DestroyWindow(window);
+    };
+
+    using WindowPtr = std::unique_ptr<SDL_Window, decltype(SDL_WindowDeleter)>;
+
+    RenderContext(
+        vk::raii::Context                ctx,
+        vk::raii::Instance               instance,
+        vk::raii::DebugUtilsMessengerEXT debugUtils,
+        WindowPtr                        window,
+        vk::raii::SurfaceKHR             surface,
+        vk::raii::PhysicalDevice         physicalDevice,
+        vk::raii::Device                 device,
+        vk::raii::Queue                  graphicsQueue,
+        vk::raii::Queue                  presentQueue,
+        uint32_t                         graphicsQueueIndex,
+        uint32_t                         presentQueueIndex,
+        vk::raii::SwapchainKHR           swapchain,
+        vk::Format                       imageFormat,
+        vk::Format                       depthFormat)
+        : ctx{std::move(ctx)},
+          instance{std::move(instance)},
+          debugUtils{std::move(debugUtils)},
+          window{std::move(window)},
+          surface{std::move(surface)},
+          physicalDevice{std::move(physicalDevice)},
+          device{std::move(device)},
+          graphicsQueue{std::move(graphicsQueue)},
+          presentQueue{std::move(presentQueue)},
+          graphicsQueueIndex{graphicsQueueIndex},
+          presentQueueIndex{presentQueueIndex},
+          swapchain{std::move(swapchain)},
+          imageFormat{imageFormat},
+          depthFormat{depthFormat}
+    {
+    }
+
+    vk::raii::Context                ctx;
+    vk::raii::Instance               instance;
+    vk::raii::DebugUtilsMessengerEXT debugUtils;
+    WindowPtr                        window;
+    vk::raii::SurfaceKHR             surface;
+    vk::raii::PhysicalDevice         physicalDevice;
+    vk::raii::Device                 device;
+    vk::raii::Queue                  graphicsQueue;
+    vk::raii::Queue                  presentQueue;
+    uint32_t                         graphicsQueueIndex;
+    uint32_t                         presentQueueIndex;
+    vk::raii::SwapchainKHR           swapchain;
+    vk::Format                       imageFormat;
+    vk::Format                       depthFormat;
+};
+
+auto initRenderContext() -> RenderContext
+{
+    // init vk::raii::Context necessary for vulkan.hpp RAII functionality
+    auto context = vk::raii::Context{};
+
+    // init SDL3 and create window
+    auto window = [&] -> RenderContext::WindowPtr {
+        // init SDL3
+        if (!SDL_Init(SDL_INIT_VIDEO)) {
+            fmt::print(stderr, "SDL_Init Error: {}\n", SDL_GetError());
+            return {};
+        }
+
+        // Dynamically load Vulkan loader library
+        if (!SDL_Vulkan_LoadLibrary(nullptr)) {
+            fmt::print(stderr, "SDL_Vulkan_LoadLibrary Error: {}\n", SDL_GetError());
+            return {};
+        }
+
+        // create Vulkan window
+        auto window = SDL_CreateWindow("Vulkan + SDL3", 800, 600, SDL_WINDOW_VULKAN);
+        if (!window) {
+            fmt::print(stderr, "SDL_CreateWindow Error: {}\n", SDL_GetError());
+            return {};
+        }
+
+        return RenderContext::WindowPtr{window};
+    }();
+
+    // if (!window) {
+    //     return EXIT_FAILURE;
+    // }
+    //
+#ifndef VK_EXT_DEBUG_REPORT_EXTENSION_NAME
+#define VK_EXT_DEBUG_REPORT_EXTENSION_NAME "VK_EXT_debug_report"
+#endif
+
+    std::vector<const char *> instance_extensions{
+        VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+        VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
+        VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME};
+
+    {
+        Uint32             sdl_extensions_count;
+        const char *const *sdl_instance_extensions =
+            SDL_Vulkan_GetInstanceExtensions(&sdl_extensions_count);
+
+        if (sdl_instance_extensions == nullptr) {
+            fmt::print(
+                stderr,
+                "SDL_Vulkan_GetInstanceExtensions Error: {}\n",
+                SDL_GetError());
+            throw std::exception{};
+        }
+        instance_extensions.insert(
+            instance_extensions.end(),
+            sdl_instance_extensions,
+            sdl_instance_extensions + sdl_extensions_count);
+    }
+
+    // --- Create Vulkan instance using vk-bootstrap
+    vkb::InstanceBuilder builder;
+    auto                 inst_ret = builder.set_app_name("Vulkan SDL3 App")
+                        .require_api_version(1, 4)
+                        .use_default_debug_messenger()
+                        .enable_validation_layers(true)
+                        .enable_extensions(instance_extensions)
+                        .build();
+
+    if (!inst_ret) {
+        fmt::print(
+            stderr,
+            "vk-bootstrap instance creation failed: {}\n",
+            inst_ret.error().message());
+        throw std::exception{};
+    }
+
+    auto vkb_inst = vkb::Instance{inst_ret.value()};
+    auto instance = vk::raii::Instance{context, vkb_inst.instance};
+    auto debugUtils =
+        vk::raii::DebugUtilsMessengerEXT{instance, vkb_inst.debug_messenger};
+
+    VULKAN_HPP_DEFAULT_DISPATCHER.init();
+    // VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
+
+    auto surface = [&] -> vk::raii::SurfaceKHR {
+        VkSurfaceKHR surface_vk;
+        if (!SDL_Vulkan_CreateSurface(window.get(), *instance, nullptr, &surface_vk)) {
+            fmt::print(stderr, "SDL_Vulkan_CreateSurface failed: {}\n", SDL_GetError());
+            return nullptr;
+        }
+        return {instance, surface_vk};
+    }();
+
+    // --- Pick physical device and create logical device using vk-bootstrap
+    vkb::PhysicalDeviceSelector selector{vkb_inst};
+
+    auto _physicalDevice = instance.enumeratePhysicalDevices().front();
+
+    auto features = _physicalDevice.getFeatures2<
+        vk::PhysicalDeviceFeatures2,
+        vk::PhysicalDeviceVulkan11Features,
+        vk::PhysicalDeviceVulkan12Features,
+        vk::PhysicalDeviceVulkan13Features,
+        vk::PhysicalDeviceVulkan14Features,
+        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
+        vk::PhysicalDeviceExtendedDynamicState2FeaturesEXT,
+        vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT,
+        vk::PhysicalDeviceSwapchainMaintenance1FeaturesEXT>();
+
+    auto phys_ret =
+        selector.set_surface(*surface)
+            .set_required_features(features.get<vk::PhysicalDeviceFeatures2>().features)
+            .require_present()
+            .select();
+
+    if (!phys_ret) {
+        fmt::print(
+            stderr,
+            "vk-bootstrap failed to select physical device: {}\n",
+            phys_ret.error().message());
+        throw std::exception{};
+    }
+
+    auto vkb_phys = phys_ret.value();
+    // auto deviceExtensions = vk::getDeviceExtensions();
+    //
+    // fmt::print(stderr, "device extensions: {}\n", deviceExtensions.size());
+    //
+    // for (const auto &extension : deviceExtensions) {
+    //     std::vector<const char *> enabledExtensions;
+    //     enabledExtensions.push_back(extension.c_str());
+    //     bool enabled = vkb_phys.enable_extensions_if_present(enabledExtensions);
+    //
+    //     fmt::print(stderr, "<{}> enabled: {}\n", extension, enabled);
+    // }
+
+    auto physicalDevice = vk::raii::PhysicalDevice(instance, vkb_phys.physical_device);
+
+    // vkb_phys.enable_extension_features_if_present(
+    //     features.get<vk::PhysicalDeviceFeatures2>());
+    vkb_phys.enable_extension_features_if_present(
+        features.get<vk::PhysicalDeviceVulkan11Features>());
+    // vkb_phys.enable_extension_features_if_present(
+    //     features.get<vk::PhysicalDeviceVulkan12Features>());
+    // vkb_phys.enable_extension_features_if_present(
+    //     features.get<vk::PhysicalDeviceVulkan13Features>());
+    // vkb_phys.enable_extension_features_if_present(
+    //     features.get<vk::PhysicalDeviceVulkan14Features>());
+
+    auto dev_builder = vkb::DeviceBuilder{vkb_phys};
+    auto dev_ret     = dev_builder.build();
+    if (!dev_ret) {
+        fmt::print(
+            stderr,
+            "vk-bootstrap failed to create logical device: {}\n",
+            dev_ret.error().message());
+        throw std::exception{};
+    }
+
+    auto vkb_device = dev_ret.value();
+    auto device     = vk::raii::Device{physicalDevice, vkb_device.device};
+
+    auto vkb_graphicsQueue = vkb_device.get_queue(vkb::QueueType::graphics).value();
+    auto graphicsQueue     = vk::raii::Queue{device, vkb_graphicsQueue};
+    auto graphicsQueueIndex =
+        vkb_device.get_queue_index(vkb::QueueType::graphics).value();
+
+    auto vkb_presentQueue = vkb_device.get_queue(vkb::QueueType::graphics).value();
+    auto presentQueue     = vk::raii::Queue{device, vkb_presentQueue};
+    auto presentQueueIndex =
+        vkb_device.get_queue_index(vkb::QueueType::present).value();
+
+    auto swap_builder = vkb::SwapchainBuilder{vkb_device};
+    auto swap_ret =
+        swap_builder
+            .set_image_usage_flags(
+                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+            .set_desired_present_mode(VK_PRESENT_MODE_MAILBOX_KHR)
+            .add_fallback_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR)
+            .add_fallback_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+            .set_desired_format(
+                VkSurfaceFormatKHR{
+                    .format     = VK_FORMAT_B8G8R8A8_UNORM,
+                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
+            .add_fallback_format(
+                VkSurfaceFormatKHR{
+                    .format     = VK_FORMAT_R8G8B8A8_SNORM,
+                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
+            .set_desired_min_image_count(3)
+            .build();
+
+    if (!swap_ret) {
+        fmt::print(
+            stderr,
+            "vk-bootstrap failed to create swapchain: {}",
+            swap_ret.error().message());
+        throw std::exception{};
+    }
+
+    auto vkb_swapchain = swap_ret.value();
+    auto swapchain     = vk::raii::SwapchainKHR(device, vkb_swapchain.swapchain);
+    auto imageFormat   = vk::Format(vkb_swapchain.image_format);
+    auto depthFormat   = findDepthFormat(physicalDevice);
+
+    return RenderContext{
+        std::move(context),
+        std::move(instance),
+        std::move(debugUtils),
+        std::move(window),
+        std::move(surface),
+        std::move(physicalDevice),
+        std::move(device),
+        std::move(graphicsQueue),
+        std::move(presentQueue),
+        graphicsQueueIndex,
+        presentQueueIndex,
+        std::move(swapchain),
+        imageFormat,
+        depthFormat};
+}
+
+auto main(
+    int    argc,
+    char **argv) -> int
+{
+    auto gltfPath = [&] -> std::filesystem::path {
+        if (argc < 2) {
+            return "resources/Duck/glTF/Duck.gltf";
+        } else {
+            return std::string{argv[1]};
+        }
+    }();
+
+    auto shaderPath = [&] -> std::filesystem::path {
+        if (argc < 3) {
+            return "shaders/shader.vert.spv";
+        } else {
+            return std::string{argv[2]};
+        }
+    }();
+
+    RenderContext ctx = initRenderContext();
+
+    VmaVulkanFunctions vulkanFunctions    = {};
+    vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+    vulkanFunctions.vkGetDeviceProcAddr   = vkGetDeviceProcAddr;
+
+    VmaAllocatorCreateInfo allocatorCreateInfo = {};
+    allocatorCreateInfo.physicalDevice         = *ctx.physicalDevice;
+    allocatorCreateInfo.device                 = *ctx.device;
+    allocatorCreateInfo.instance               = *ctx.instance;
+    allocatorCreateInfo.vulkanApiVersion       = VK_API_VERSION_1_4;
+    allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT
+                              | VMA_ALLOCATOR_CREATE_EXT_MEMORY_PRIORITY_BIT;
+    allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
+
+    VmaAllocator allocator;
+    if (vmaCreateAllocator(&allocatorCreateInfo, &allocator) != VK_SUCCESS) {
+        fmt::print(stderr, "Failed to create VMA allocator\n");
+        return -1;
+    }
+
+    // get swapchain images
+
+    auto images            = ctx.swapchain.getImages();
+    auto maxFramesInFlight = images.size();
+
+    auto imageViews     = std::vector<vk::raii::ImageView>{};
+    auto imageAvailable = std::vector<vk::raii::Semaphore>{};
+    auto renderFinished = std::vector<vk::raii::Semaphore>{};
+
+    for (auto image : images) {
+        imageViews.emplace_back(
+            ctx.device,
+            vk::ImageViewCreateInfo{
+                {},
+                image,
+                vk::ImageViewType::e2D,
+                ctx.imageFormat,
+                {},
+                {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
+        imageAvailable.emplace_back(ctx.device, vk::SemaphoreCreateInfo{});
+        renderFinished.emplace_back(ctx.device, vk::SemaphoreCreateInfo{});
+    }
+
+    // create transient command pool for single-time commands
+    auto transientCommandPool = vk::raii::CommandPool{
+        ctx.device,
+        vk::CommandPoolCreateInfo{
+            vk::CommandPoolCreateFlagBits::eTransient,
+            ctx.graphicsQueueIndex}};
+
+    // Transition image layout
+    auto commandBuffer = beginSingleTimeCommands(ctx.device, transientCommandPool);
+
+    for (auto image : images) {
+        cmdTransitionImageLayout(
+            commandBuffer,
+            image,
+            vk::ImageLayout::eUndefined,
+            vk::ImageLayout::ePresentSrcKHR,
+            vk::ImageAspectFlagBits::eColor);
+    }
+
+    endSingleTimeCommands(
+        ctx.device,
+        transientCommandPool,
+        commandBuffer,
+        ctx.graphicsQueue);
+
+    auto commandPools   = std::vector<vk::raii::CommandPool>{};
+    auto commandBuffers = std::vector<vk::raii::CommandBuffer>{};
+    auto frameNumbers   = std::vector<uint64_t>{maxFramesInFlight, 0};
+    std::ranges::iota(frameNumbers, 0);
+
+    uint64_t initialValue = maxFramesInFlight - 1;
+
+    auto timelineSemaphoreCreateInfo =
+        vk::SemaphoreTypeCreateInfo{vk::SemaphoreType::eTimeline, initialValue};
+    auto frameTimelineSemaphore =
+        vk::raii::Semaphore{ctx.device, {{}, &timelineSemaphoreCreateInfo}};
+
+    for (auto n : std::views::iota(0u, maxFramesInFlight)) {
+
+        commandPools.emplace_back(
+            ctx.device,
+            vk::CommandPoolCreateInfo{{}, ctx.graphicsQueueIndex});
+
+        commandBuffers.emplace_back(
+            std::move(
+                vk::raii::CommandBuffers{
+                    ctx.device,
+                    vk::CommandBufferAllocateInfo{
+                        commandPools.back(),
+                        vk::CommandBufferLevel::ePrimary,
+                        1}}
+                    .front()));
+    }
+
+    // create descriptor pool for ImGui (?)
+
+    // init ImGui
+
+    // create GBuffer
+
+    auto asset = getGltfAsset(gltfPath);
+
+    auto [indices, vertices] = getGltfAssetData(asset.get());
+
+    auto [vertShaderModule, fragShaderModule] = createShaderModules(ctx.device);
+
+    const auto descriptorSetLayoutBindings = std::array{
+        vk::DescriptorSetLayoutBinding{
+            0,
+            vk::DescriptorType::eUniformBuffer,
+            1,
+            vk::ShaderStageFlagBits::eVertex},
+        vk::DescriptorSetLayoutBinding{
+            1,
+            vk::DescriptorType::eCombinedImageSampler,
+            1,
+            vk::ShaderStageFlagBits::eFragment}};
+
+    auto descriptorSetLayout = vk::raii::DescriptorSetLayout{
+        ctx.device,
+        vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
+
+    auto pipelineLayout =
+        vk::raii::PipelineLayout{ctx.device, {{}, *descriptorSetLayout}};
+
+    auto graphicsPipeline = create_pipeline(
+        ctx.device,
+        ctx.imageFormat,
+        ctx.depthFormat,
+        vertShaderModule,
+        fragShaderModule,
+        pipelineLayout);
 
     // std::vector<vk::raii::DescriptorSetLayout>  descriptorSetLayouts;
     // std::vector<vk::PushConstantRange>          pushConstantRanges;
