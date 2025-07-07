@@ -80,6 +80,11 @@ auto Allocator::createBuffer(
 
     return buffer;
 }
+//*-- Destroy a buffer -*/
+void Allocator::destroyBuffer(Buffer buffer) const
+{
+    vmaDestroyBuffer(allocator, buffer.buffer, buffer.allocation);
+}
 
 /*--
  * Create a staging buffer, copy data into it, and track it.
@@ -175,20 +180,20 @@ void Allocator::destroyImage(Image &image) const
     vmaDestroyImage(allocator, image.image, image.allocation);
 }
 
-void destroyImageResource(ImageResource &imageRessource) const
+void Allocator::destroyImageResource(ImageResource &imageResource) const
 {
-    destroyImage(imageRessource);
-    vkDestroyImageView(m_device, imageRessource.view, nullptr);
+    destroyImage(imageResource);
+    vkDestroyImageView(device, imageResource.view, nullptr);
 }
 
 /*-- Create an image and upload data using a staging buffer --*/
 template <typename T>
 [[nodiscard]]
-ImageResource createImageAndUploadData(
-    VkCommandBuffer          cmd,
-    const std::span<T>      &vectorData,
-    const VkImageCreateInfo &_imageInfo,
-    VkImageLayout            finalLayout)
+auto Allocator::createImageAndUploadData(
+    vk::raii::CommandBuffer   &cmd,
+    const std::span<T>        &vectorData,
+    const vk::ImageCreateInfo &_imageInfo,
+    vk::ImageLayout            finalLayout) -> ImageResource
 {
     // Create staging buffer and upload data
     Buffer stagingBuffer = createStagingBuffer(vectorData);
@@ -200,33 +205,32 @@ ImageResource createImageAndUploadData(
     Image image = createImage(imageInfo);
 
     // Transition image layout for copying data
-    cmdTransitionImageLayout(
-        cmd,
-        image.image,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    // cmdTransitionImageLayout(
+    //     cmd,
+    //     image.image,
+    //     VK_IMAGE_LAYOUT_UNDEFINED,
+    //     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     // Copy buffer data to the image
-    const std::array<VkBufferImageCopy, 1> copyRegion{
-        {{.imageSubresource =
-              {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .layerCount = 1},
-          .imageExtent = imageInfo.extent}}};
+    // const std::array<VkBufferImageCopy, 1> copyRegion{
+    //     {{.imageSubresource =
+    //           {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .layerCount = 1},
+    //       .imageExtent = imageInfo.extent}}};
 
-    vkCmdCopyBufferToImage(
-        cmd,
+    cmd.copyBufferToImage(
         stagingBuffer.buffer,
         image.image,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        uint32_t(copyRegion.size()),
-        copyRegion.data());
+        vk::ImageLayout::eTransferDstOptimal,
+        // vk::BufferImageCopy{}
+    );
 
     // Transition image layout to final layout
-    cmdTransitionImageLayout(
-        cmd,
-        image.image,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        finalLayout);
-
+    // cmdTransitionImageLayout(
+    //     cmd,
+    //     image.image,
+    //     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    //     finalLayout);
+    //
     ImageResource resultImage(image);
     resultImage.layout = finalLayout;
     return resultImage;
