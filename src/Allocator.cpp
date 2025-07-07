@@ -212,17 +212,22 @@ auto Allocator::createImageAndUploadData(
     //     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     // Copy buffer data to the image
-    // const std::array<VkBufferImageCopy, 1> copyRegion{
-    //     {{.imageSubresource =
-    //           {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .layerCount = 1},
-    //       .imageExtent = imageInfo.extent}}};
+    const std::array<VkBufferImageCopy, 1> copyRegion{
+        {{.imageSubresource =
+              {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .layerCount = 1},
+          .imageExtent = imageInfo.extent}}};
 
     cmd.copyBufferToImage(
         stagingBuffer.buffer,
         image.image,
         vk::ImageLayout::eTransferDstOptimal,
-        // vk::BufferImageCopy{}
-    );
+        vk::BufferImageCopy{
+            {},
+            {},
+            {},
+            vk::ImageSubresourceLayers{vk::ImageAspectFlagBits::eColor, {}, {}, 1},
+            {},
+            imageInfo.extent});
 
     // Transition image layout to final layout
     // cmdTransitionImageLayout(
@@ -232,7 +237,7 @@ auto Allocator::createImageAndUploadData(
     //     finalLayout);
     //
     ImageResource resultImage(image);
-    resultImage.layout = finalLayout;
+    resultImage.layout = *finalLayout;
     return resultImage;
 }
 
