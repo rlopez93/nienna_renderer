@@ -766,6 +766,11 @@ auto main(
     // auto renderingAttachmentInfo =
     //     vk::RenderingAttachmentInfo{{}, {}, {}, {}, {}, {}, {}, {}};
 
+    uint32_t frameRingCurrent = 0;
+    uint32_t currentFrame     = 0;
+
+    bool swapchainNeedRebuild = false;
+
     bool      running = true;
     SDL_Event e;
     while (running) {
@@ -774,7 +779,91 @@ auto main(
                 running = false;
             }
         }
-        SDL_Delay(16); // Simulate frame
+
+        // check swapchain rebuild
+        if (swapchainNeedRebuild) {
+        }
+
+        // get current frame data
+        auto &cmdPool     = commandPools[frameRingCurrent];
+        auto &cmd         = commandBuffers[frameRingCurrent];
+        auto  frameNumber = frameNumbers[frameRingCurrent];
+
+        {
+            // wait semaphore frame (n - numFrames)
+            auto res = r.ctx.device.waitSemaphores(
+                vk::SemaphoreWaitInfo{{}, frameTimelineSemaphore, frameNumber},
+                std::numeric_limits<uint64_t>::max());
+        }
+
+        cmdPool.reset();
+        cmd.begin(
+            vk::CommandBufferBeginInfo{vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+
+        auto [result, nextImageIndex] = r.ctx.swapchain.acquireNextImage(
+            std::numeric_limits<uint64_t>::max(),
+            imageAvailable[currentFrame]);
+
+        if (result == vk::Result::eErrorOutOfDateKHR) {
+            swapchainNeedRebuild = true;
+        } else if (!(result == vk::Result::eSuccess
+                     || result == vk::Result::eSuboptimalKHR)) {
+            throw std::exception{};
+        }
+
+        if (swapchainNeedRebuild) {
+        }
+
+        // update uniform buffers
+
+        // get color attachment image to render to: vk::RenderingAttachmentInfo
+
+        // get depth attachment buffer: vk::RenderingAttachmentInfo
+
+        // vk::RenderingInfo
+
+        // transition swapchain image layout:
+        // vk::ImageLayout::eGeneral -> vk::ImageLayout::eColorAttachmentOptimal
+
+        cmd.beginRendering(vk::RenderingInfo{});
+
+        cmd.setViewportWithCount({/*viewport*/});
+        cmd.setScissorWithCount({/*scissor*/});
+
+        // bind texture resources passed to shader
+        // cmd.bindDescriptorSets2(vk::BindDescriptorSetsInfo{});
+
+        // bind vertex data
+        // cmd.bindVertexBuffers(uint32_t firstBinding, const vk::ArrayProxy<const
+        // vk::Buffer> &buffers, const vk::ArrayProxy<const vk::DeviceSize> &offsets);
+
+        // bind index data
+        // cmd.bindIndexBuffer(vk::Buffer buffer, vk::DeviceSize offset, vk::IndexType
+        // indexType)
+
+        // cmd.drawIndexed(uint32_t indexCount, uint32_t instanceCount,
+        // uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance)
+
+        cmd.endRendering();
+
+        // transition swapchain image layout: color attach opt -> general
+
+        // beginDynamicRenderingToSwapchain()
+
+        auto colorAttachment = vk::RenderingAttachmentInfo{}
+                                   .setImageView(imageViews[nextImageIndex])
+                                   .setLoadOp(vk::AttachmentLoadOp::eClear)
+                                   .setStoreOp(vk::AttachmentStoreOp::eStore)
+                                   .setClearValue({{0.0f, 0.0f, 0.0f, 1.0f}})
+                                   .setImageLayout(vk::ImageLayout::eAttachmentOptimal);
+
+        // transition image layout imageViews[nextImageIndex]
+        // ePresentSrcKHR -> eColorAttachmentOptimal
+        cmd.beginRendering({});
+
+        cmd.endRendering();
+        // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
+        // SDL_Delay(16); // Simulate frame
     }
 
     // --- Cleanup
