@@ -3,12 +3,6 @@
 #include <vulkan/vulkan_extension_inspection.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
-#define VMA_IMPLEMENTATION
-#define VMA_STATIC_VULKAN_FUNCTIONS 0
-#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
-#define VMA_USE_STL_CONTAINERS 1
-#include <vma/vk_mem_alloc.h>
-
 #include <fastgltf/core.hpp>
 #include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/math.hpp>
@@ -39,6 +33,7 @@
 #include <ranges>
 #include <variant>
 
+#include "Allocator.hpp"
 #include "Renderer.hpp"
 
 struct Vertex;
@@ -792,7 +787,7 @@ auto main(
         {
             // wait semaphore frame (n - numFrames)
             auto res = r.ctx.device.waitSemaphores(
-                vk::SemaphoreWaitInfo{{}, frameTimelineSemaphore, frameNumber},
+                vk::SemaphoreWaitInfo{{}, *frameTimelineSemaphore, frameNumber},
                 std::numeric_limits<uint64_t>::max());
         }
 

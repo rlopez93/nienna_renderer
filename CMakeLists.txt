@@ -10,7 +10,11 @@ find_package(Vulkan REQUIRED)
 find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
 find_package(fmt REQUIRED)
 
-add_executable(nienna src/main.cpp include/Renderer.hpp src/Renderer.cpp)
+add_executable(nienna
+    src/main.cpp
+    include/Renderer.hpp src/Renderer.cpp
+    include/Allocator.hpp src/Allocator.cpp
+)
 
 add_library(spirv_reflect STATIC spirv_reflect.c)
 
@@ -24,7 +28,6 @@ target_include_directories(nienna PRIVATE
 target_link_directories(nienna PRIVATE
     ${Vulkan_LIBRARIES}
 )
-
 
 add_subdirectory(third_party/vk-bootstrap)
 add_subdirectory(third_party/fastgltf)
