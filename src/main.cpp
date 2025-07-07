@@ -602,51 +602,6 @@ auto createShaderModules(vk::raii::Device &device) -> std::tuple<
     return {std::move(vertShaderModule), std::move(fragShaderModule)};
 }
 
-auto createFrameSubmission(
-    vk::raii::Device &device,
-    uint32_t          graphicsQueueIndex,
-    uint32_t          maxFramesInFlight)
-    -> std::tuple<
-        std::vector<vk::raii::CommandPool>,
-        std::vector<vk::raii::CommandBuffer>,
-        std::vector<uint64_t>>
-{
-    // create frame submission
-    auto commandPools   = std::vector<vk::raii::CommandPool>{};
-    auto commandBuffers = std::vector<vk::raii::CommandBuffer>{};
-    auto frameNumbers   = std::vector<uint64_t>{maxFramesInFlight, 0};
-    std::ranges::iota(frameNumbers, 0);
-
-    uint64_t initialValue = maxFramesInFlight - 1;
-
-    auto timelineSemaphoreCreateInfo =
-        vk::SemaphoreTypeCreateInfo{vk::SemaphoreType::eTimeline, initialValue};
-    auto frameTimelineSemaphore =
-        vk::raii::Semaphore{device, {{}, &timelineSemaphoreCreateInfo}};
-
-    for (auto n : std::views::iota(0u, maxFramesInFlight)) {
-
-        commandPools.emplace_back(
-            device,
-            vk::CommandPoolCreateInfo{{}, graphicsQueueIndex});
-
-        commandBuffers.emplace_back(
-            std::move(
-                vk::raii::CommandBuffers{
-                    device,
-                    vk::CommandBufferAllocateInfo{
-                        commandPools.back(),
-                        vk::CommandBufferLevel::ePrimary,
-                        1}}
-                    .front()));
-    }
-
-    return {
-        std::move(commandPools),
-        std::move(commandBuffers),
-        std::move(frameNumbers)};
-}
-
 auto createVmaAllocator(RenderContext &ctx) -> VmaAllocator
 {
 
@@ -692,8 +647,8 @@ auto main(
         }
     }();
 
-    Renderer r;
-    auto     vmaAllocator = createVmaAllocator(r.ctx);
+    Renderer     r;
+    VmaAllocator vmaAllocator = createVmaAllocator(r.ctx);
 
     // get swapchain images
 
@@ -721,9 +676,7 @@ auto main(
     // create transient command pool for single-time commands
     auto transientCommandPool = vk::raii::CommandPool{
         r.ctx.device,
-        vk::CommandPoolCreateInfo{
-            vk::CommandPoolCreateFlagBits::eTransient,
-            r.ctx.graphicsQueueIndex}};
+        {vk::CommandPoolCreateFlagBits::eTransient, r.ctx.graphicsQueueIndex}};
 
     // Transition image layout
     auto commandBuffer = beginSingleTimeCommands(r.ctx.device, transientCommandPool);
@@ -796,9 +749,8 @@ auto main(
             1,
             vk::ShaderStageFlagBits::eFragment}};
 
-    auto descriptorSetLayout = vk::raii::DescriptorSetLayout{
-        r.ctx.device,
-        vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
+    auto descriptorSetLayout =
+        vk::raii::DescriptorSetLayout{r.ctx.device, {{}, descriptorSetLayoutBindings}};
 
     auto pipelineLayout =
         vk::raii::PipelineLayout{r.ctx.device, {{}, *descriptorSetLayout}};
@@ -810,6 +762,9 @@ auto main(
         vertShaderModule,
         fragShaderModule,
         pipelineLayout);
+
+    // auto renderingAttachmentInfo =
+    //     vk::RenderingAttachmentInfo{{}, {}, {}, {}, {}, {}, {}, {}};
 
     bool      running = true;
     SDL_Event e;
