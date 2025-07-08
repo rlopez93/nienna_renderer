@@ -3,6 +3,8 @@
 #include <vulkan/vulkan_extension_inspection.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
+#include <SDL3/SDL_events.h>
+
 #include <fastgltf/core.hpp>
 #include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/math.hpp>
@@ -11,12 +13,6 @@
 
 #include "spirv_reflect.h"
 #include "stb_image.h"
-
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_error.h>
-#include <SDL3/SDL_main.h>
-#include <SDL3/SDL_video.h>
-#include <SDL3/SDL_vulkan.h>
 
 #include <fmt/base.h>
 
@@ -706,7 +702,5 @@ auto main(
         // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
     }
 
-    // --- Cleanup
-    SDL_Quit();
     return 0;
 }

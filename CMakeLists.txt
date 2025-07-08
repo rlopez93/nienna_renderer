@@ -10,7 +10,9 @@ find_package(Vulkan REQUIRED)
 find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
 find_package(fmt REQUIRED)
 
-add_executable(nienna
+add_executable(nienna)
+
+target_sources(nienna PRIVATE
     src/main.cpp
     include/Renderer.hpp src/Renderer.cpp
     include/Allocator.hpp src/Allocator.cpp
