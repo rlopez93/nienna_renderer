@@ -46,9 +46,10 @@ struct Image {
 /*The image resource is an image with an image view and a
         layout and other information like format and extent*/
 struct ImageResource : Image {
-    VkImageView   view{};   // Image view
-    VkExtent2D    extent{}; // Size of the image
-    VkImageLayout layout{}; // Layout of the image (color attachment, shader read, ...)
+    vk::ImageView view{};   // Image view
+    vk::Extent2D  extent{}; // Size of the image
+    vk::ImageLayout
+        layout{}; // Layout of the image (color attachment, shader read, ...)
 };
 
 struct Allocator {

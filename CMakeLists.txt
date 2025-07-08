@@ -14,6 +14,7 @@ add_executable(nienna
     src/main.cpp
     include/Renderer.hpp src/Renderer.cpp
     include/Allocator.hpp src/Allocator.cpp
+    include/Utility.hpp src/Utility.cpp
 )
 
 add_library(spirv_reflect STATIC spirv_reflect.c)

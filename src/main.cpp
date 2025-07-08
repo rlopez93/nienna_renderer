@@ -35,146 +35,10 @@
 
 #include "Allocator.hpp"
 #include "Renderer.hpp"
+#include "Utility.hpp"
 
 struct Vertex;
 struct VertexReflectionData;
-
-auto readShaders(const std::string &filename) -> std::vector<char>;
-auto reflectShader(const std::filesystem::path &path) -> VertexReflectionData;
-
-auto getGltfAsset(const std::filesystem::path &gltfPath)
-    -> fastgltf::Expected<fastgltf::Asset>;
-
-auto getGltfAssetData(fastgltf::Asset &asset) -> std::pair<
-    std::vector<uint16_t>,
-    std::vector<Vertex>>;
-
-void cmdTransitionImageLayout(
-    vk::raii::CommandBuffer &cmd,
-    VkImage                  image,
-    vk::ImageLayout          oldLayout,
-    vk::ImageLayout          newLayout,
-    vk::ImageAspectFlags     aspectMask);
-
-auto makePipelineStageAccessTuple(vk::ImageLayout state) -> std::tuple<
-    vk::PipelineStageFlags2,
-    vk::AccessFlags2>;
-
-auto makePipelineStageAccessTuple(vk::ImageLayout state) -> std::tuple<
-    vk::PipelineStageFlags2,
-    vk::AccessFlags2>
-{
-    switch (state) {
-    case vk::ImageLayout::eUndefined:
-        return std::make_tuple(
-            vk::PipelineStageFlagBits2::eTopOfPipe,
-            vk::AccessFlagBits2::eNone);
-    case vk::ImageLayout::eColorAttachmentOptimal:
-        return std::make_tuple(
-            vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-            vk::AccessFlagBits2::eColorAttachmentRead
-                | vk::AccessFlagBits2::eColorAttachmentWrite);
-    case vk::ImageLayout::eShaderReadOnlyOptimal:
-        return std::make_tuple(
-            vk::PipelineStageFlagBits2::eFragmentShader
-                | vk::PipelineStageFlagBits2::eComputeShader
-                | vk::PipelineStageFlagBits2::ePreRasterizationShaders,
-            vk::AccessFlagBits2::eShaderRead);
-    case vk::ImageLayout::eTransferDstOptimal:
-        return std::make_tuple(
-            vk::PipelineStageFlagBits2::eTransfer,
-            vk::AccessFlagBits2::eTransferWrite);
-    case vk::ImageLayout::eGeneral:
-        return std::make_tuple(
-            vk::PipelineStageFlagBits2::eComputeShader
-                | vk::PipelineStageFlagBits2::eTransfer,
-            vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite
-                | vk::AccessFlagBits2::eTransferWrite);
-    case vk::ImageLayout::ePresentSrcKHR:
-        return std::make_tuple(
-            vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-            vk::AccessFlagBits2::eNone);
-    default: {
-        assert(false && "Unsupported layout transition!");
-        return std::make_tuple(
-            vk::PipelineStageFlagBits2::eAllCommands,
-            vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite);
-    }
-    }
-}
-
-void cmdTransitionImageLayout(
-    vk::raii::CommandBuffer &cmd,
-    VkImage                  image,
-    vk::ImageLayout          oldLayout,
-    vk::ImageLayout          newLayout,
-    vk::ImageAspectFlags     aspectMask)
-
-{
-    const auto [srcStage, srcAccess] = makePipelineStageAccessTuple(oldLayout);
-    const auto [dstStage, dstAccess] = makePipelineStageAccessTuple(newLayout);
-
-    auto barrier = vk::ImageMemoryBarrier2{
-        srcStage,
-        srcAccess,
-        dstStage,
-        dstAccess,
-        oldLayout,
-        newLayout,
-        vk::QueueFamilyIgnored,
-        vk::QueueFamilyIgnored,
-        image,
-        {aspectMask, 0, 1, 0, 1}};
-
-    cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, {}, barrier});
-}
-
-auto beginSingleTimeCommands(
-    vk::raii::Device      &device,
-    vk::raii::CommandPool &commandPool) -> vk::raii::CommandBuffer;
-
-auto endSingleTimeCommands(
-    vk::raii::Device      &device,
-    vk::raii::CommandPool &commandPool,
-    vk::CommandBuffer     &commandBuffer,
-    vk::Queue             &queue);
-
-auto endSingleTimeCommands(
-    vk::raii::Device        &device,
-    vk::raii::CommandPool   &commandPool,
-    vk::raii::CommandBuffer &commandBuffer,
-    vk::raii::Queue         &queue)
-{
-    // submit command buffer
-    commandBuffer.end();
-
-    // create fence for synchronization
-    auto fenceCreateInfo         = vk::FenceCreateInfo{};
-    auto fence                   = vk::raii::Fence{device, fenceCreateInfo};
-    auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{commandBuffer};
-
-    queue.submit2(vk::SubmitInfo2{{}, {}, commandBufferSubmitInfo}, fence);
-    auto result =
-        device.waitForFences(*fence, true, std::numeric_limits<uint64_t>::max());
-
-    assert(result == vk::Result::eSuccess);
-}
-
-auto beginSingleTimeCommands(
-    vk::raii::Device      &device,
-    vk::raii::CommandPool &commandPool) -> vk::raii::CommandBuffer
-{
-    auto commandBuffers = vk::raii::CommandBuffers{
-        device,
-        vk::CommandBufferAllocateInfo{
-            commandPool,
-            vk::CommandBufferLevel::ePrimary,
-            1}};
-    commandBuffers.front().begin(
-        vk::CommandBufferBeginInfo{vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-
-    return std::move(commandBuffers.front());
-};
 
 struct Vertex {
     fastgltf::math::fvec3 pos{};
@@ -182,134 +46,8 @@ struct Vertex {
     fastgltf::math::fvec2 texCoord{};
 };
 
-auto getGltfAsset(const std::filesystem::path &gltfPath)
-    -> fastgltf::Expected<fastgltf::Asset>
-{
-    constexpr auto supportedExtensions = fastgltf::Extensions::KHR_mesh_quantization
-                                       | fastgltf::Extensions::KHR_texture_transform
-                                       | fastgltf::Extensions::KHR_materials_variants;
-
-    fastgltf::Parser parser(supportedExtensions);
-
-    constexpr auto gltfOptions = fastgltf::Options::DontRequireValidAssetMember
-                               | fastgltf::Options::AllowDouble
-                               | fastgltf::Options::LoadExternalBuffers
-                               | fastgltf::Options::GenerateMeshIndices;
-
-    auto gltfFile = fastgltf::GltfDataBuffer::FromPath(gltfPath);
-    if (!bool(gltfFile)) {
-        fmt::print(
-            stderr,
-            "Failed to open glTF file: {}\n",
-            fastgltf::getErrorMessage(gltfFile.error()));
-        return fastgltf::Error{};
-    }
-
-    auto asset = parser.loadGltf(gltfFile.get(), gltfPath.parent_path(), gltfOptions);
-
-    if (fastgltf::getErrorName(asset.error()) != "None") {
-        fmt::print(
-            stderr,
-            "Failed to open glTF file: {}\n",
-            fastgltf::getErrorMessage(gltfFile.error()));
-    }
-
-    return asset;
-}
-
-auto getGltfAssetData(fastgltf::Asset &asset) -> std::pair<
-    std::vector<uint16_t>,
-    std::vector<Vertex>>
-{
-    auto indices  = std::vector<uint16_t>{};
-    auto vertices = std::vector<Vertex>{};
-    for (auto &mesh : asset.meshes) {
-        fmt::print(stderr, "Mesh is: <{}>\n", mesh.name);
-        for (auto primitiveIt = mesh.primitives.begin();
-             primitiveIt != mesh.primitives.end();
-             ++primitiveIt) {
-
-            if (primitiveIt->indicesAccessor.has_value()) {
-                auto &indexAccessor =
-                    asset.accessors[primitiveIt->indicesAccessor.value()];
-                indices.resize(indexAccessor.count);
-
-                fastgltf::iterateAccessorWithIndex<std::uint16_t>(
-                    asset,
-                    indexAccessor,
-                    [&](std::uint16_t index, std::size_t idx) {
-                        indices[idx] = index;
-                    });
-            }
-
-            auto positionIt = primitiveIt->findAttribute("POSITION");
-            auto normalIt   = primitiveIt->findAttribute("NORMAL");
-            auto texCoordIt = primitiveIt->findAttribute("TEXCOORD_0");
-
-            assert(positionIt != primitiveIt->attributes.end());
-            assert(normalIt != primitiveIt->attributes.end());
-            assert(texCoordIt != primitiveIt->attributes.end());
-
-            auto &positionAccessor = asset.accessors[positionIt->accessorIndex];
-            auto &normalAccessor   = asset.accessors[normalIt->accessorIndex];
-            auto &texCoordAccessor = asset.accessors[texCoordIt->accessorIndex];
-
-            vertices.resize(positionAccessor.count);
-
-            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
-                asset,
-                positionAccessor,
-                [&](fastgltf::math::fvec3 pos, std::size_t idx) {
-                    vertices[idx].pos = pos;
-                });
-
-            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
-                asset,
-                normalAccessor,
-                [&](fastgltf::math::fvec3 normal, std::size_t idx) {
-                    vertices[idx].normal = normal;
-                });
-
-            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
-                asset,
-                texCoordAccessor,
-                [&](fastgltf::math::fvec2 texCoord, std::size_t idx) {
-                    vertices[idx].texCoord = texCoord;
-                });
-
-            assert(primitiveIt->materialIndex.has_value());
-
-            fastgltf::Material &material =
-                asset.materials[primitiveIt->materialIndex.value()];
-            assert(material.pbrData.baseColorTexture.has_value());
-
-            fastgltf::TextureInfo &textureInfo =
-                material.pbrData.baseColorTexture.value();
-            assert(textureInfo.texCoordIndex == 0);
-
-            fastgltf::Texture &texture = asset.textures[textureInfo.textureIndex];
-            assert(texture.imageIndex.has_value());
-
-            fastgltf::Image &image = asset.images[texture.imageIndex.value()];
-
-            fastgltf::URI &imageURI = std::get<fastgltf::sources::URI>(image.data).uri;
-
-            auto image_data = std::vector<unsigned char>{};
-            {
-                int  x, y, n;
-                auto stbi_data = stbi_load(imageURI.c_str(), &x, &y, &n, 0);
-
-                image_data.assign(stbi_data, stbi_data + (x * y));
-
-                stbi_image_free(stbi_data);
-
-                // MapMemory -> copy to GPU -> UnmapMemory
-            }
-        }
-    }
-
-    return {indices, vertices};
-}
+auto readShaders(const std::string &filename) -> std::vector<char>;
+auto reflectShader(const std::filesystem::path &path) -> VertexReflectionData;
 
 auto readShaders(const std::string &filename) -> std::vector<char>
 {
@@ -444,6 +182,142 @@ auto reflectShader(const std::vector<char> &code) -> VertexReflectionData
     }
 
     return data;
+}
+
+auto getGltfAsset(const std::filesystem::path &gltfPath)
+    -> fastgltf::Expected<fastgltf::Asset>;
+
+auto getGltfAssetData(fastgltf::Asset &asset) -> std::pair<
+    std::vector<uint16_t>,
+    std::vector<Vertex>>;
+
+auto getGltfAsset(const std::filesystem::path &gltfPath)
+    -> fastgltf::Expected<fastgltf::Asset>
+{
+    constexpr auto supportedExtensions = fastgltf::Extensions::KHR_mesh_quantization
+                                       | fastgltf::Extensions::KHR_texture_transform
+                                       | fastgltf::Extensions::KHR_materials_variants;
+
+    fastgltf::Parser parser(supportedExtensions);
+
+    constexpr auto gltfOptions = fastgltf::Options::DontRequireValidAssetMember
+                               | fastgltf::Options::AllowDouble
+                               | fastgltf::Options::LoadExternalBuffers
+                               | fastgltf::Options::GenerateMeshIndices;
+
+    auto gltfFile = fastgltf::GltfDataBuffer::FromPath(gltfPath);
+    if (!bool(gltfFile)) {
+        fmt::print(
+            stderr,
+            "Failed to open glTF file: {}\n",
+            fastgltf::getErrorMessage(gltfFile.error()));
+        return fastgltf::Error{};
+    }
+
+    auto asset = parser.loadGltf(gltfFile.get(), gltfPath.parent_path(), gltfOptions);
+
+    if (fastgltf::getErrorName(asset.error()) != "None") {
+        fmt::print(
+            stderr,
+            "Failed to open glTF file: {}\n",
+            fastgltf::getErrorMessage(gltfFile.error()));
+    }
+
+    return asset;
+}
+
+auto getGltfAssetData(fastgltf::Asset &asset) -> std::pair<
+    std::vector<uint16_t>,
+    std::vector<Vertex>>
+{
+    auto indices  = std::vector<uint16_t>{};
+    auto vertices = std::vector<Vertex>{};
+    for (auto &mesh : asset.meshes) {
+        fmt::print(stderr, "Mesh is: <{}>\n", mesh.name);
+        for (auto primitiveIt = mesh.primitives.begin();
+             primitiveIt != mesh.primitives.end();
+             ++primitiveIt) {
+
+            if (primitiveIt->indicesAccessor.has_value()) {
+                auto &indexAccessor =
+                    asset.accessors[primitiveIt->indicesAccessor.value()];
+                indices.resize(indexAccessor.count);
+
+                fastgltf::iterateAccessorWithIndex<std::uint16_t>(
+                    asset,
+                    indexAccessor,
+                    [&](std::uint16_t index, std::size_t idx) {
+                        indices[idx] = index;
+                    });
+            }
+
+            auto positionIt = primitiveIt->findAttribute("POSITION");
+            auto normalIt   = primitiveIt->findAttribute("NORMAL");
+            auto texCoordIt = primitiveIt->findAttribute("TEXCOORD_0");
+
+            assert(positionIt != primitiveIt->attributes.end());
+            assert(normalIt != primitiveIt->attributes.end());
+            assert(texCoordIt != primitiveIt->attributes.end());
+
+            auto &positionAccessor = asset.accessors[positionIt->accessorIndex];
+            auto &normalAccessor   = asset.accessors[normalIt->accessorIndex];
+            auto &texCoordAccessor = asset.accessors[texCoordIt->accessorIndex];
+
+            vertices.resize(positionAccessor.count);
+
+            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+                asset,
+                positionAccessor,
+                [&](fastgltf::math::fvec3 pos, std::size_t idx) {
+                    vertices[idx].pos = pos;
+                });
+
+            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+                asset,
+                normalAccessor,
+                [&](fastgltf::math::fvec3 normal, std::size_t idx) {
+                    vertices[idx].normal = normal;
+                });
+
+            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
+                asset,
+                texCoordAccessor,
+                [&](fastgltf::math::fvec2 texCoord, std::size_t idx) {
+                    vertices[idx].texCoord = texCoord;
+                });
+
+            assert(primitiveIt->materialIndex.has_value());
+
+            fastgltf::Material &material =
+                asset.materials[primitiveIt->materialIndex.value()];
+            assert(material.pbrData.baseColorTexture.has_value());
+
+            fastgltf::TextureInfo &textureInfo =
+                material.pbrData.baseColorTexture.value();
+            assert(textureInfo.texCoordIndex == 0);
+
+            fastgltf::Texture &texture = asset.textures[textureInfo.textureIndex];
+            assert(texture.imageIndex.has_value());
+
+            fastgltf::Image &image = asset.images[texture.imageIndex.value()];
+
+            fastgltf::URI &imageURI = std::get<fastgltf::sources::URI>(image.data).uri;
+
+            auto image_data = std::vector<unsigned char>{};
+            {
+                int  x, y, n;
+                auto stbi_data = stbi_load(imageURI.c_str(), &x, &y, &n, 0);
+
+                image_data.assign(stbi_data, stbi_data + (x * y));
+
+                stbi_image_free(stbi_data);
+
+                // MapMemory -> copy to GPU -> UnmapMemory
+            }
+        }
+    }
+
+    return {indices, vertices};
 }
 
 auto createPipeline(

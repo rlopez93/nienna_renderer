@@ -1,5 +1,6 @@
 #define VMA_IMPLEMENTATION
 #include "Allocator.hpp"
+#include "Utility.hpp"
 
 Allocator::Allocator(VmaAllocatorCreateInfo allocatorInfo)
 {
@@ -100,7 +101,6 @@ auto Allocator::createStagingBuffer(const std::span<T> &vectorData) -> Buffer
     // Create a staging buffer
     Buffer stagingBuffer = createBuffer(
         bufferSize,
-        // VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT_KHR,
         vk::BufferUsageFlagBits2::eTransferSrc,
         VMA_MEMORY_USAGE_CPU_TO_GPU,
         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
@@ -199,24 +199,21 @@ auto Allocator::createImageAndUploadData(
     Buffer stagingBuffer = createStagingBuffer(vectorData);
 
     // Create image in GPU memory
-    VkImageCreateInfo imageInfo = _imageInfo;
-    imageInfo.usage |=
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT; // We will copy data to this image
+    vk::ImageCreateInfo imageInfo = _imageInfo;
+    imageInfo.setUsage(vk::ImageUsageFlagBits::eTransferDst);
     Image image = createImage(imageInfo);
 
     // Transition image layout for copying data
-    // cmdTransitionImageLayout(
-    //     cmd,
-    //     image.image,
-    //     VK_IMAGE_LAYOUT_UNDEFINED,
-    //     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    cmdTransitionImageLayout(
+        cmd,
+        image.image,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eTransferDstOptimal
+        // VK_IMAGE_LAYOUT_UNDEFINED,
+        // VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+    );
 
     // Copy buffer data to the image
-    const std::array<VkBufferImageCopy, 1> copyRegion{
-        {{.imageSubresource =
-              {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .layerCount = 1},
-          .imageExtent = imageInfo.extent}}};
-
     cmd.copyBufferToImage(
         stagingBuffer.buffer,
         image.image,
@@ -230,14 +227,14 @@ auto Allocator::createImageAndUploadData(
             imageInfo.extent});
 
     // Transition image layout to final layout
-    // cmdTransitionImageLayout(
-    //     cmd,
-    //     image.image,
-    //     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-    //     finalLayout);
-    //
+    cmdTransitionImageLayout(
+        cmd,
+        image.image,
+        vk::ImageLayout::eTransferDstOptimal,
+        finalLayout);
+
     ImageResource resultImage(image);
-    resultImage.layout = *finalLayout;
+    resultImage.layout = finalLayout;
     return resultImage;
 }
 
