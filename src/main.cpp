@@ -9,12 +9,8 @@
 #include <fastgltf/tools.hpp>
 #include <fastgltf/types.hpp>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
-
-#include <SPIRV-Reflect/spirv_reflect.h>
-
-#include <VkBootstrap.h>
+#include "spirv_reflect.h"
+#include "stb_image.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_error.h>
@@ -452,7 +448,8 @@ auto createShaderModules(vk::raii::Device &device) -> std::tuple<
     auto vertShaderCode = readShaders("shaders/shader.vert.spv");
     auto fragShaderCode = readShaders("shaders/shader.frag.spv");
 
-    // auto vertexData = reflectShader(vertShaderCode);
+    auto vertexData = reflectShader(vertShaderCode);
+    auto fragData   = reflectShader(fragShaderCode);
 
     auto vertShaderModule = vk::raii::ShaderModule{
         device,
@@ -469,31 +466,6 @@ auto createShaderModules(vk::raii::Device &device) -> std::tuple<
             reinterpret_cast<const uint32_t *>(fragShaderCode.data())}};
 
     return {std::move(vertShaderModule), std::move(fragShaderModule)};
-}
-
-auto createVmaAllocator(RenderContext &ctx) -> VmaAllocator
-{
-
-    VmaVulkanFunctions vulkanFunctions    = {};
-    vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
-    vulkanFunctions.vkGetDeviceProcAddr   = vkGetDeviceProcAddr;
-
-    VmaAllocatorCreateInfo allocatorCreateInfo = {};
-    allocatorCreateInfo.physicalDevice         = *ctx.physicalDevice;
-    allocatorCreateInfo.device                 = *ctx.device;
-    allocatorCreateInfo.instance               = *ctx.instance;
-    allocatorCreateInfo.vulkanApiVersion       = VK_API_VERSION_1_4;
-    allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT
-                              | VMA_ALLOCATOR_CREATE_EXT_MEMORY_PRIORITY_BIT;
-    allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
-
-    VmaAllocator allocator;
-    if (vmaCreateAllocator(&allocatorCreateInfo, &allocator) != VK_SUCCESS) {
-        fmt::print(stderr, "Failed to create VMA allocator\n");
-        throw std::exception{};
-    }
-
-    return allocator;
 }
 
 auto main(
@@ -516,11 +488,14 @@ auto main(
         }
     }();
 
-    Renderer     r;
-    VmaAllocator vmaAllocator = createVmaAllocator(r.ctx);
+    Renderer  r;
+    Allocator allocator{
+        r.ctx.instance,
+        r.ctx.physicalDevice,
+        r.ctx.device,
+        vk::ApiVersion14};
 
     // get swapchain images
-
     auto images            = r.ctx.swapchain.getImages();
     auto maxFramesInFlight = images.size();
 
@@ -632,9 +607,6 @@ auto main(
         fragShaderModule,
         pipelineLayout);
 
-    // auto renderingAttachmentInfo =
-    //     vk::RenderingAttachmentInfo{{}, {}, {}, {}, {}, {}, {}, {}};
-
     uint32_t frameRingCurrent = 0;
     uint32_t currentFrame     = 0;
 
@@ -732,11 +704,9 @@ auto main(
 
         cmd.endRendering();
         // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
-        // SDL_Delay(16); // Simulate frame
     }
 
     // --- Cleanup
-    vmaDestroyAllocator(vmaAllocator);
     SDL_Quit();
     return 0;
 }

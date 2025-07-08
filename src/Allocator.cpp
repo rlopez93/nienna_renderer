@@ -2,27 +2,38 @@
 #include "Allocator.hpp"
 #include "Utility.hpp"
 
-Allocator::Allocator(VmaAllocatorCreateInfo allocatorInfo)
+Allocator::Allocator(
+    vk::raii::Instance       &instance,
+    vk::raii::PhysicalDevice &physicalDevice,
+    vk::raii::Device         &device,
+    uint32_t                  api)
+    : device{device}
 {
     // Initialization of VMA allocator.
     // #TODO : VK_EXT_memory_priority ? VMA_ALLOCATOR_CREATE_EXT_MEMORY_PRIORITY_BIT
+    VmaAllocatorCreateInfo allocatorCreateInfo{
+        .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT
+               | VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE4_BIT,
+        .physicalDevice   = *physicalDevice,
+        .device           = *device,
+        .instance         = *instance,
+        .vulkanApiVersion = api};
 
-    allocatorInfo.flags |=
+    allocatorCreateInfo.flags |=
         VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT; // allow querying for the
                                                         // GPU address of a buffer
-    allocatorInfo.flags |= VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE4_BIT;
-    allocatorInfo.flags |=
+    allocatorCreateInfo.flags |= VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE4_BIT;
+    allocatorCreateInfo.flags |=
         VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE5_BIT; // allow using
                                                    // VkBufferUsageFlags2CreateInfoKHR
 
-    device = allocatorInfo.device;
     // Because we use VMA_DYNAMIC_VULKAN_FUNCTIONS
     const VmaVulkanFunctions functions = {
         .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
         .vkGetDeviceProcAddr   = vkGetDeviceProcAddr,
     };
-    allocatorInfo.pVulkanFunctions = &functions;
-    vmaCreateAllocator(&allocatorInfo, &allocator);
+    allocatorCreateInfo.pVulkanFunctions = &functions;
+    vmaCreateAllocator(&allocatorCreateInfo, &allocator);
 }
 
 /*-- Create a buffer -*/

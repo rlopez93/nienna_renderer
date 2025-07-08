@@ -37,7 +37,16 @@ struct ImageResource : Image {
 };
 
 struct Allocator {
-    Allocator(VmaAllocatorCreateInfo allocatorInfo);
+    Allocator(
+        vk::raii::Instance       &instance,
+        vk::raii::PhysicalDevice &physicalDevice,
+        vk::raii::Device         &device,
+        uint32_t                  api);
+
+    ~Allocator()
+    {
+        vmaDestroyAllocator(allocator);
+    }
 
     [[nodiscard]]
     auto createBuffer(

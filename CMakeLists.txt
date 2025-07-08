@@ -15,15 +15,13 @@ add_executable(nienna
     include/Renderer.hpp src/Renderer.cpp
     include/Allocator.hpp src/Allocator.cpp
     include/Utility.hpp src/Utility.cpp
+    include/spirv_reflect.h src/spirv_reflect.c
+    include/stb_image.h src/stb_image.cpp
 )
 
-add_library(spirv_reflect STATIC spirv_reflect.c)
-
-target_include_directories(nienna PRIVATE
+target_include_directories(nienna PUBLIC
     include
     ${Vulkan_INCLUDE_DIRS}
-    ${Vulkan_INCLUDE_DIRS}/SPIRV-Reflect
-    ${Vulkan_INCLUDE_DIRS}/SPIRV-Reflect/include
 )
 
 target_link_directories(nienna PRIVATE
@@ -39,7 +37,6 @@ target_link_libraries(nienna PRIVATE
     vk-bootstrap::vk-bootstrap
     fastgltf::fastgltf
     fmt::fmt
-    spirv_reflect
 )
 
 if(NOT Vulkan_SLANGC_EXECUTABLE)
