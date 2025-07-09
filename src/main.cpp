@@ -187,7 +187,8 @@ auto getGltfAssetData(
         std::vector<uint16_t>,
         std::vector<Vertex>,
         std::vector<unsigned char>,
-        vk::Extent2D>;
+        vk::Extent2D,
+        fastgltf::math::fmat4x4>;
 
 auto getGltfAsset(const std::filesystem::path &gltfPath)
     -> fastgltf::Expected<fastgltf::Asset>
@@ -231,103 +232,182 @@ auto getGltfAssetData(
         std::vector<uint16_t>,
         std::vector<Vertex>,
         std::vector<unsigned char>,
-        vk::Extent2D>
+        vk::Extent2D,
+        fastgltf::math::fmat4x4>
 {
-    auto indices     = std::vector<uint16_t>{};
-    auto vertices    = std::vector<Vertex>{};
-    auto image_data  = std::vector<unsigned char>{};
-    auto imageExtent = vk::Extent2D{};
-    for (auto &mesh : asset.meshes) {
-        fmt::print(stderr, "Mesh is: <{}>\n", mesh.name);
-        for (auto primitiveIt = mesh.primitives.begin();
-             primitiveIt != mesh.primitives.end();
-             ++primitiveIt) {
+    auto indices      = std::vector<uint16_t>{};
+    auto vertices     = std::vector<Vertex>{};
+    auto image_data   = std::vector<unsigned char>{};
+    auto imageExtent  = vk::Extent2D{};
+    auto returnMatrix = fastgltf::math::fmat4x4{};
+    fastgltf::iterateSceneNodes(
+        asset,
+        0,
+        fastgltf::math::fmat4x4{},
+        [&](fastgltf::Node &node, fastgltf::math::fmat4x4 matrix) {
+            if (node.cameraIndex.has_value()) {
+                auto &camera = asset.cameras[node.cameraIndex.value()];
+                fmt::print(stderr, "camera is {}\n", camera.name);
+                fmt::print(
+                    stderr,
+                    "matrix is:{} {} {} {}\n{} {} {} {}\n{} {} {} {}\n{} {} {} {}\n",
+                    matrix[0][0],
+                    matrix[0][1],
+                    matrix[0][2],
+                    matrix[0][3],
+                    matrix[1][0],
+                    matrix[1][1],
+                    matrix[1][2],
+                    matrix[1][3],
+                    matrix[2][0],
+                    matrix[2][1],
+                    matrix[2][2],
+                    matrix[2][3],
+                    matrix[3][0],
+                    matrix[3][1],
+                    matrix[3][2],
+                    matrix[3][3]);
 
-            if (primitiveIt->indicesAccessor.has_value()) {
-                auto &indexAccessor =
-                    asset.accessors[primitiveIt->indicesAccessor.value()];
-                indices.resize(indexAccessor.count);
-
-                fastgltf::iterateAccessorWithIndex<std::uint16_t>(
-                    asset,
-                    indexAccessor,
-                    [&](std::uint16_t index, std::size_t idx) {
-                        indices[idx] = index;
-                    });
+                matrix = fastgltf::getTransformMatrix(node);
+                fmt::print(
+                    stderr,
+                    "local matrix is:{} {} {} {}\n{} {} {} {}\n{} {} {} {}\n{} {} {} "
+                    "{}\n",
+                    matrix[0][0],
+                    matrix[0][1],
+                    matrix[0][2],
+                    matrix[0][3],
+                    matrix[1][0],
+                    matrix[1][1],
+                    matrix[1][2],
+                    matrix[1][3],
+                    matrix[2][0],
+                    matrix[2][1],
+                    matrix[2][2],
+                    matrix[2][3],
+                    matrix[3][0],
+                    matrix[3][1],
+                    matrix[3][2],
+                    matrix[3][3]);
             }
+            if (node.meshIndex.has_value()) {
+                auto &mesh = asset.meshes[node.meshIndex.value()];
+                fmt::print(stderr, "Mesh is: <{}>\n", mesh.name);
 
-            auto positionIt = primitiveIt->findAttribute("POSITION");
-            auto normalIt   = primitiveIt->findAttribute("NORMAL");
-            auto texCoordIt = primitiveIt->findAttribute("TEXCOORD_0");
+                returnMatrix = matrix;
 
-            assert(positionIt != primitiveIt->attributes.end());
-            assert(normalIt != primitiveIt->attributes.end());
-            assert(texCoordIt != primitiveIt->attributes.end());
+                fmt::print(
+                    stderr,
+                    "matrix is:{} {} {} {}\n{} {} {} {}\n{} {} {} {}\n{} {} {} {}\n",
+                    matrix[0][0],
+                    matrix[0][1],
+                    matrix[0][2],
+                    matrix[0][3],
+                    matrix[1][0],
+                    matrix[1][1],
+                    matrix[1][2],
+                    matrix[1][3],
+                    matrix[2][0],
+                    matrix[2][1],
+                    matrix[2][2],
+                    matrix[2][3],
+                    matrix[3][0],
+                    matrix[3][1],
+                    matrix[3][2],
+                    matrix[3][3]);
 
-            auto &positionAccessor = asset.accessors[positionIt->accessorIndex];
-            auto &normalAccessor   = asset.accessors[normalIt->accessorIndex];
-            auto &texCoordAccessor = asset.accessors[texCoordIt->accessorIndex];
+                for (auto primitiveIt = mesh.primitives.begin();
+                     primitiveIt != mesh.primitives.end();
+                     ++primitiveIt) {
 
-            vertices.resize(positionAccessor.count);
+                    if (primitiveIt->indicesAccessor.has_value()) {
+                        auto &indexAccessor =
+                            asset.accessors[primitiveIt->indicesAccessor.value()];
+                        indices.resize(indexAccessor.count);
 
-            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
-                asset,
-                positionAccessor,
-                [&](fastgltf::math::fvec3 pos, std::size_t idx) {
-                    vertices[idx].pos = pos;
-                });
+                        fastgltf::iterateAccessorWithIndex<std::uint16_t>(
+                            asset,
+                            indexAccessor,
+                            [&](std::uint16_t index, std::size_t idx) {
+                                indices[idx] = index;
+                            });
+                    }
 
-            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
-                asset,
-                normalAccessor,
-                [&](fastgltf::math::fvec3 normal, std::size_t idx) {
-                    vertices[idx].normal = normal;
-                });
+                    auto positionIt = primitiveIt->findAttribute("POSITION");
+                    auto normalIt   = primitiveIt->findAttribute("NORMAL");
+                    auto texCoordIt = primitiveIt->findAttribute("TEXCOORD_0");
 
-            fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
-                asset,
-                texCoordAccessor,
-                [&](fastgltf::math::fvec2 texCoord, std::size_t idx) {
-                    vertices[idx].texCoord = texCoord;
-                });
+                    assert(positionIt != primitiveIt->attributes.end());
+                    assert(normalIt != primitiveIt->attributes.end());
+                    assert(texCoordIt != primitiveIt->attributes.end());
 
-            assert(primitiveIt->materialIndex.has_value());
+                    auto &positionAccessor = asset.accessors[positionIt->accessorIndex];
+                    auto &normalAccessor   = asset.accessors[normalIt->accessorIndex];
+                    auto &texCoordAccessor = asset.accessors[texCoordIt->accessorIndex];
 
-            fastgltf::Material &material =
-                asset.materials[primitiveIt->materialIndex.value()];
-            assert(material.pbrData.baseColorTexture.has_value());
+                    vertices.resize(positionAccessor.count);
 
-            fastgltf::TextureInfo &textureInfo =
-                material.pbrData.baseColorTexture.value();
-            assert(textureInfo.texCoordIndex == 0);
+                    fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+                        asset,
+                        positionAccessor,
+                        [&](fastgltf::math::fvec3 pos, std::size_t idx) {
+                            vertices[idx].pos = pos;
+                        });
 
-            fastgltf::Texture &texture = asset.textures[textureInfo.textureIndex];
-            assert(texture.imageIndex.has_value());
+                    fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+                        asset,
+                        normalAccessor,
+                        [&](fastgltf::math::fvec3 normal, std::size_t idx) {
+                            vertices[idx].normal = normal;
+                        });
 
-            fastgltf::Image &image = asset.images[texture.imageIndex.value()];
+                    fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
+                        asset,
+                        texCoordAccessor,
+                        [&](fastgltf::math::fvec2 texCoord, std::size_t idx) {
+                            vertices[idx].texCoord = texCoord;
+                        });
 
-            fastgltf::URI &imageURI = std::get<fastgltf::sources::URI>(image.data).uri;
+                    assert(primitiveIt->materialIndex.has_value());
 
-            {
-                auto path = directory / imageURI.fspath();
-                fmt::print(stderr, "\"{}\"\n", path.c_str());
-                int  x, y, n;
-                auto stbi_data = stbi_load(path.c_str(), &x, &y, &n, 0);
+                    fastgltf::Material &material =
+                        asset.materials[primitiveIt->materialIndex.value()];
+                    assert(material.pbrData.baseColorTexture.has_value());
 
-                fmt::print(stderr, "channels in file: {}\n", n);
-                assert(stbi_data);
+                    fastgltf::TextureInfo &textureInfo =
+                        material.pbrData.baseColorTexture.value();
+                    assert(textureInfo.texCoordIndex == 0);
 
-                image_data.assign(stbi_data, stbi_data + (x * y));
-                assert(
-                    image_data.size() * sizeof(unsigned char)
-                    == (x * y) * sizeof(unsigned char));
-                // assert(strcmp(image_data.data(), stbi_data) == 0);
-                imageExtent.setWidth(x).setHeight(y);
+                    fastgltf::Texture &texture =
+                        asset.textures[textureInfo.textureIndex];
+                    assert(texture.imageIndex.has_value());
 
-                stbi_image_free(stbi_data);
+                    fastgltf::Image &image = asset.images[texture.imageIndex.value()];
+
+                    fastgltf::URI &imageURI =
+                        std::get<fastgltf::sources::URI>(image.data).uri;
+
+                    {
+                        auto path = directory / imageURI.fspath();
+                        fmt::print(stderr, "\"{}\"\n", path.c_str());
+                        int  x, y, n;
+                        auto stbi_data = stbi_load(path.c_str(), &x, &y, &n, 0);
+
+                        fmt::print(stderr, "channels in file: {}\n", n);
+                        assert(stbi_data);
+
+                        image_data.assign(stbi_data, stbi_data + (x * y));
+                        assert(
+                            image_data.size() * sizeof(unsigned char)
+                            == (x * y) * sizeof(unsigned char));
+                        // assert(strcmp(image_data.data(), stbi_data) == 0);
+                        imageExtent.setWidth(x).setHeight(y);
+
+                        stbi_image_free(stbi_data);
+                    }
+                }
             }
-        }
-    }
+        });
 
     return {indices, vertices, image_data, imageExtent};
 }
@@ -643,7 +723,7 @@ auto main(
 
     auto asset = getGltfAsset(gltfDirectory / gltfFilename);
 
-    auto [indexData, vertexData, textureData, textureExtent] =
+    auto [indexData, vertexData, textureData, textureExtent, matrix] =
         getGltfAssetData(asset.get(), gltfDirectory);
 
     auto [vertexBuffer, indexBuffer, textureImage] = uploadBuffers(
@@ -655,6 +735,7 @@ auto main(
         textureExtent,
         r.ctx.graphicsQueue,
         allocator);
+
     auto [vertShaderModule, fragShaderModule] = createShaderModules(r.ctx.device);
 
     const auto descriptorSetLayoutBindings = std::array{
