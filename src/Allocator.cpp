@@ -33,7 +33,7 @@ Allocator::Allocator(
         .vkGetDeviceProcAddr   = vkGetDeviceProcAddr,
     };
     allocatorCreateInfo.pVulkanFunctions = &functions;
-    vmaCreateAllocator(&allocatorCreateInfo, &allocator);
+    VK_CHECK(vmaCreateAllocator(&allocatorCreateInfo, &allocator));
 }
 
 /*-- Create a buffer -*/
@@ -55,38 +55,42 @@ Allocator::Allocator(
  */
 [[nodiscard]]
 auto Allocator::createBuffer(
-    vk::DeviceSize           deviceSize,
-    vk::BufferUsageFlags2    usage,
+    vk::DeviceSize           bufferSize,
+    vk::BufferUsageFlags2    usageFlags,
     VmaMemoryUsage           memoryUsage,
-    VmaAllocationCreateFlags flags) const -> Buffer
+    VmaAllocationCreateFlags allocationFlags) const -> Buffer
 {
 
-    const auto bufferUsageFlags2CreateInfo = vk::BufferUsageFlags2CreateInfo{
-        usage | vk::BufferUsageFlagBits2::eShaderDeviceAddress};
-    const auto bufferCreateInfo =
-        vk::BufferCreateInfo{{}, deviceSize, {}, vk::SharingMode::eExclusive}.setPNext(
-            &bufferUsageFlags2CreateInfo);
+    const auto bufferUsageFlags2CreateInfo = *vk::BufferUsageFlags2CreateInfo{
+        usageFlags}; //| vk::BufferUsageFlagBits2::eShaderDeviceAddress};
+    auto bufferCreateInfo =
+        *vk::BufferCreateInfo{{}, bufferSize, {}, vk::SharingMode::eExclusive};
+
+    bufferCreateInfo.pNext = &bufferUsageFlags2CreateInfo;
 
     auto vmaAllocationCreateInfo =
-        VmaAllocationCreateInfo{.flags = flags, .usage = memoryUsage};
+        VmaAllocationCreateInfo{.flags = allocationFlags, .usage = memoryUsage};
+
     const VkDeviceSize dedicatedMemoryMinSize = 64ULL * 1024; // 64 KB
 
-    if (deviceSize > dedicatedMemoryMinSize) {
+    if (bufferSize > dedicatedMemoryMinSize) {
         vmaAllocationCreateInfo.flags |=
             VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT; // use dedicated memory for
                                                         // large buffers
     }
+
+    // VkBufferCreateInfo b_info         = *bufferCreateInfo;
     auto allocationInfo = VmaAllocationInfo{};
 
     Buffer   buffer;
     VkBuffer vk_buffer;
-    vmaCreateBuffer(
+    VK_CHECK(vmaCreateBuffer(
         allocator,
-        &*bufferCreateInfo,
+        &bufferCreateInfo,
         &vmaAllocationCreateInfo,
         &vk_buffer,
         &buffer.allocation,
-        &allocationInfo);
+        &allocationInfo));
 
     buffer.buffer = vk_buffer;
 
@@ -99,69 +103,6 @@ void Allocator::destroyBuffer(Buffer buffer) const
 }
 
 /*--
- * Create a staging buffer, copy data into it, and track it.
- * This method accepts data, handles the mapping, copying, and unmapping
- * automatically.
--*/
-template <typename T>
-[[nodiscard]]
-auto Allocator::createStagingBuffer(const std::span<T> &vectorData) -> Buffer
-{
-    const vk::DeviceSize bufferSize = sizeof(T) * vectorData.size();
-
-    // Create a staging buffer
-    Buffer stagingBuffer = createBuffer(
-        bufferSize,
-        vk::BufferUsageFlagBits2::eTransferSrc,
-        VMA_MEMORY_USAGE_CPU_TO_GPU,
-        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-
-    // Track the staging buffer for later cleanup
-    stagingBuffers.push_back(stagingBuffer);
-
-    // Map and copy data to the staging buffer
-    void *data;
-    vmaMapMemory(allocator, stagingBuffer.allocation, &data);
-    memcpy(data, vectorData.data(), (size_t)bufferSize);
-    vmaUnmapMemory(allocator, stagingBuffer.allocation);
-    return stagingBuffer;
-}
-
-/*--
- * Create a buffer (GPU only) with data, this is done using a staging buffer
- * The staging buffer is a buffer that is used to transfer data from the CPU
- * to the GPU.
- * and cannot be freed until the data is transferred. So the command buffer
- * must be submitted, then
- * the staging buffer can be cleared using the freeStagingBuffers function.
--*/
-template <typename T>
-[[nodiscard]]
-auto Allocator::createBufferAndUploadData(
-    vk::raii::CommandBuffer &cmd,
-    const std::span<T>      &vectorData,
-    vk::BufferUsageFlags2    usageFlags) -> Buffer
-{
-    // Create staging buffer and upload data
-    Buffer stagingBuffer = createStagingBuffer(vectorData);
-
-    // Create the final buffer in GPU memory
-    const vk::DeviceSize bufferSize = sizeof(T) * vectorData.size();
-
-    Buffer buffer = createBuffer(
-        bufferSize,
-        usageFlags | vk::BufferUsageFlagBits2::eTransferDst,
-        VMA_MEMORY_USAGE_GPU_ONLY);
-
-    cmd.copyBuffer(
-        stagingBuffer.buffer,
-        buffer.buffer,
-        vk::BufferCopy{}.setSize(bufferSize));
-
-    return buffer;
-}
-
-/*--
  * Create an image in GPU memory. This does not adding data to the image.
  * This is only creating the image in GPU memory.
  * See createImageAndUploadData for creating an image and uploading data.
@@ -169,6 +110,8 @@ auto Allocator::createBufferAndUploadData(
 [[nodiscard]]
 auto Allocator::createImage(const vk::ImageCreateInfo &imageInfo) const -> Image
 {
+    const auto imageCreateInfo = *imageInfo;
+
     const VmaAllocationCreateInfo createInfo{.usage = VMA_MEMORY_USAGE_GPU_ONLY};
 
     Image             image;
@@ -176,7 +119,7 @@ auto Allocator::createImage(const vk::ImageCreateInfo &imageInfo) const -> Image
     VmaAllocationInfo allocInfo{};
     VK_CHECK(vmaCreateImage(
         allocator,
-        &*imageInfo,
+        &imageCreateInfo,
         &createInfo,
         &vk_image,
         &image.allocation,
@@ -195,58 +138,6 @@ void Allocator::destroyImageResource(ImageResource &imageResource) const
 {
     destroyImage(imageResource);
     vkDestroyImageView(device, imageResource.view, nullptr);
-}
-
-/*-- Create an image and upload data using a staging buffer --*/
-template <typename T>
-[[nodiscard]]
-auto Allocator::createImageAndUploadData(
-    vk::raii::CommandBuffer   &cmd,
-    const std::span<T>        &vectorData,
-    const vk::ImageCreateInfo &_imageInfo,
-    vk::ImageLayout            finalLayout) -> ImageResource
-{
-    // Create staging buffer and upload data
-    Buffer stagingBuffer = createStagingBuffer(vectorData);
-
-    // Create image in GPU memory
-    vk::ImageCreateInfo imageInfo = _imageInfo;
-    imageInfo.setUsage(vk::ImageUsageFlagBits::eTransferDst);
-    Image image = createImage(imageInfo);
-
-    // Transition image layout for copying data
-    cmdTransitionImageLayout(
-        cmd,
-        image.image,
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eTransferDstOptimal
-        // VK_IMAGE_LAYOUT_UNDEFINED,
-        // VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-    );
-
-    // Copy buffer data to the image
-    cmd.copyBufferToImage(
-        stagingBuffer.buffer,
-        image.image,
-        vk::ImageLayout::eTransferDstOptimal,
-        vk::BufferImageCopy{
-            {},
-            {},
-            {},
-            vk::ImageSubresourceLayers{vk::ImageAspectFlagBits::eColor, {}, {}, 1},
-            {},
-            imageInfo.extent});
-
-    // Transition image layout to final layout
-    cmdTransitionImageLayout(
-        cmd,
-        image.image,
-        vk::ImageLayout::eTransferDstOptimal,
-        finalLayout);
-
-    ImageResource resultImage(image);
-    resultImage.layout = finalLayout;
-    return resultImage;
 }
 
 /*--

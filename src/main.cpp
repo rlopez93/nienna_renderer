@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -179,9 +180,14 @@ auto reflectShader(const std::vector<char> &code) -> VertexReflectionData
 auto getGltfAsset(const std::filesystem::path &gltfPath)
     -> fastgltf::Expected<fastgltf::Asset>;
 
-auto getGltfAssetData(fastgltf::Asset &asset) -> std::pair<
-    std::vector<uint16_t>,
-    std::vector<Vertex>>;
+auto getGltfAssetData(
+    fastgltf::Asset             &asset,
+    const std::filesystem::path &path)
+    -> std::tuple<
+        std::vector<uint16_t>,
+        std::vector<Vertex>,
+        std::vector<unsigned char>,
+        vk::Extent2D>;
 
 auto getGltfAsset(const std::filesystem::path &gltfPath)
     -> fastgltf::Expected<fastgltf::Asset>
@@ -218,12 +224,19 @@ auto getGltfAsset(const std::filesystem::path &gltfPath)
     return asset;
 }
 
-auto getGltfAssetData(fastgltf::Asset &asset) -> std::pair<
-    std::vector<uint16_t>,
-    std::vector<Vertex>>
+auto getGltfAssetData(
+    fastgltf::Asset             &asset,
+    const std::filesystem::path &directory)
+    -> std::tuple<
+        std::vector<uint16_t>,
+        std::vector<Vertex>,
+        std::vector<unsigned char>,
+        vk::Extent2D>
 {
-    auto indices  = std::vector<uint16_t>{};
-    auto vertices = std::vector<Vertex>{};
+    auto indices     = std::vector<uint16_t>{};
+    auto vertices    = std::vector<Vertex>{};
+    auto image_data  = std::vector<unsigned char>{};
+    auto imageExtent = vk::Extent2D{};
     for (auto &mesh : asset.meshes) {
         fmt::print(stderr, "Mesh is: <{}>\n", mesh.name);
         for (auto primitiveIt = mesh.primitives.begin();
@@ -295,21 +308,28 @@ auto getGltfAssetData(fastgltf::Asset &asset) -> std::pair<
 
             fastgltf::URI &imageURI = std::get<fastgltf::sources::URI>(image.data).uri;
 
-            auto image_data = std::vector<unsigned char>{};
             {
+                auto path = directory / imageURI.fspath();
+                fmt::print(stderr, "\"{}\"\n", path.c_str());
                 int  x, y, n;
-                auto stbi_data = stbi_load(imageURI.c_str(), &x, &y, &n, 0);
+                auto stbi_data = stbi_load(path.c_str(), &x, &y, &n, 0);
+
+                fmt::print(stderr, "channels in file: {}\n", n);
+                assert(stbi_data);
 
                 image_data.assign(stbi_data, stbi_data + (x * y));
+                assert(
+                    image_data.size() * sizeof(unsigned char)
+                    == (x * y) * sizeof(unsigned char));
+                // assert(strcmp(image_data.data(), stbi_data) == 0);
+                imageExtent.setWidth(x).setHeight(y);
 
                 stbi_image_free(stbi_data);
-
-                // MapMemory -> copy to GPU -> UnmapMemory
             }
         }
     }
 
-    return {indices, vertices};
+    return {indices, vertices, image_data, imageExtent};
 }
 
 auto createPipeline(
@@ -464,25 +484,75 @@ auto createShaderModules(vk::raii::Device &device) -> std::tuple<
     return {std::move(vertShaderModule), std::move(fragShaderModule)};
 }
 
+auto uploadBuffers(
+    vk::raii::Device                 &device,
+    vk::raii::CommandPool            &transientCommandPool,
+    const std::vector<Vertex>        &vertexData,
+    const std::vector<uint16_t>      &indexData,
+    const std::vector<unsigned char> &textureData,
+    const vk::Extent2D                textureExtent,
+    vk::raii::Queue                  &queue,
+    Allocator                        &allocator)
+    -> std::tuple<
+        Buffer,
+        Buffer,
+        ImageResource>
+{
+
+    auto commandBuffer = beginSingleTimeCommands(device, transientCommandPool);
+
+    auto vertexBuffer = allocator.createBufferAndUploadData(
+        commandBuffer,
+        vertexData,
+        vk::BufferUsageFlagBits2::eVertexBuffer);
+    auto indexBuffer = allocator.createBufferAndUploadData(
+        commandBuffer,
+        indexData,
+        vk::BufferUsageFlagBits2::eIndexBuffer);
+    assert(textureExtent.width * textureExtent.height == textureData.size());
+    auto textureImage = allocator.createImageAndUploadData(
+        commandBuffer,
+        textureData,
+        vk::ImageCreateInfo{
+            {},
+            vk::ImageType::e2D,
+            vk::Format::eR8Unorm, // TODO: IDK
+            // vk::Format::eR8G8B8A8Unorm,
+            {static_cast<uint32_t>(textureExtent.width),
+             static_cast<uint32_t>(textureExtent.height),
+             1},
+            1,
+            1,
+            vk::SampleCountFlagBits::e1,
+            vk::ImageTiling::eOptimal,
+            vk::ImageUsageFlagBits::eSampled},
+        vk::ImageLayout::eShaderReadOnlyOptimal);
+    endSingleTimeCommands(device, transientCommandPool, commandBuffer, queue);
+
+    return {vertexBuffer, indexBuffer, textureImage};
+}
+
 auto main(
     int    argc,
     char **argv) -> int
 {
-    auto gltfPath = [&] -> std::filesystem::path {
+    auto gltfDirectory = [&] -> std::filesystem::path {
         if (argc < 2) {
-            return "resources/Duck/glTF/Duck.gltf";
+            return "resources/Duck/glTF/";
         } else {
             return std::string{argv[1]};
         }
     }();
 
-    auto shaderPath = [&] -> std::filesystem::path {
+    auto gltfFilename = [&] -> std::filesystem::path {
         if (argc < 3) {
-            return "shaders/shader.vert.spv";
+            return "Duck.gltf";
         } else {
             return std::string{argv[2]};
         }
     }();
+
+    auto shaderPath = std::filesystem::path("shaders/shader.vert.spv");
 
     Renderer  r;
     Allocator allocator{
@@ -492,15 +562,15 @@ auto main(
         vk::ApiVersion14};
 
     // get swapchain images
-    auto images            = r.ctx.swapchain.getImages();
-    auto maxFramesInFlight = images.size();
+    auto swapchainImages   = r.ctx.swapchain.getImages();
+    auto maxFramesInFlight = swapchainImages.size();
 
-    auto imageViews     = std::vector<vk::raii::ImageView>{};
-    auto imageAvailable = std::vector<vk::raii::Semaphore>{};
-    auto renderFinished = std::vector<vk::raii::Semaphore>{};
+    auto swapchainImageViews = std::vector<vk::raii::ImageView>{};
+    auto imageAvailable      = std::vector<vk::raii::Semaphore>{};
+    auto renderFinished      = std::vector<vk::raii::Semaphore>{};
 
-    for (auto image : images) {
-        imageViews.emplace_back(
+    for (auto image : swapchainImages) {
+        swapchainImageViews.emplace_back(
             r.ctx.device,
             vk::ImageViewCreateInfo{
                 {},
@@ -521,7 +591,7 @@ auto main(
     // Transition image layout
     auto commandBuffer = beginSingleTimeCommands(r.ctx.device, transientCommandPool);
 
-    for (auto image : images) {
+    for (auto image : swapchainImages) {
         cmdTransitionImageLayout(
             commandBuffer,
             image,
@@ -571,10 +641,20 @@ auto main(
 
     // create GBuffer
 
-    auto asset = getGltfAsset(gltfPath);
+    auto asset = getGltfAsset(gltfDirectory / gltfFilename);
 
-    auto [indices, vertices] = getGltfAssetData(asset.get());
+    auto [indexData, vertexData, textureData, textureExtent] =
+        getGltfAssetData(asset.get(), gltfDirectory);
 
+    auto [vertexBuffer, indexBuffer, textureImage] = uploadBuffers(
+        r.ctx.device,
+        transientCommandPool,
+        vertexData,
+        indexData,
+        textureData,
+        textureExtent,
+        r.ctx.graphicsQueue,
+        allocator);
     auto [vertShaderModule, fragShaderModule] = createShaderModules(r.ctx.device);
 
     const auto descriptorSetLayoutBindings = std::array{
@@ -589,11 +669,36 @@ auto main(
             1,
             vk::ShaderStageFlagBits::eFragment}};
 
-    auto descriptorSetLayout =
-        vk::raii::DescriptorSetLayout{r.ctx.device, {{}, descriptorSetLayoutBindings}};
+    auto descriptorSetLayout = vk::raii::DescriptorSetLayout{
+        r.ctx.device,
+        vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
+
+    auto descriptorSetLayouts =
+        std::vector<vk::DescriptorSetLayout>(maxFramesInFlight, descriptorSetLayout);
+
+    auto poolSizes = std::array{
+        vk::DescriptorPoolSize{
+            vk::DescriptorType::eUniformBuffer,
+            static_cast<uint32_t>(maxFramesInFlight)},
+        vk::DescriptorPoolSize{
+            vk::DescriptorType::eCombinedImageSampler,
+            static_cast<uint32_t>(maxFramesInFlight)}};
+
+    auto descriptorPool = vk::raii::DescriptorPool{
+        r.ctx.device,
+        vk::DescriptorPoolCreateInfo{
+            vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+            static_cast<uint32_t>(maxFramesInFlight),
+            poolSizes}};
+
+    auto descriptorSetAllocateInfo =
+        vk::DescriptorSetAllocateInfo{descriptorPool, descriptorSetLayouts};
+
+    auto descriptorSets =
+        r.ctx.device.allocateDescriptorSets(descriptorSetAllocateInfo);
 
     auto pipelineLayout =
-        vk::raii::PipelineLayout{r.ctx.device, {{}, *descriptorSetLayout}};
+        vk::raii::PipelineLayout{r.ctx.device, {{}, descriptorSetLayouts}};
 
     auto graphicsPipeline = createPipeline(
         r.ctx.device,
@@ -672,11 +777,12 @@ auto main(
 
         // bind vertex data
         // cmd.bindVertexBuffers(uint32_t firstBinding, const vk::ArrayProxy<const
-        // vk::Buffer> &buffers, const vk::ArrayProxy<const vk::DeviceSize> &offsets);
+        // vk::Buffer> &buffers, const vk::ArrayProxy<const vk::DeviceSize>
+        // &offsets);
 
         // bind index data
-        // cmd.bindIndexBuffer(vk::Buffer buffer, vk::DeviceSize offset, vk::IndexType
-        // indexType)
+        // cmd.bindIndexBuffer(vk::Buffer buffer, vk::DeviceSize offset,
+        // vk::IndexType indexType)
 
         // cmd.drawIndexed(uint32_t indexCount, uint32_t instanceCount,
         // uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance)
@@ -688,7 +794,7 @@ auto main(
         // beginDynamicRenderingToSwapchain()
 
         auto colorAttachment = vk::RenderingAttachmentInfo{}
-                                   .setImageView(imageViews[nextImageIndex])
+                                   .setImageView(swapchainImageViews[nextImageIndex])
                                    .setLoadOp(vk::AttachmentLoadOp::eClear)
                                    .setStoreOp(vk::AttachmentStoreOp::eStore)
                                    .setClearValue({{0.0f, 0.0f, 0.0f, 1.0f}})
