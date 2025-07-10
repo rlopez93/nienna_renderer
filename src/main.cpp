@@ -828,14 +828,20 @@ auto main(
         r.ctx.graphicsQueue,
         allocator);
 
-    auto sceneBuffers = std::vector<Buffer>{};
+    auto sceneBuffers       = std::vector<Buffer>{};
+    auto sceneBuffersMapped = std::vector<Buffer>{};
 
     for (auto i : std::views::iota(0u, maxFramesInFlight)) {
 
         sceneBuffers.emplace_back(allocator.createBuffer(
             sizeof(Scene),
             vk::BufferUsageFlagBits2::eUniformBuffer
-                | vk::BufferUsageFlagBits2::eTransferDst));
+                | vk::BufferUsageFlagBits2::eTransferDst,
+            VMA_MEMORY_USAGE_CPU_TO_GPU,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                | VMA_ALLOCATION_CREATE_MAPPED_BIT));
+
+        // sceneBuffersMapped ??
     }
 
     auto [vertShaderModule, fragShaderModule] = createShaderModules(r.ctx.device);
@@ -977,7 +983,7 @@ auto main(
             vk::PipelineStageFlagBits2::eFragmentShader,
             vk::PipelineStageFlagBits2::eTransfer);
 
-        cmdBuffer.updateBuffer<Scene>(sceneBuffers[frameNumber].buffer, 0, scene);
+        cmdBuffer.updateBuffer<Scene>(sceneBuffers[frameNumber].buffer, 0, scene); // ??
 
         cmdBufferMemoryBarrier(
             cmdBuffer,

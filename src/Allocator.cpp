@@ -62,7 +62,7 @@ auto Allocator::createBuffer(
 {
 
     const auto bufferUsageFlags2CreateInfo = *vk::BufferUsageFlags2CreateInfo{
-        usageFlags}; //| vk::BufferUsageFlagBits2::eShaderDeviceAddress};
+        usageFlags | vk::BufferUsageFlagBits2::eShaderDeviceAddress};
     auto bufferCreateInfo =
         *vk::BufferCreateInfo{{}, bufferSize, {}, vk::SharingMode::eExclusive};
 
