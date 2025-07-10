@@ -188,6 +188,8 @@ auto getGltfAssetData(
         std::vector<Vertex>,
         std::vector<unsigned char>,
         vk::Extent2D,
+        fastgltf::math::fmat4x4,
+        fastgltf::math::fmat4x4,
         fastgltf::math::fmat4x4>;
 
 auto getGltfAsset(const std::filesystem::path &gltfPath)
@@ -233,13 +235,17 @@ auto getGltfAssetData(
         std::vector<Vertex>,
         std::vector<unsigned char>,
         vk::Extent2D,
+        fastgltf::math::fmat4x4,
+        fastgltf::math::fmat4x4,
         fastgltf::math::fmat4x4>
 {
-    auto indices      = std::vector<uint16_t>{};
-    auto vertices     = std::vector<Vertex>{};
-    auto image_data   = std::vector<unsigned char>{};
-    auto imageExtent  = vk::Extent2D{};
-    auto returnMatrix = fastgltf::math::fmat4x4{};
+    auto indices          = std::vector<uint16_t>{};
+    auto vertices         = std::vector<Vertex>{};
+    auto image_data       = std::vector<unsigned char>{};
+    auto imageExtent      = vk::Extent2D{};
+    auto modelMatrix      = fastgltf::math::fmat4x4{};
+    auto viewMatrix       = fastgltf::math::fmat4x4{};
+    auto projectionMatrix = fastgltf::math::fmat4x4{};
     fastgltf::iterateSceneNodes(
         asset,
         0,
@@ -247,7 +253,62 @@ auto getGltfAssetData(
         [&](fastgltf::Node &node, fastgltf::math::fmat4x4 matrix) {
             if (node.cameraIndex.has_value()) {
                 auto &camera = asset.cameras[node.cameraIndex.value()];
-                fmt::print(stderr, "camera is {}\n", camera.name);
+                viewMatrix   = matrix;
+                if (std::holds_alternative<fastgltf::Camera::Perspective>(
+                        camera.camera)) {
+                    auto cameraProjection =
+                        std::get<fastgltf::Camera::Perspective>(camera.camera);
+
+                    auto a = cameraProjection.aspectRatio.value_or(1.0f);
+                    auto y = cameraProjection.yfov;
+                    auto n = cameraProjection.znear;
+
+                    projectionMatrix = [&] -> fastgltf::math::fmat4x4 {
+                        if (cameraProjection.zfar.has_value()) {
+                            // finite perspective projection
+                            float f = cameraProjection.zfar.value();
+                            return fastgltf::math::fmat4x4{
+                                1.0f / (a * tan(0.5f * y)),
+                                0,
+                                0,
+                                0,
+                                0,
+                                1.0f / tan(0.5f * y),
+                                0,
+                                0,
+                                0,
+                                0,
+                                (f + n) / (n - f),
+                                -1,
+                                0,
+                                0,
+                                (2 * f * n) / (n - f),
+                                0};
+                        }
+
+                        else {
+                            // infinite perspective projection
+                            return fastgltf::math::fmat4x4{
+                                1.0f / (a * tan(0.5f * y)),
+                                0,
+                                0,
+                                0,
+                                0,
+                                1.0f / tan(0.5f * y),
+                                0,
+                                0,
+                                0,
+                                0,
+                                -1,
+                                -1,
+                                0,
+                                0,
+                                2 * n,
+                                0};
+                        }
+                    }();
+                }
+
                 fmt::print(
                     stderr,
                     "matrix is:{} {} {} {}\n{} {} {} {}\n{} {} {} {}\n{} {} {} {}\n",
@@ -290,11 +351,12 @@ auto getGltfAssetData(
                     matrix[3][2],
                     matrix[3][3]);
             }
-            if (node.meshIndex.has_value()) {
+
+            else if (node.meshIndex.has_value()) {
                 auto &mesh = asset.meshes[node.meshIndex.value()];
                 fmt::print(stderr, "Mesh is: <{}>\n", mesh.name);
 
-                returnMatrix = matrix;
+                modelMatrix = matrix;
 
                 fmt::print(
                     stderr,
@@ -409,7 +471,14 @@ auto getGltfAssetData(
             }
         });
 
-    return {indices, vertices, image_data, imageExtent};
+    return {
+        indices,
+        vertices,
+        image_data,
+        imageExtent,
+        modelMatrix,
+        viewMatrix,
+        projectionMatrix};
 }
 
 auto createPipeline(
@@ -723,8 +792,14 @@ auto main(
 
     auto asset = getGltfAsset(gltfDirectory / gltfFilename);
 
-    auto [indexData, vertexData, textureData, textureExtent, matrix] =
-        getGltfAssetData(asset.get(), gltfDirectory);
+    auto
+        [indexData,
+         vertexData,
+         textureData,
+         textureExtent,
+         modelMatrix,
+         viewMatrix,
+         projectionMatrix] = getGltfAssetData(asset.get(), gltfDirectory);
 
     auto [vertexBuffer, indexBuffer, textureImage] = uploadBuffers(
         r.ctx.device,
@@ -735,6 +810,8 @@ auto main(
         textureExtent,
         r.ctx.graphicsQueue,
         allocator);
+
+    // allocator.createBuffer(vk::DeviceSize deviceSize, vk::BufferUsageFlags2 usage)
 
     auto [vertShaderModule, fragShaderModule] = createShaderModules(r.ctx.device);
 
