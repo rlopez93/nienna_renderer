@@ -39,6 +39,12 @@ struct Vertex {
     fastgltf::math::fvec2 texCoord{};
 };
 
+struct Scene {
+    fastgltf::math::fmat4x4 model{};
+    fastgltf::math::fmat4x4 view{};
+    fastgltf::math::fmat4x4 projection{};
+};
+
 auto readShaders(const std::string &filename) -> std::vector<char>;
 auto reflectShader(const std::filesystem::path &path) -> VertexReflectionData;
 
@@ -190,7 +196,8 @@ auto getGltfAssetData(
         vk::Extent2D,
         fastgltf::math::fmat4x4,
         fastgltf::math::fmat4x4,
-        fastgltf::math::fmat4x4>;
+        fastgltf::math::fmat4x4,
+        vk::SamplerCreateInfo>;
 
 auto getGltfAsset(const std::filesystem::path &gltfPath)
     -> fastgltf::Expected<fastgltf::Asset>
@@ -237,15 +244,18 @@ auto getGltfAssetData(
         vk::Extent2D,
         fastgltf::math::fmat4x4,
         fastgltf::math::fmat4x4,
-        fastgltf::math::fmat4x4>
+        fastgltf::math::fmat4x4,
+        vk::SamplerCreateInfo>
 {
-    auto indices          = std::vector<uint16_t>{};
-    auto vertices         = std::vector<Vertex>{};
-    auto image_data       = std::vector<unsigned char>{};
-    auto imageExtent      = vk::Extent2D{};
-    auto modelMatrix      = fastgltf::math::fmat4x4{};
-    auto viewMatrix       = fastgltf::math::fmat4x4{};
-    auto projectionMatrix = fastgltf::math::fmat4x4{};
+    auto indices           = std::vector<uint16_t>{};
+    auto vertices          = std::vector<Vertex>{};
+    auto image_data        = std::vector<unsigned char>{};
+    auto imageExtent       = vk::Extent2D{};
+    auto modelMatrix       = fastgltf::math::fmat4x4{};
+    auto viewMatrix        = fastgltf::math::fmat4x4{};
+    auto projectionMatrix  = fastgltf::math::fmat4x4{};
+    auto samplerCreateInfo = vk::SamplerCreateInfo{};
+
     fastgltf::iterateSceneNodes(
         asset,
         0,
@@ -431,19 +441,18 @@ auto getGltfAssetData(
                         });
 
                     assert(primitiveIt->materialIndex.has_value());
-
                     fastgltf::Material &material =
                         asset.materials[primitiveIt->materialIndex.value()];
-                    assert(material.pbrData.baseColorTexture.has_value());
 
+                    assert(material.pbrData.baseColorTexture.has_value());
                     fastgltf::TextureInfo &textureInfo =
                         material.pbrData.baseColorTexture.value();
-                    assert(textureInfo.texCoordIndex == 0);
 
+                    assert(textureInfo.texCoordIndex == 0);
                     fastgltf::Texture &texture =
                         asset.textures[textureInfo.textureIndex];
-                    assert(texture.imageIndex.has_value());
 
+                    assert(texture.imageIndex.has_value());
                     fastgltf::Image &image = asset.images[texture.imageIndex.value()];
 
                     fastgltf::URI &imageURI =
@@ -467,6 +476,12 @@ auto getGltfAssetData(
 
                         stbi_image_free(stbi_data);
                     }
+
+                    assert(texture.samplerIndex.has_value());
+                    fastgltf::Sampler &textureSampler =
+                        asset.samplers[texture.samplerIndex.value()];
+
+                    // TODO make vk::SamplerCreateInfo from fastgltf::Sampler
                 }
             }
         });
@@ -478,7 +493,8 @@ auto getGltfAssetData(
         imageExtent,
         modelMatrix,
         viewMatrix,
-        projectionMatrix};
+        projectionMatrix,
+        samplerCreateInfo};
 }
 
 auto createPipeline(
@@ -609,7 +625,6 @@ auto createShaderModules(vk::raii::Device &device) -> std::tuple<
     vk::raii::ShaderModule,
     vk::raii::ShaderModule>
 {
-
     auto vertShaderCode = readShaders("shaders/shader.vert.spv");
     auto fragShaderCode = readShaders("shaders/shader.frag.spv");
 
@@ -647,7 +662,6 @@ auto uploadBuffers(
         Buffer,
         ImageResource>
 {
-
     auto commandBuffer = beginSingleTimeCommands(device, transientCommandPool);
 
     auto vertexBuffer = allocator.createBufferAndUploadData(
@@ -799,7 +813,10 @@ auto main(
          textureExtent,
          modelMatrix,
          viewMatrix,
-         projectionMatrix] = getGltfAssetData(asset.get(), gltfDirectory);
+         projectionMatrix,
+         samplerCreateInfo] = getGltfAssetData(asset.get(), gltfDirectory);
+
+    auto sampler = vk::raii::Sampler{r.ctx.device, samplerCreateInfo};
 
     auto [vertexBuffer, indexBuffer, textureImage] = uploadBuffers(
         r.ctx.device,
@@ -811,7 +828,15 @@ auto main(
         r.ctx.graphicsQueue,
         allocator);
 
-    // allocator.createBuffer(vk::DeviceSize deviceSize, vk::BufferUsageFlags2 usage)
+    auto sceneBuffers = std::vector<Buffer>{};
+
+    for (auto i : std::views::iota(0u, maxFramesInFlight)) {
+
+        sceneBuffers.emplace_back(allocator.createBuffer(
+            sizeof(Scene),
+            vk::BufferUsageFlagBits2::eUniformBuffer
+                | vk::BufferUsageFlagBits2::eTransferDst));
+    }
 
     auto [vertShaderModule, fragShaderModule] = createShaderModules(r.ctx.device);
 
@@ -854,6 +879,30 @@ auto main(
 
     auto descriptorSets =
         r.ctx.device.allocateDescriptorSets(descriptorSetAllocateInfo);
+
+    for (auto i : std::views::iota(0u, maxFramesInFlight)) {
+        auto descriptorBufferInfo =
+            vk::DescriptorBufferInfo{sceneBuffers[i].buffer, 0, sizeof(Scene)};
+        auto descriptorImageInfo =
+            vk::DescriptorImageInfo{sampler, textureImage.view, textureImage.layout};
+        auto descriptorWrites = std::array{
+            vk::WriteDescriptorSet{
+                descriptorSets[i],
+                0,
+                0,
+                1,
+                vk::DescriptorType::eUniformBuffer,
+                {},
+                &descriptorBufferInfo},
+            vk::WriteDescriptorSet{
+                descriptorSets[i],
+                1,
+                0,
+                1,
+                vk::DescriptorType::eCombinedImageSampler,
+                &descriptorImageInfo}};
+        r.ctx.device.updateDescriptorSets(descriptorWrites, {});
+    }
 
     auto pipelineLayout =
         vk::raii::PipelineLayout{r.ctx.device, {{}, descriptorSetLayouts}};
