@@ -134,12 +134,6 @@ void Allocator::destroyImage(Image &image) const
     vmaDestroyImage(allocator, image.image, image.allocation);
 }
 
-void Allocator::destroyImageResource(ImageResource &imageResource) const
-{
-    destroyImage(imageResource);
-    vkDestroyImageView(device, imageResource.view, nullptr);
-}
-
 /*--
  * The staging buffers are buffers that are used to transfer data from the CPU to
 the GPU.

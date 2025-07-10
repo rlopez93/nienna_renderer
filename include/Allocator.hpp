@@ -32,8 +32,8 @@ struct Image {
 /*The image resource is an image with an image view and a
         layout and other information like format and extent*/
 struct ImageResource : Image {
-    vk::ImageView view{};   // Image view
-    vk::Extent2D  extent{}; // Size of the image
+    vk::raii::ImageView view;     // Image view
+    vk::Extent2D        extent{}; // Size of the image
     vk::ImageLayout
         layout{}; // Layout of the image (color attachment, shader read, ...)
 };
@@ -130,8 +130,6 @@ struct Allocator {
 
     void destroyImage(Image &image) const;
 
-    void destroyImageResource(ImageResource &imageResource) const;
-
     /*-- Create an image and upload data using a staging buffer --*/
     template <typename T>
     [[nodiscard]]
@@ -139,7 +137,7 @@ struct Allocator {
         vk::raii::CommandBuffer &cmd,
         const std::vector<T>    &vectorData,
         vk::ImageCreateInfo      imageInfo,
-        vk::ImageLayout          finalLayout) -> ImageResource
+        vk::ImageLayout          finalLayout) -> Image
     {
         // Create staging buffer and upload data
         Buffer stagingBuffer = createStagingBuffer(vectorData);
@@ -167,7 +165,7 @@ struct Allocator {
                 {},
                 {},
                 {},
-                vk::ImageSubresourceLayers{vk::ImageAspectFlagBits::eColor, {}, {}, 1},
+                vk::ImageSubresourceLayers{vk::ImageAspectFlagBits::eColor, 0, 0, 1},
                 {},
                 imageInfo.extent});
 
@@ -178,9 +176,7 @@ struct Allocator {
             vk::ImageLayout::eTransferDstOptimal,
             finalLayout);
 
-        ImageResource resultImage(image);
-        resultImage.layout = finalLayout;
-        return resultImage;
+        return image;
     }
 
     void freeStagingBuffers();

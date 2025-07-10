@@ -192,6 +192,10 @@ auto RenderContext::init() -> RenderContext
             .add_fallback_present_mode(VK_PRESENT_MODE_FIFO_KHR)
             .set_desired_format(
                 VkSurfaceFormatKHR{
+                    .format     = VK_FORMAT_R8G8B8A8_SRGB,
+                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
+            .add_fallback_format(
+                VkSurfaceFormatKHR{
                     .format     = VK_FORMAT_B8G8R8A8_UNORM,
                     .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
             .add_fallback_format(
@@ -213,6 +217,7 @@ auto RenderContext::init() -> RenderContext
     auto swapchain     = vk::raii::SwapchainKHR(device, vkb_swapchain.swapchain);
     auto imageFormat   = vk::Format(vkb_swapchain.image_format);
     auto depthFormat   = findDepthFormat(physicalDevice);
+    auto windowExtent = physicalDevice.getSurfaceCapabilitiesKHR(surface).currentExtent;
 
     return RenderContext{
         std::move(context),
@@ -228,12 +233,17 @@ auto RenderContext::init() -> RenderContext
         presentQueueIndex,
         std::move(swapchain),
         imageFormat,
-        depthFormat};
+        depthFormat,
+        windowExtent};
 }
 
 auto findDepthFormat(vk::raii::PhysicalDevice &physicalDevice) -> vk::Format
 {
     auto candidateFormats = std::array{
+
+        // vk::Format::eD32Sfloat,
+        // vk::Format::eD32SfloatS8Uint,
+        // vk::Format::eD24UnormS8Uint,
         vk::Format::eD16Unorm,        // depth only
         vk::Format::eD32Sfloat,       // depth only
         vk::Format::eD32SfloatS8Uint, // depth-stencil
@@ -244,11 +254,13 @@ auto findDepthFormat(vk::raii::PhysicalDevice &physicalDevice) -> vk::Format
         auto properties = physicalDevice.getFormatProperties(format);
 
         if ((properties.optimalTilingFeatures
-             | vk::FormatFeatureFlagBits::eDepthStencilAttachment)
+             & vk::FormatFeatureFlagBits::eDepthStencilAttachment)
             == vk::FormatFeatureFlagBits::eDepthStencilAttachment) {
             return format;
         }
     }
+
+    assert(false);
 
     return vk::Format::eUndefined;
 }

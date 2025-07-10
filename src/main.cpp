@@ -462,15 +462,12 @@ auto getGltfAssetData(
                         auto path = directory / imageURI.fspath();
                         fmt::print(stderr, "\"{}\"\n", path.c_str());
                         int  x, y, n;
-                        auto stbi_data = stbi_load(path.c_str(), &x, &y, &n, 0);
+                        auto stbi_data = stbi_load(path.c_str(), &x, &y, &n, 4);
 
                         fmt::print(stderr, "channels in file: {}\n", n);
                         assert(stbi_data);
 
-                        image_data.assign(stbi_data, stbi_data + (x * y));
-                        assert(
-                            image_data.size() * sizeof(unsigned char)
-                            == (x * y) * sizeof(unsigned char));
+                        image_data.assign(stbi_data, stbi_data + (x * y * 4));
                         // assert(strcmp(image_data.data(), stbi_data) == 0);
                         imageExtent.setWidth(x).setHeight(y);
 
@@ -570,6 +567,13 @@ auto createPipeline(
     const auto pipelineMultisampleStateCreateInfo =
         vk::PipelineMultisampleStateCreateInfo{};
 
+    const auto pipelineDepthStencilStateCreateInfo =
+        vk::PipelineDepthStencilStateCreateInfo{
+            {},
+            true,
+            true,
+            vk::CompareOp::eLessOrEqual};
+
     const auto colorBlendAttachmentState = vk::PipelineColorBlendAttachmentState{
         {},
         {},
@@ -608,7 +612,7 @@ auto createPipeline(
         &pipelineViewportStateCreateInfo,
         &pipelineRasterizationStateCreateInfo,
         &pipelineMultisampleStateCreateInfo,
-        {},
+        &pipelineDepthStencilStateCreateInfo,
         &pipelineColorBlendStateCreateInfo,
         &pipelineDynamicStateCreateInfo,
         *pipelineLayout,
@@ -660,7 +664,8 @@ auto uploadBuffers(
     -> std::tuple<
         Buffer,
         Buffer,
-        ImageResource>
+        Image,
+        vk::raii::ImageView>
 {
     auto commandBuffer = beginSingleTimeCommands(device, transientCommandPool);
 
@@ -672,14 +677,18 @@ auto uploadBuffers(
         commandBuffer,
         indexData,
         vk::BufferUsageFlagBits2::eIndexBuffer);
-    assert(textureExtent.width * textureExtent.height == textureData.size());
+    fmt::print(
+        stderr,
+        "texture extent: {}x{}\n",
+        textureExtent.width,
+        textureExtent.height);
     auto textureImage = allocator.createImageAndUploadData(
         commandBuffer,
         textureData,
         vk::ImageCreateInfo{
             {},
             vk::ImageType::e2D,
-            vk::Format::eR8Unorm, // TODO: IDK
+            vk::Format::eR8G8B8A8Srgb,
             // vk::Format::eR8G8B8A8Unorm,
             {static_cast<uint32_t>(textureExtent.width),
              static_cast<uint32_t>(textureExtent.height),
@@ -690,9 +699,17 @@ auto uploadBuffers(
             vk::ImageTiling::eOptimal,
             vk::ImageUsageFlagBits::eSampled},
         vk::ImageLayout::eShaderReadOnlyOptimal);
+    auto imageView = device.createImageView(
+        vk::ImageViewCreateInfo{
+            {},
+            textureImage.image,
+            vk::ImageViewType::e2D,
+            vk::Format::eR8G8B8A8Srgb,
+            {},
+            vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
     endSingleTimeCommands(device, transientCommandPool, commandBuffer, queue);
 
-    return {vertexBuffer, indexBuffer, textureImage};
+    return {vertexBuffer, indexBuffer, textureImage, std::move(imageView)};
 }
 
 auto main(
@@ -746,6 +763,27 @@ auto main(
         renderFinished.emplace_back(r.ctx.device, vk::SemaphoreCreateInfo{});
     }
 
+    auto depthImage = allocator.createImage(
+        vk::ImageCreateInfo{
+            {},
+            vk::ImageType::e2D,
+            r.ctx.depthFormat,
+            vk::Extent3D(r.ctx.windowExtent, 1),
+            1,
+            1
+
+        }
+            .setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment));
+
+    auto depthImageView = r.ctx.device.createImageView(
+        vk::ImageViewCreateInfo{
+            {},
+            depthImage.image,
+            vk::ImageViewType::e2D,
+            r.ctx.depthFormat,
+            {},
+            vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}});
+
     // create transient command pool for single-time commands
     auto transientCommandPool = vk::raii::CommandPool{
         r.ctx.device,
@@ -782,7 +820,6 @@ auto main(
         vk::raii::Semaphore{r.ctx.device, {{}, &timelineSemaphoreCreateInfo}};
 
     for (auto n : std::views::iota(0u, maxFramesInFlight)) {
-
         commandPools.emplace_back(
             r.ctx.device,
             vk::CommandPoolCreateInfo{{}, r.ctx.graphicsQueueIndex});
@@ -818,7 +855,7 @@ auto main(
 
     auto sampler = vk::raii::Sampler{r.ctx.device, samplerCreateInfo};
 
-    auto [vertexBuffer, indexBuffer, textureImage] = uploadBuffers(
+    auto [vertexBuffer, indexBuffer, textureImage, textureImageView] = uploadBuffers(
         r.ctx.device,
         transientCommandPool,
         vertexData,
@@ -828,11 +865,9 @@ auto main(
         r.ctx.graphicsQueue,
         allocator);
 
-    auto sceneBuffers       = std::vector<Buffer>{};
-    auto sceneBuffersMapped = std::vector<Buffer>{};
+    auto sceneBuffers = std::vector<Buffer>{};
 
     for (auto i : std::views::iota(0u, maxFramesInFlight)) {
-
         sceneBuffers.emplace_back(allocator.createBuffer(
             sizeof(Scene),
             vk::BufferUsageFlagBits2::eUniformBuffer
@@ -889,8 +924,10 @@ auto main(
     for (auto i : std::views::iota(0u, maxFramesInFlight)) {
         auto descriptorBufferInfo =
             vk::DescriptorBufferInfo{sceneBuffers[i].buffer, 0, sizeof(Scene)};
-        auto descriptorImageInfo =
-            vk::DescriptorImageInfo{sampler, textureImage.view, textureImage.layout};
+        auto descriptorImageInfo = vk::DescriptorImageInfo{
+            sampler,
+            textureImageView,
+            vk::ImageLayout::eShaderReadOnlyOptimal};
         auto descriptorWrites = std::array{
             vk::WriteDescriptorSet{
                 descriptorSets[i],
@@ -935,19 +972,21 @@ auto main(
             }
         }
 
+        // begin frame
+
         // check swapchain rebuild
         if (swapchainNeedRebuild) {
         }
 
         // get current frame data
-        auto &cmdPool     = commandPools[frameRingCurrent];
-        auto &cmdBuffer   = commandBuffers[frameRingCurrent];
-        auto  frameNumber = frameNumbers[frameRingCurrent];
+        auto &cmdPool   = commandPools[frameRingCurrent];
+        auto &cmdBuffer = commandBuffers[frameRingCurrent];
+        auto  waitValue = frameNumbers[frameRingCurrent];
 
         {
             // wait semaphore frame (n - numFrames)
             auto res = r.ctx.device.waitSemaphores(
-                vk::SemaphoreWaitInfo{{}, *frameTimelineSemaphore, frameNumber},
+                vk::SemaphoreWaitInfo{{}, *frameTimelineSemaphore, waitValue},
                 std::numeric_limits<uint64_t>::max());
         }
 
@@ -977,28 +1016,48 @@ auto main(
             .view       = viewMatrix,
             .projection = projectionMatrix};
 
-        cmdBufferMemoryBarrier(
-            cmdBuffer,
-            sceneBuffers[frameNumber].buffer,
-            vk::PipelineStageFlagBits2::eFragmentShader,
-            vk::PipelineStageFlagBits2::eTransfer);
+        assert(false && "fix this");
+        memcpy(sceneBuffers[currentFrame].buffer, &scene, sizeof(scene));
 
-        cmdBuffer.updateBuffer<Scene>(sceneBuffers[frameNumber].buffer, 0, scene); // ??
+        // color attachment image to render to: vk::RenderingAttachmentInfo
+        auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
+            swapchainImageViews[nextImageIndex],
+            vk::ImageLayout::eAttachmentOptimal,
+            {},
+            {},
+            {},
+            vk::AttachmentLoadOp::eClear,
+            vk::AttachmentStoreOp::eStore,
+            vk::ClearColorValue{std::array{0.0f, 0.f, 0.0f, 1.0f}}};
 
-        cmdBufferMemoryBarrier(
-            cmdBuffer,
-            sceneBuffers[frameNumber].buffer,
-            vk::PipelineStageFlagBits2::eTransfer,
-            vk::PipelineStageFlagBits2::eFragmentShader);
-
-        // get color attachment image to render to: vk::RenderingAttachmentInfo
-
-        // get depth attachment buffer: vk::RenderingAttachmentInfo
+        // depth attachment buffer: vk::RenderingAttachmentInfo
+        auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
+            depthImageView,
+            vk::ImageLayout::eAttachmentOptimal,
+            {},
+            {},
+            {},
+            vk::AttachmentLoadOp::eClear,
+            vk::AttachmentStoreOp::eStore,
+            vk::ClearDepthStencilValue{1.0f, 0}};
 
         // vk::RenderingInfo
+        auto renderingInfo = vk::RenderingInfo{
+            {},
+            vk::Rect2D{{}, r.ctx.windowExtent},
+            1,
+            {},
+            renderingColorAttachmentInfo,
+            &renderingDepthAttachmentInfo};
 
         // transition swapchain image layout:
         // vk::ImageLayout::eGeneral -> vk::ImageLayout::eColorAttachmentOptimal
+
+        cmdTransitionImageLayout(
+            cmdBuffer,
+            swapchainImages[nextImageIndex],
+            vk::ImageLayout::eGeneral,
+            vk::ImageLayout::eColorAttachmentOptimal);
 
         cmdBuffer.beginRendering(vk::RenderingInfo{});
 
@@ -1006,6 +1065,12 @@ auto main(
         cmdBuffer.setScissorWithCount({/*scissor*/});
 
         // bind texture resources passed to shader
+        // cmdBuffer.bindDescriptorSets2(
+        //     vk::BindDescriptorSetsInfo{
+        //         vk::PipelineBindPoint::eGraphics,
+        //         pipelineLayout,
+        //         0,
+        //         descriptorSets[currentFrame]});
         // cmd.bindDescriptorSets2(vk::BindDescriptorSetsInfo{});
 
         // bind vertex data
@@ -1039,6 +1104,66 @@ auto main(
 
         cmdBuffer.endRendering();
         // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
+
+        // end frame
+
+        // prepare to submit the current frame for rendering
+        // add the swapchain semaphore to wait for the image to be available
+
+        uint64_t signalFrameValue      = waitValue + maxFramesInFlight;
+        frameNumbers[frameRingCurrent] = signalFrameValue;
+
+        auto waitSemaphore = vk::SemaphoreSubmitInfo{
+            imageAvailable[currentFrame],
+            {},
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput};
+
+        auto signalSemaphores = std::array{
+            vk::SemaphoreSubmitInfo{
+                renderFinished[nextImageIndex],
+                {},
+                vk::PipelineStageFlagBits2::eColorAttachmentOutput},
+            vk::SemaphoreSubmitInfo{
+                frameTimelineSemaphore,
+                signalFrameValue,
+                vk::PipelineStageFlagBits2::eColorAttachmentOutput}};
+
+        auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{cmdBuffer};
+
+        auto submitInfo = vk::SubmitInfo2{
+            {},
+            waitSemaphore,
+            commandBufferSubmitInfo,
+            signalSemaphores};
+
+        r.ctx.graphicsQueue.submit2(
+            vk::SubmitInfo2{
+                {},
+                waitSemaphore,
+                commandBufferSubmitInfo,
+                signalSemaphores});
+
+        // present frame
+        auto presentResult = r.ctx.presentQueue.presentKHR(
+            vk::PresentInfoKHR{
+                *renderFinished[nextImageIndex],
+                *r.ctx.swapchain,
+                nextImageIndex});
+
+        if (presentResult == vk::Result::eErrorOutOfDateKHR) {
+            swapchainNeedRebuild = true;
+        }
+
+        else if (!(result == vk::Result::eSuccess
+                   || result == vk::Result::eSuboptimalKHR)) {
+            throw std::exception{};
+        }
+
+        // advance to the next frame in the swapchain
+        currentFrame = (currentFrame + 1) % maxFramesInFlight;
+
+        // move to the next frame
+        frameRingCurrent = (frameRingCurrent + 1) % maxFramesInFlight;
     }
 
     return 0;

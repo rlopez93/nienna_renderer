@@ -31,7 +31,8 @@ struct RenderContext {
         uint32_t                         presentQueueIndex,
         vk::raii::SwapchainKHR           swapchain,
         vk::Format                       imageFormat,
-        vk::Format                       depthFormat)
+        vk::Format                       depthFormat,
+        vk::Extent2D                     windowExtent)
         : context{std::move(context)},
           instance{std::move(instance)},
           debugUtils{std::move(debugUtils)},
@@ -45,7 +46,8 @@ struct RenderContext {
           presentQueueIndex{presentQueueIndex},
           swapchain{std::move(swapchain)},
           imageFormat{imageFormat},
-          depthFormat{depthFormat}
+          depthFormat{depthFormat},
+          windowExtent{windowExtent}
     {
     }
 
@@ -72,6 +74,7 @@ struct RenderContext {
     vk::raii::SwapchainKHR           swapchain;
     vk::Format                       imageFormat;
     vk::Format                       depthFormat;
+    vk::Extent2D                     windowExtent;
 };
 
 struct Renderer {
