@@ -935,7 +935,7 @@ auto main(
 
         // get current frame data
         auto &cmdPool     = commandPools[frameRingCurrent];
-        auto &cmd         = commandBuffers[frameRingCurrent];
+        auto &cmdBuffer   = commandBuffers[frameRingCurrent];
         auto  frameNumber = frameNumbers[frameRingCurrent];
 
         {
@@ -945,8 +945,9 @@ auto main(
                 std::numeric_limits<uint64_t>::max());
         }
 
+        // reset current frame's command pool to reuse the command buffer
         cmdPool.reset();
-        cmd.begin(
+        cmdBuffer.begin(
             vk::CommandBufferBeginInfo{vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
 
         auto [result, nextImageIndex] = r.ctx.swapchain.acquireNextImage(
@@ -961,9 +962,28 @@ auto main(
         }
 
         if (swapchainNeedRebuild) {
+            // continue;
         }
 
         // update uniform buffers
+        auto scene = Scene{
+            .model      = modelMatrix,
+            .view       = viewMatrix,
+            .projection = projectionMatrix};
+
+        cmdBufferMemoryBarrier(
+            cmdBuffer,
+            sceneBuffers[frameNumber].buffer,
+            vk::PipelineStageFlagBits2::eFragmentShader,
+            vk::PipelineStageFlagBits2::eTransfer);
+
+        cmdBuffer.updateBuffer<Scene>(sceneBuffers[frameNumber].buffer, 0, scene);
+
+        cmdBufferMemoryBarrier(
+            cmdBuffer,
+            sceneBuffers[frameNumber].buffer,
+            vk::PipelineStageFlagBits2::eTransfer,
+            vk::PipelineStageFlagBits2::eFragmentShader);
 
         // get color attachment image to render to: vk::RenderingAttachmentInfo
 
@@ -974,10 +994,10 @@ auto main(
         // transition swapchain image layout:
         // vk::ImageLayout::eGeneral -> vk::ImageLayout::eColorAttachmentOptimal
 
-        cmd.beginRendering(vk::RenderingInfo{});
+        cmdBuffer.beginRendering(vk::RenderingInfo{});
 
-        cmd.setViewportWithCount({/*viewport*/});
-        cmd.setScissorWithCount({/*scissor*/});
+        cmdBuffer.setViewportWithCount({/*viewport*/});
+        cmdBuffer.setScissorWithCount({/*scissor*/});
 
         // bind texture resources passed to shader
         // cmd.bindDescriptorSets2(vk::BindDescriptorSetsInfo{});
@@ -994,7 +1014,7 @@ auto main(
         // cmd.drawIndexed(uint32_t indexCount, uint32_t instanceCount,
         // uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance)
 
-        cmd.endRendering();
+        cmdBuffer.endRendering();
 
         // transition swapchain image layout: color attach opt -> general
 
@@ -1009,9 +1029,9 @@ auto main(
 
         // transition image layout imageViews[nextImageIndex]
         // ePresentSrcKHR -> eColorAttachmentOptimal
-        cmd.beginRendering({});
+        cmdBuffer.beginRendering({});
 
-        cmd.endRendering();
+        cmdBuffer.endRendering();
         // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
     }
 

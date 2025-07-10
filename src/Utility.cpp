@@ -104,3 +104,71 @@ void endSingleTimeCommands(
 
     assert(result == vk::Result::eSuccess);
 }
+void cmdBufferMemoryBarrier(
+    vk::raii::CommandBuffer &commandBuffer,
+    vk::Buffer              &buffer,
+    vk::PipelineStageFlags2  srcStageMask,
+    vk::PipelineStageFlags2  dstStageMask,
+    vk::AccessFlags2         srcAccessMask, // Default to infer if not provided
+    vk::AccessFlags2         dstAccessMask, // Default to infer if not provided
+    vk::DeviceSize           offset,
+    vk::DeviceSize           size,
+    uint32_t                 srcQueueFamilyIndex,
+    uint32_t                 dstQueueFamilyIndex)
+{
+    // Infer access masks if not explicitly provided
+    if (srcAccessMask == vk::AccessFlagBits2{}) {
+        srcAccessMask = inferAccessMaskFromStage(srcStageMask, true);
+    }
+    if (dstAccessMask == vk::AccessFlagBits2{}) {
+        dstAccessMask = inferAccessMaskFromStage(dstStageMask, false);
+    }
+
+    auto bufferMemoryBarrier = vk::BufferMemoryBarrier2{
+        srcStageMask,
+        srcAccessMask,
+        dstStageMask,
+        dstAccessMask,
+        srcQueueFamilyIndex,
+        dstQueueFamilyIndex,
+        buffer,
+        offset,
+        size};
+
+    commandBuffer.pipelineBarrier2(
+        vk::DependencyInfo{}.setBufferMemoryBarriers(bufferMemoryBarrier));
+}
+
+auto inferAccessMaskFromStage(
+    vk::PipelineStageFlags2 stage,
+    bool                    src) -> vk::AccessFlags2
+{
+    vk::AccessFlags2 access = {};
+
+    // Handle each possible stage bit
+    if ((stage | vk::PipelineStageFlagBits2::eComputeShader)
+        == vk::PipelineStageFlagBits2::eComputeShader) {
+        access |= (src) ? vk::AccessFlagBits2::eShaderRead
+                        : vk::AccessFlagBits2::eShaderWrite;
+    }
+
+    if ((stage | vk::PipelineStageFlagBits2::eFragmentShader)
+        == vk::PipelineStageFlagBits2::eFragmentShader) {
+        access |= (src) ? vk::AccessFlagBits2::eShaderRead
+                        : vk::AccessFlagBits2::eShaderWrite;
+    }
+
+    if ((stage | vk::PipelineStageFlagBits2::eVertexAttributeInput)
+        == vk::PipelineStageFlagBits2::eVertexAttributeInput) {
+        access |= vk::AccessFlagBits2::eVertexAttributeRead;
+    }
+
+    if ((stage | vk::PipelineStageFlagBits2::eTransfer)
+        == vk::PipelineStageFlagBits2::eTransfer) {
+        access |= (src) ? vk::AccessFlagBits2::eTransferRead
+                        : vk::AccessFlagBits2::eTransferWrite;
+    }
+
+    assert(access != vk::AccessFlagBits2{});
+    return access;
+}
