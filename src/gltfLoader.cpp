@@ -352,11 +352,7 @@ auto getGltfAssetData(
         });
 
     if (!hasCamera) {
-        viewMatrix = glm::lookAt(
-            glm::vec3(0.0f, 0.0f, 3.0f),
-            glm::vec3(0.0f, 0.0f, 0.0f),
-            glm::vec3(0.0f, 0.0f, 1.0f));
-        projectionMatrix = glm::perspectiveRH_ZO(0.66f, 1.5f, 1.0f, 1000.0f);
+        viewMatrix = glm::inverse(modelMatrix);
     }
 
     return {
