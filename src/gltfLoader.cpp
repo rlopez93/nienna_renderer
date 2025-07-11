@@ -101,11 +101,17 @@ auto getGltfAssetData(
     // }
     //
 
+    bool hasMesh   = false;
+    bool hasCamera = false;
+
     fastgltf::iterateSceneNodes(
         asset,
         0,
         fastgltf::math::fmat4x4{},
         [&](fastgltf::Node &node, fastgltf::math::fmat4x4 matrix) {
+            if (hasMesh && hasCamera) {
+                return;
+            }
             if (node.cameraIndex.has_value()) {
 
                 fastgltf::math::fvec3 _scale;
@@ -173,6 +179,8 @@ auto getGltfAssetData(
                             cameraProjection.aspectRatio.value_or(1.0f),
                             cameraProjection.znear);
                     }
+
+                    hasCamera = true;
                 }
 
                 fmt::print(
@@ -300,7 +308,9 @@ auto getGltfAssetData(
                     fastgltf::Material &material =
                         asset.materials[primitiveIt->materialIndex.value()];
 
-                    assert(material.pbrData.baseColorTexture.has_value());
+                    if (!material.pbrData.baseColorTexture.has_value()) {
+                        continue;
+                    }
                     fastgltf::TextureInfo &textureInfo =
                         material.pbrData.baseColorTexture.value();
 
@@ -335,9 +345,19 @@ auto getGltfAssetData(
                         asset.samplers[texture.samplerIndex.value()];
 
                     // TODO make vk::SamplerCreateInfo from fastgltf::Sampler
+
+                    hasMesh = true;
                 }
             }
         });
+
+    if (!hasCamera) {
+        viewMatrix = glm::lookAt(
+            glm::vec3(0.0f, 0.0f, 3.0f),
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 0.0f, 1.0f));
+        projectionMatrix = glm::perspectiveRH_ZO(0.66f, 1.5f, 1.0f, 1000.0f);
+    }
 
     return {
         indices,
