@@ -51,6 +51,9 @@ void cmdTransitionImageLayout(
     vk::ImageAspectFlags     aspectMask)
 
 {
+    static int64_t count = 0;
+    // fmt::print(stderr, "\n\ncmdTransitionImageLayout(): {}\n\n", count);
+    ++count;
     const auto [srcStage, srcAccess] = makePipelineStageAccessTuple(oldLayout);
     const auto [dstStage, dstAccess] = makePipelineStageAccessTuple(newLayout);
 
@@ -73,6 +76,10 @@ auto beginSingleTimeCommands(
     vk::raii::Device      &device,
     vk::raii::CommandPool &commandPool) -> vk::raii::CommandBuffer
 {
+    static int64_t count = 0;
+
+    // fmt::print(stderr, "beginSingleTimeCommands(): {}\n", count);
+    ++count;
     auto commandBuffers = vk::raii::CommandBuffers{
         device,
         vk::CommandBufferAllocateInfo{

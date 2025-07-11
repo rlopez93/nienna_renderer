@@ -71,17 +71,18 @@ auto Allocator::createBuffer(
     auto vmaAllocationCreateInfo =
         VmaAllocationCreateInfo{.flags = allocationFlags, .usage = memoryUsage};
 
-    const VkDeviceSize dedicatedMemoryMinSize = 64ULL * 1024; // 64 KB
-
-    if (bufferSize > dedicatedMemoryMinSize) {
-        vmaAllocationCreateInfo.flags |=
-            VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT; // use dedicated memory for
-                                                        // large buffers
-    }
+    // const VkDeviceSize dedicatedMemoryMinSize = 64ULL * 1024; // 64 KB
+    //
+    // if (bufferSize > dedicatedMemoryMinSize) {
+    //     vmaAllocationCreateInfo.flags |=
+    //         VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT; // use dedicated memory for
+    //                                                     // large buffers
+    // }
 
     // VkBufferCreateInfo b_info         = *bufferCreateInfo;
     auto allocationInfo = VmaAllocationInfo{};
 
+    // fmt::print(stderr, "\n\ncalling vmaCreateBuffer()...\n\n");
     Buffer   buffer;
     VkBuffer vk_buffer;
     VK_CHECK(vmaCreateBuffer(

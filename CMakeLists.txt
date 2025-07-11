@@ -9,6 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(Vulkan REQUIRED)
 find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
 find_package(fmt REQUIRED)
+find_package(glm REQUIRED)
 
 add_executable(nienna)
 
@@ -19,6 +20,7 @@ target_sources(nienna PRIVATE
     include/Utility.hpp src/Utility.cpp
     include/spirv_reflect.h src/spirv_reflect.c
     include/stb_image.h src/stb_image.cpp
+    include/gltfLoader.hpp src/gltfLoader.cpp
 )
 
 target_include_directories(nienna PUBLIC
@@ -39,6 +41,7 @@ target_link_libraries(nienna PRIVATE
     vk-bootstrap::vk-bootstrap
     fastgltf::fastgltf
     fmt::fmt
+    glm::glm
 )
 
 if(NOT Vulkan_SLANGC_EXECUTABLE)

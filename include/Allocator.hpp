@@ -72,6 +72,7 @@ struct Allocator {
 
         fmt::print(stderr, "size {}\n", vectorData.size() * sizeof(T));
 
+        // fmt::print(stderr, "\n\ncalling createBuffer()...\n\n");
         // Create a staging buffer
         Buffer stagingBuffer = createBuffer(
             bufferSize,
@@ -83,11 +84,19 @@ struct Allocator {
         // Track the staging buffer for later cleanup
         stagingBuffers.push_back(stagingBuffer);
 
+        // fmt::print(stderr, "\n\ncalling vmaCopyMemoryToAllocation()...\n\n");
+        vmaCopyMemoryToAllocation(
+            allocator,
+            vectorData.data(),
+            stagingBuffer.allocation,
+            0,
+            bufferSize);
+
         // Map and copy data to the staging buffer
-        void *data;
-        vmaMapMemory(allocator, stagingBuffer.allocation, &data);
-        memcpy(data, vectorData.data(), (size_t)bufferSize);
-        vmaUnmapMemory(allocator, stagingBuffer.allocation);
+        // void *data;
+        // vmaMapMemory(allocator, stagingBuffer.allocation, &data);
+        // memcpy(data, vectorData.data(), (size_t)bufferSize);
+        // vmaUnmapMemory(allocator, stagingBuffer.allocation);
         return stagingBuffer;
     }
 
@@ -106,22 +115,26 @@ struct Allocator {
         const std::vector<T>    &vectorData,
         vk::BufferUsageFlags2    usageFlags) -> Buffer
     {
+        // fmt::print(stderr, "\n\ncalling createStagingBuffer()...\n\n");
         // Create staging buffer and upload data
         Buffer stagingBuffer = createStagingBuffer(vectorData);
 
         // Create the final buffer in GPU memory
         const vk::DeviceSize bufferSize = sizeof(T) * vectorData.size();
 
+        // fmt::print(stderr, "\n\ncalling createBuffer()...\n\n");
         Buffer buffer = createBuffer(
             bufferSize,
             usageFlags | vk::BufferUsageFlagBits2::eTransferDst,
             VMA_MEMORY_USAGE_GPU_ONLY);
 
+        // fmt::print(stderr, "\n\ncalling cmd.copyBuffer()...\n\n");
         cmd.copyBuffer(
             stagingBuffer.buffer,
             buffer.buffer,
             vk::BufferCopy{}.setSize(bufferSize));
 
+        // fmt::print(stderr, "\n\nexiting...\n\n");
         return buffer;
     }
 

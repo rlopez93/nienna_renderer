@@ -29,21 +29,10 @@
 #include "Allocator.hpp"
 #include "Renderer.hpp"
 #include "Utility.hpp"
+#include "gltfLoader.hpp"
 
 struct Vertex;
 struct VertexReflectionData;
-
-struct Vertex {
-    fastgltf::math::fvec3 pos{};
-    fastgltf::math::fvec3 normal{};
-    fastgltf::math::fvec2 texCoord{};
-};
-
-struct Scene {
-    fastgltf::math::fmat4x4 model{};
-    fastgltf::math::fmat4x4 view{};
-    fastgltf::math::fmat4x4 projection{};
-};
 
 auto readShaders(const std::string &filename) -> std::vector<char>;
 auto reflectShader(const std::filesystem::path &path) -> VertexReflectionData;
@@ -183,317 +172,6 @@ auto reflectShader(const std::vector<char> &code) -> VertexReflectionData
     return data;
 }
 
-auto getGltfAsset(const std::filesystem::path &gltfPath)
-    -> fastgltf::Expected<fastgltf::Asset>;
-
-auto getGltfAssetData(
-    fastgltf::Asset             &asset,
-    const std::filesystem::path &path)
-    -> std::tuple<
-        std::vector<uint16_t>,
-        std::vector<Vertex>,
-        std::vector<unsigned char>,
-        vk::Extent2D,
-        fastgltf::math::fmat4x4,
-        fastgltf::math::fmat4x4,
-        fastgltf::math::fmat4x4,
-        vk::SamplerCreateInfo>;
-
-auto getGltfAsset(const std::filesystem::path &gltfPath)
-    -> fastgltf::Expected<fastgltf::Asset>
-{
-    constexpr auto supportedExtensions = fastgltf::Extensions::KHR_mesh_quantization
-                                       | fastgltf::Extensions::KHR_texture_transform
-                                       | fastgltf::Extensions::KHR_materials_variants;
-
-    fastgltf::Parser parser(supportedExtensions);
-
-    constexpr auto gltfOptions = fastgltf::Options::DontRequireValidAssetMember
-                               | fastgltf::Options::AllowDouble
-                               | fastgltf::Options::LoadExternalBuffers
-                               | fastgltf::Options::GenerateMeshIndices;
-
-    auto gltfFile = fastgltf::GltfDataBuffer::FromPath(gltfPath);
-    if (!bool(gltfFile)) {
-        fmt::print(
-            stderr,
-            "Failed to open glTF file: {}\n",
-            fastgltf::getErrorMessage(gltfFile.error()));
-        return fastgltf::Error{};
-    }
-
-    auto asset = parser.loadGltf(gltfFile.get(), gltfPath.parent_path(), gltfOptions);
-
-    if (fastgltf::getErrorName(asset.error()) != "None") {
-        fmt::print(
-            stderr,
-            "Failed to open glTF file: {}\n",
-            fastgltf::getErrorMessage(gltfFile.error()));
-    }
-
-    return asset;
-}
-
-auto getGltfAssetData(
-    fastgltf::Asset             &asset,
-    const std::filesystem::path &directory)
-    -> std::tuple<
-        std::vector<uint16_t>,
-        std::vector<Vertex>,
-        std::vector<unsigned char>,
-        vk::Extent2D,
-        fastgltf::math::fmat4x4,
-        fastgltf::math::fmat4x4,
-        fastgltf::math::fmat4x4,
-        vk::SamplerCreateInfo>
-{
-    auto indices           = std::vector<uint16_t>{};
-    auto vertices          = std::vector<Vertex>{};
-    auto image_data        = std::vector<unsigned char>{};
-    auto imageExtent       = vk::Extent2D{};
-    auto modelMatrix       = fastgltf::math::fmat4x4{};
-    auto viewMatrix        = fastgltf::math::fmat4x4{};
-    auto projectionMatrix  = fastgltf::math::fmat4x4{};
-    auto samplerCreateInfo = vk::SamplerCreateInfo{};
-
-    fastgltf::iterateSceneNodes(
-        asset,
-        0,
-        fastgltf::math::fmat4x4{},
-        [&](fastgltf::Node &node, fastgltf::math::fmat4x4 matrix) {
-            if (node.cameraIndex.has_value()) {
-                auto &camera = asset.cameras[node.cameraIndex.value()];
-                viewMatrix   = matrix;
-                if (std::holds_alternative<fastgltf::Camera::Perspective>(
-                        camera.camera)) {
-                    auto cameraProjection =
-                        std::get<fastgltf::Camera::Perspective>(camera.camera);
-
-                    auto a = cameraProjection.aspectRatio.value_or(1.0f);
-                    auto y = cameraProjection.yfov;
-                    auto n = cameraProjection.znear;
-
-                    projectionMatrix = [&] -> fastgltf::math::fmat4x4 {
-                        if (cameraProjection.zfar.has_value()) {
-                            // finite perspective projection
-                            float f = cameraProjection.zfar.value();
-                            return fastgltf::math::fmat4x4{
-                                1.0f / (a * tan(0.5f * y)),
-                                0,
-                                0,
-                                0,
-                                0,
-                                1.0f / tan(0.5f * y),
-                                0,
-                                0,
-                                0,
-                                0,
-                                (f + n) / (n - f),
-                                -1,
-                                0,
-                                0,
-                                (2 * f * n) / (n - f),
-                                0};
-                        }
-
-                        else {
-                            // infinite perspective projection
-                            return fastgltf::math::fmat4x4{
-                                1.0f / (a * tan(0.5f * y)),
-                                0,
-                                0,
-                                0,
-                                0,
-                                1.0f / tan(0.5f * y),
-                                0,
-                                0,
-                                0,
-                                0,
-                                -1,
-                                -1,
-                                0,
-                                0,
-                                2 * n,
-                                0};
-                        }
-                    }();
-                }
-
-                fmt::print(
-                    stderr,
-                    "matrix is:{} {} {} {}\n{} {} {} {}\n{} {} {} {}\n{} {} {} {}\n",
-                    matrix[0][0],
-                    matrix[0][1],
-                    matrix[0][2],
-                    matrix[0][3],
-                    matrix[1][0],
-                    matrix[1][1],
-                    matrix[1][2],
-                    matrix[1][3],
-                    matrix[2][0],
-                    matrix[2][1],
-                    matrix[2][2],
-                    matrix[2][3],
-                    matrix[3][0],
-                    matrix[3][1],
-                    matrix[3][2],
-                    matrix[3][3]);
-
-                matrix = fastgltf::getTransformMatrix(node);
-                fmt::print(
-                    stderr,
-                    "local matrix is:{} {} {} {}\n{} {} {} {}\n{} {} {} {}\n{} {} {} "
-                    "{}\n",
-                    matrix[0][0],
-                    matrix[0][1],
-                    matrix[0][2],
-                    matrix[0][3],
-                    matrix[1][0],
-                    matrix[1][1],
-                    matrix[1][2],
-                    matrix[1][3],
-                    matrix[2][0],
-                    matrix[2][1],
-                    matrix[2][2],
-                    matrix[2][3],
-                    matrix[3][0],
-                    matrix[3][1],
-                    matrix[3][2],
-                    matrix[3][3]);
-            }
-
-            else if (node.meshIndex.has_value()) {
-                auto &mesh = asset.meshes[node.meshIndex.value()];
-                fmt::print(stderr, "Mesh is: <{}>\n", mesh.name);
-
-                modelMatrix = matrix;
-
-                fmt::print(
-                    stderr,
-                    "matrix is:{} {} {} {}\n{} {} {} {}\n{} {} {} {}\n{} {} {} {}\n",
-                    matrix[0][0],
-                    matrix[0][1],
-                    matrix[0][2],
-                    matrix[0][3],
-                    matrix[1][0],
-                    matrix[1][1],
-                    matrix[1][2],
-                    matrix[1][3],
-                    matrix[2][0],
-                    matrix[2][1],
-                    matrix[2][2],
-                    matrix[2][3],
-                    matrix[3][0],
-                    matrix[3][1],
-                    matrix[3][2],
-                    matrix[3][3]);
-
-                for (auto primitiveIt = mesh.primitives.begin();
-                     primitiveIt != mesh.primitives.end();
-                     ++primitiveIt) {
-
-                    if (primitiveIt->indicesAccessor.has_value()) {
-                        auto &indexAccessor =
-                            asset.accessors[primitiveIt->indicesAccessor.value()];
-                        indices.resize(indexAccessor.count);
-
-                        fastgltf::iterateAccessorWithIndex<std::uint16_t>(
-                            asset,
-                            indexAccessor,
-                            [&](std::uint16_t index, std::size_t idx) {
-                                indices[idx] = index;
-                            });
-                    }
-
-                    auto positionIt = primitiveIt->findAttribute("POSITION");
-                    auto normalIt   = primitiveIt->findAttribute("NORMAL");
-                    auto texCoordIt = primitiveIt->findAttribute("TEXCOORD_0");
-
-                    assert(positionIt != primitiveIt->attributes.end());
-                    assert(normalIt != primitiveIt->attributes.end());
-                    assert(texCoordIt != primitiveIt->attributes.end());
-
-                    auto &positionAccessor = asset.accessors[positionIt->accessorIndex];
-                    auto &normalAccessor   = asset.accessors[normalIt->accessorIndex];
-                    auto &texCoordAccessor = asset.accessors[texCoordIt->accessorIndex];
-
-                    vertices.resize(positionAccessor.count);
-
-                    fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
-                        asset,
-                        positionAccessor,
-                        [&](fastgltf::math::fvec3 pos, std::size_t idx) {
-                            vertices[idx].pos = pos;
-                        });
-
-                    fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
-                        asset,
-                        normalAccessor,
-                        [&](fastgltf::math::fvec3 normal, std::size_t idx) {
-                            vertices[idx].normal = normal;
-                        });
-
-                    fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
-                        asset,
-                        texCoordAccessor,
-                        [&](fastgltf::math::fvec2 texCoord, std::size_t idx) {
-                            vertices[idx].texCoord = texCoord;
-                        });
-
-                    assert(primitiveIt->materialIndex.has_value());
-                    fastgltf::Material &material =
-                        asset.materials[primitiveIt->materialIndex.value()];
-
-                    assert(material.pbrData.baseColorTexture.has_value());
-                    fastgltf::TextureInfo &textureInfo =
-                        material.pbrData.baseColorTexture.value();
-
-                    assert(textureInfo.texCoordIndex == 0);
-                    fastgltf::Texture &texture =
-                        asset.textures[textureInfo.textureIndex];
-
-                    assert(texture.imageIndex.has_value());
-                    fastgltf::Image &image = asset.images[texture.imageIndex.value()];
-
-                    fastgltf::URI &imageURI =
-                        std::get<fastgltf::sources::URI>(image.data).uri;
-
-                    {
-                        auto path = directory / imageURI.fspath();
-                        fmt::print(stderr, "\"{}\"\n", path.c_str());
-                        int  x, y, n;
-                        auto stbi_data = stbi_load(path.c_str(), &x, &y, &n, 4);
-
-                        fmt::print(stderr, "channels in file: {}\n", n);
-                        assert(stbi_data);
-
-                        image_data.assign(stbi_data, stbi_data + (x * y * 4));
-                        // assert(strcmp(image_data.data(), stbi_data) == 0);
-                        imageExtent.setWidth(x).setHeight(y);
-
-                        stbi_image_free(stbi_data);
-                    }
-
-                    assert(texture.samplerIndex.has_value());
-                    fastgltf::Sampler &textureSampler =
-                        asset.samplers[texture.samplerIndex.value()];
-
-                    // TODO make vk::SamplerCreateInfo from fastgltf::Sampler
-                }
-            }
-        });
-
-    return {
-        indices,
-        vertices,
-        image_data,
-        imageExtent,
-        modelMatrix,
-        viewMatrix,
-        projectionMatrix,
-        samplerCreateInfo};
-}
-
 auto createPipeline(
     vk::raii::Device         &device,
     vk::Format                imageFormat,
@@ -525,7 +203,7 @@ auto createPipeline(
             0,
             0,
             vk::Format::eR32G32B32Sfloat,
-            offsetof(Vertex, pos)},
+            offsetof(Vertex, position)},
         vk::VertexInputAttributeDescription{
             1,
             0,
@@ -655,19 +333,23 @@ auto uploadBuffers(
 {
     auto commandBuffer = beginSingleTimeCommands(device, transientCommandPool);
 
+    // fmt::print(stderr, "\n\nvertexBuffer = createBufferAndUploadData()\n\n");
     auto vertexBuffer = allocator.createBufferAndUploadData(
         commandBuffer,
         vertexData,
-        vk::BufferUsageFlagBits2::eVertexBuffer);
+        vk::BufferUsageFlagBits2::eVertexBuffer
+            | vk::BufferUsageFlagBits2::eStorageBuffer);
+    // fmt::print(stderr, "\n\nindexBuffer = createBufferAndUploadData()\n\n");
     auto indexBuffer = allocator.createBufferAndUploadData(
         commandBuffer,
         indexData,
         vk::BufferUsageFlagBits2::eIndexBuffer);
-    fmt::print(
-        stderr,
-        "texture extent: {}x{}\n",
-        textureExtent.width,
-        textureExtent.height);
+    // fmt::print(
+    // stderr,
+    // "texture extent: {}x{}\n",
+    // textureExtent.width,
+    // textureExtent.height);
+    // fmt::print(stderr, "\n\ntextureImage = createImageAndUploadData()\n\n");
     auto textureImage = allocator.createImageAndUploadData(
         commandBuffer,
         textureData,
@@ -685,6 +367,7 @@ auto uploadBuffers(
             vk::ImageTiling::eOptimal,
             vk::ImageUsageFlagBits::eSampled},
         vk::ImageLayout::eShaderReadOnlyOptimal);
+    // fmt::print(stderr, "\n\nimageView = createImageView()\n\n");
     auto imageView = device.createImageView(
         vk::ImageViewCreateInfo{
             {},
@@ -840,7 +523,7 @@ auto main(
          modelMatrix,
          viewMatrix,
          projectionMatrix,
-         samplerCreateInfo] = getGltfAssetData(asset.get(), gltfDirectory);
+         samplerCreateInfo] = getGltfAssetData(asset, gltfDirectory);
 
     auto sampler = vk::raii::Sampler{r.ctx.device, samplerCreateInfo};
 
@@ -864,8 +547,6 @@ auto main(
             VMA_MEMORY_USAGE_AUTO,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
                 | VMA_ALLOCATION_CREATE_MAPPED_BIT));
-
-        // sceneBuffersMapped ??
     }
 
     auto shaderModule = createShaderModule(r.ctx.device);
@@ -956,9 +637,9 @@ auto main(
     SDL_Event e;
     while (running) {
         if (totalFrames % 10 == 0) {
-            fmt::print(stderr, "\n{} ", totalFrames);
+            // fmt::print(stderr, "\n{} ", totalFrames);
         }
-        fmt::print(stderr, ".");
+        // fmt::print(stderr, ".");
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) {
                 running = false;
@@ -966,6 +647,7 @@ auto main(
         }
 
         // begin frame
+        // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
 
         // check swapchain rebuild
         if (swapchainNeedRebuild) {
@@ -978,15 +660,14 @@ auto main(
 
         {
             // wait semaphore frame (n - numFrames)
-            auto res = r.ctx.device.waitSemaphores(
+            auto result = r.ctx.device.waitSemaphores(
                 vk::SemaphoreWaitInfo{{}, *frameTimelineSemaphore, waitValue},
                 std::numeric_limits<uint64_t>::max());
         }
 
         // reset current frame's command pool to reuse the command buffer
         cmdPool.reset();
-        cmdBuffer.begin(
-            vk::CommandBufferBeginInfo{vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+        cmdBuffer.begin({});
 
         auto [result, nextImageIndex] = r.ctx.swapchain.acquireNextImage(
             std::numeric_limits<uint64_t>::max(),
@@ -1009,6 +690,8 @@ auto main(
             .view       = viewMatrix,
             .projection = projectionMatrix};
 
+        scene.projection[1][1] *= -1;
+
         vmaCopyMemoryToAllocation(
             allocator.allocator,
             &scene,
@@ -1025,7 +708,7 @@ auto main(
             {},
             vk::AttachmentLoadOp::eClear,
             vk::AttachmentStoreOp::eStore,
-            vk::ClearColorValue{std::array{0.0f, 0.f, 0.0f, 1.0f}}};
+            vk::ClearColorValue{std::array{0.2f, 0.1f, 0.4f, 1.0f}}};
 
         // depth attachment buffer: vk::RenderingAttachmentInfo
         auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
@@ -1052,7 +735,7 @@ auto main(
         cmdTransitionImageLayout(
             cmdBuffer,
             swapchainImages[nextImageIndex],
-            vk::ImageLayout::eGeneral,
+            vk::ImageLayout::eUndefined,
             vk::ImageLayout::eColorAttachmentOptimal);
 
         cmdBuffer.beginRendering(renderingInfo);
@@ -1121,18 +804,14 @@ auto main(
 
         auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{cmdBuffer};
 
-        auto submitInfo = vk::SubmitInfo2{
-            {},
-            waitSemaphore,
-            commandBufferSubmitInfo,
-            signalSemaphores};
-
+        // fmt::print(stderr, "\n\nBefore vkQueueSubmit2()\n\n");
         r.ctx.graphicsQueue.submit2(
             vk::SubmitInfo2{
                 {},
                 waitSemaphore,
                 commandBufferSubmitInfo,
                 signalSemaphores});
+        // fmt::print(stderr, "\n\nAfter vkQueueSubmit2()\n\n");
 
         // present frame
         auto presentResult = r.ctx.presentQueue.presentKHR(
@@ -1156,8 +835,15 @@ auto main(
         // move to the next frame
         frameRingCurrent = (frameRingCurrent + 1) % maxFramesInFlight;
 
+        // fmt::print(
+        //     stderr,
+        //     "imageIndex: {}, currentFrame: {}, frameRingCurrent: {}, totalFrames:
+        //     {}\n", nextImageIndex, currentFrame, nextImageIndex, totalFrames);
+        //
         ++totalFrames;
     }
+
+    r.ctx.device.waitIdle();
 
     return 0;
 }
