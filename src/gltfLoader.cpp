@@ -159,54 +159,20 @@ auto getGltfAssetData(
                     auto cameraProjection =
                         std::get<fastgltf::Camera::Perspective>(camera.camera);
 
-                    auto a = cameraProjection.aspectRatio.value_or(1.0f);
-                    auto y = cameraProjection.yfov;
-                    auto n = cameraProjection.znear;
-
-                    projectionMatrix = [&] -> glm::mat4 {
-                        if (cameraProjection.zfar.has_value()) {
-                            // finite perspective projection
-                            float f = cameraProjection.zfar.value();
-                            return {
-                                1.0f / (a * tan(0.5f * y)),
-                                0,
-                                0,
-                                0,
-                                0,
-                                1.0f / tan(0.5f * y),
-                                0,
-                                0,
-                                0,
-                                0,
-                                (f + n) / (n - f),
-                                -1,
-                                0,
-                                0,
-                                (2 * f * n) / (n - f),
-                                0};
-                        }
-
-                        else {
-                            // infinite perspective projection
-                            return {
-                                1.0f / (a * tan(0.5f * y)),
-                                0,
-                                0,
-                                0,
-                                0,
-                                1.0f / tan(0.5f * y),
-                                0,
-                                0,
-                                0,
-                                0,
-                                -1,
-                                -1,
-                                0,
-                                0,
-                                2 * n,
-                                0};
-                        }
-                    }();
+                    if (cameraProjection.zfar.has_value()) {
+                        fmt::print(stderr, "finite perspective projection\n");
+                        projectionMatrix = glm::perspectiveRH_ZO(
+                            cameraProjection.yfov,
+                            cameraProjection.aspectRatio.value_or(1.0f),
+                            cameraProjection.znear,
+                            cameraProjection.zfar.value());
+                    } else {
+                        fmt::print(stderr, "infinite perspective projection\n");
+                        projectionMatrix = glm::infinitePerspectiveRH_ZO(
+                            cameraProjection.yfov,
+                            cameraProjection.aspectRatio.value_or(1.0f),
+                            cameraProjection.znear);
+                    }
                 }
 
                 fmt::print(
