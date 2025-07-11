@@ -498,8 +498,7 @@ auto createPipeline(
     vk::raii::Device         &device,
     vk::Format                imageFormat,
     vk::Format                depthFormat,
-    vk::raii::ShaderModule   &vertShaderModule,
-    vk::raii::ShaderModule   &fragShaderModule,
+    vk::raii::ShaderModule   &shaderModule,
     vk::raii::PipelineLayout &pipelineLayout) -> vk::raii::Pipeline
 {
     // The stages used by this pipeline
@@ -507,14 +506,14 @@ auto createPipeline(
         vk::PipelineShaderStageCreateInfo{
             {},
             vk::ShaderStageFlagBits::eVertex,
-            vertShaderModule,
-            "main",
+            shaderModule,
+            "vertexMain",
             {}},
         vk::PipelineShaderStageCreateInfo{
             {},
             vk::ShaderStageFlagBits::eFragment,
-            fragShaderModule,
-            "main",
+            shaderModule,
+            "fragmentMain",
             {}},
     };
 
@@ -625,31 +624,18 @@ auto createPipeline(
     return vk::raii::Pipeline{device, nullptr, graphicsPipelineCreateInfo};
 }
 
-auto createShaderModules(vk::raii::Device &device) -> std::tuple<
-    vk::raii::ShaderModule,
-    vk::raii::ShaderModule>
+auto createShaderModule(vk::raii::Device &device) -> vk::raii::ShaderModule
 {
-    auto vertShaderCode = readShaders("shaders/shader.vert.spv");
-    auto fragShaderCode = readShaders("shaders/shader.frag.spv");
+    auto shaderCode = readShaders("shaders/shader.slang.spv");
 
-    auto vertexData = reflectShader(vertShaderCode);
-    auto fragData   = reflectShader(fragShaderCode);
+    auto data = reflectShader(shaderCode);
 
-    auto vertShaderModule = vk::raii::ShaderModule{
+    return vk::raii::ShaderModule{
         device,
         vk::ShaderModuleCreateInfo{
             {},
-            vertShaderCode.size(),
-            reinterpret_cast<const uint32_t *>(vertShaderCode.data())}};
-
-    auto fragShaderModule = vk::raii::ShaderModule{
-        device,
-        vk::ShaderModuleCreateInfo{
-            {},
-            fragShaderCode.size(),
-            reinterpret_cast<const uint32_t *>(fragShaderCode.data())}};
-
-    return {std::move(vertShaderModule), std::move(fragShaderModule)};
+            shaderCode.size(),
+            reinterpret_cast<const uint32_t *>(shaderCode.data())}};
 }
 
 auto uploadBuffers(
@@ -742,12 +728,12 @@ auto main(
         vk::ApiVersion14};
 
     // get swapchain images
-    auto swapchainImages   = r.ctx.swapchain.getImages();
-    auto maxFramesInFlight = swapchainImages.size();
-
+    auto swapchainImages     = r.ctx.swapchain.getImages();
     auto swapchainImageViews = std::vector<vk::raii::ImageView>{};
-    auto imageAvailable      = std::vector<vk::raii::Semaphore>{};
-    auto renderFinished      = std::vector<vk::raii::Semaphore>{};
+    auto maxFramesInFlight   = swapchainImages.size();
+
+    auto imageAvailable = std::vector<vk::raii::Semaphore>{};
+    auto renderFinished = std::vector<vk::raii::Semaphore>{};
 
     for (auto image : swapchainImages) {
         swapchainImageViews.emplace_back(
@@ -759,6 +745,9 @@ auto main(
                 r.ctx.imageFormat,
                 {},
                 {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
+    }
+
+    for (auto i : std::views::iota(0u, maxFramesInFlight)) {
         imageAvailable.emplace_back(r.ctx.device, vk::SemaphoreCreateInfo{});
         renderFinished.emplace_back(r.ctx.device, vk::SemaphoreCreateInfo{});
     }
@@ -809,7 +798,7 @@ auto main(
 
     auto commandPools   = std::vector<vk::raii::CommandPool>{};
     auto commandBuffers = std::vector<vk::raii::CommandBuffer>{};
-    auto frameNumbers   = std::vector<uint64_t>{maxFramesInFlight, 0};
+    auto frameNumbers   = std::vector<uint64_t>(maxFramesInFlight, 0);
     std::ranges::iota(frameNumbers, 0);
 
     uint64_t initialValue = maxFramesInFlight - 1;
@@ -872,14 +861,14 @@ auto main(
             sizeof(Scene),
             vk::BufferUsageFlagBits2::eUniformBuffer
                 | vk::BufferUsageFlagBits2::eTransferDst,
-            VMA_MEMORY_USAGE_CPU_TO_GPU,
+            VMA_MEMORY_USAGE_AUTO,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
                 | VMA_ALLOCATION_CREATE_MAPPED_BIT));
 
         // sceneBuffersMapped ??
     }
 
-    auto [vertShaderModule, fragShaderModule] = createShaderModules(r.ctx.device);
+    auto shaderModule = createShaderModule(r.ctx.device);
 
     const auto descriptorSetLayoutBindings = std::array{
         vk::DescriptorSetLayoutBinding{
@@ -954,18 +943,22 @@ auto main(
         r.ctx.device,
         r.ctx.imageFormat,
         r.ctx.depthFormat,
-        vertShaderModule,
-        fragShaderModule,
+        shaderModule,
         pipelineLayout);
 
     uint32_t frameRingCurrent = 0;
     uint32_t currentFrame     = 0;
+    uint32_t totalFrames      = 0;
 
     bool swapchainNeedRebuild = false;
 
     bool      running = true;
     SDL_Event e;
     while (running) {
+        if (totalFrames % 10 == 0) {
+            fmt::print(stderr, "\n{} ", totalFrames);
+        }
+        fmt::print(stderr, ".");
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) {
                 running = false;
@@ -1016,8 +1009,12 @@ auto main(
             .view       = viewMatrix,
             .projection = projectionMatrix};
 
-        assert(false && "fix this");
-        memcpy(sceneBuffers[currentFrame].buffer, &scene, sizeof(scene));
+        vmaCopyMemoryToAllocation(
+            allocator.allocator,
+            &scene,
+            sceneBuffers[currentFrame].allocation,
+            0,
+            sizeof(Scene));
 
         // color attachment image to render to: vk::RenderingAttachmentInfo
         auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
@@ -1051,7 +1048,6 @@ auto main(
             &renderingDepthAttachmentInfo};
 
         // transition swapchain image layout:
-        // vk::ImageLayout::eGeneral -> vk::ImageLayout::eColorAttachmentOptimal
 
         cmdTransitionImageLayout(
             cmdBuffer,
@@ -1059,51 +1055,46 @@ auto main(
             vk::ImageLayout::eGeneral,
             vk::ImageLayout::eColorAttachmentOptimal);
 
-        cmdBuffer.beginRendering(vk::RenderingInfo{});
+        cmdBuffer.beginRendering(renderingInfo);
 
-        cmdBuffer.setViewportWithCount({/*viewport*/});
-        cmdBuffer.setScissorWithCount({/*scissor*/});
+        cmdBuffer.setViewportWithCount(
+            vk::Viewport(
+                0.0f,
+                0.0f,
+                r.ctx.windowExtent.width,
+                r.ctx.windowExtent.height,
+                0.0f,
+                1.0f));
+        cmdBuffer.setScissorWithCount(
+            vk::Rect2D{vk::Offset2D(0, 0), r.ctx.windowExtent});
+
+        cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
         // bind texture resources passed to shader
-        // cmdBuffer.bindDescriptorSets2(
-        //     vk::BindDescriptorSetsInfo{
-        //         vk::PipelineBindPoint::eGraphics,
-        //         pipelineLayout,
-        //         0,
-        //         descriptorSets[currentFrame]});
-        // cmd.bindDescriptorSets2(vk::BindDescriptorSetsInfo{});
+        cmdBuffer.bindDescriptorSets2(
+            vk::BindDescriptorSetsInfo{
+                vk::ShaderStageFlagBits::eAllGraphics,
+                pipelineLayout,
+                0,
+                *descriptorSets[currentFrame]});
 
         // bind vertex data
-        // cmd.bindVertexBuffers(uint32_t firstBinding, const vk::ArrayProxy<const
-        // vk::Buffer> &buffers, const vk::ArrayProxy<const vk::DeviceSize>
-        // &offsets);
+        cmdBuffer.bindVertexBuffers(0, vertexBuffer.buffer, {0});
 
         // bind index data
-        // cmd.bindIndexBuffer(vk::Buffer buffer, vk::DeviceSize offset,
-        // vk::IndexType indexType)
+        cmdBuffer.bindIndexBuffer(indexBuffer.buffer, 0, vk::IndexType::eUint16);
 
-        // cmd.drawIndexed(uint32_t indexCount, uint32_t instanceCount,
-        // uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance)
+        cmdBuffer.drawIndexed(indexData.size(), 1, 0, 0, 0);
 
         cmdBuffer.endRendering();
 
-        // transition swapchain image layout: color attach opt -> general
-
-        // beginDynamicRenderingToSwapchain()
-
-        auto colorAttachment = vk::RenderingAttachmentInfo{}
-                                   .setImageView(swapchainImageViews[nextImageIndex])
-                                   .setLoadOp(vk::AttachmentLoadOp::eClear)
-                                   .setStoreOp(vk::AttachmentStoreOp::eStore)
-                                   .setClearValue({{0.0f, 0.0f, 0.0f, 1.0f}})
-                                   .setImageLayout(vk::ImageLayout::eAttachmentOptimal);
-
-        // transition image layout imageViews[nextImageIndex]
-        // ePresentSrcKHR -> eColorAttachmentOptimal
-        cmdBuffer.beginRendering({});
-
-        cmdBuffer.endRendering();
-        // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
+        // ???transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
+        cmdTransitionImageLayout(
+            cmdBuffer,
+            swapchainImages[nextImageIndex],
+            vk::ImageLayout::eColorAttachmentOptimal,
+            vk::ImageLayout::ePresentSrcKHR);
+        cmdBuffer.end();
 
         // end frame
 
@@ -1164,6 +1155,8 @@ auto main(
 
         // move to the next frame
         frameRingCurrent = (frameRingCurrent + 1) % maxFramesInFlight;
+
+        ++totalFrames;
     }
 
     return 0;

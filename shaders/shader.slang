@@ -8,6 +8,7 @@ struct VertexInput
 struct VertexOutput
 {
 	float4 position : SV_Position;
+    float3 normal : NORMAL;
 	float2 uv : TEXCOORD0;
 }
 
@@ -30,6 +31,7 @@ VertexOutput vertexMain(VertexInput input)
 {
 	VertexOutput output;
 	output.position = mul(scene.projection, mul(scene.view, mul(scene.model, float4(input.position, 1.0))));
+    output.normal = input.normal;
 	output.uv = input.uv;
 	return output;
 }
