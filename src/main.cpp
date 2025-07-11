@@ -16,6 +16,7 @@
 
 #include <fmt/base.h>
 
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -28,157 +29,17 @@
 
 #include "Allocator.hpp"
 #include "Renderer.hpp"
+#include "Shader.hpp"
 #include "Utility.hpp"
 #include "gltfLoader.hpp"
-
-struct Vertex;
-struct VertexReflectionData;
-
-auto readShaders(const std::string &filename) -> std::vector<char>;
-auto reflectShader(const std::filesystem::path &path) -> VertexReflectionData;
-
-auto readShaders(const std::string &filename) -> std::vector<char>
-{
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
-
-    if (!file.is_open()) {
-        throw std::runtime_error("failed to open file.");
-    }
-
-    auto fileSize = file.tellg();
-    auto buffer   = std::vector<char>(fileSize);
-
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-    file.close();
-
-    return buffer;
-}
-
-struct VertexReflectionData {
-
-    std::vector<SpvReflectInterfaceVariable *> variables;
-    std::vector<SpvReflectDescriptorBinding *> bindings;
-    std::vector<SpvReflectDescriptorSet *>     sets;
-};
-
-auto reflectShader(const std::vector<char> &code) -> VertexReflectionData
-{
-    auto reflection = spv_reflect::ShaderModule(code.size(), code.data());
-
-    if (reflection.GetResult() != SPV_REFLECT_RESULT_SUCCESS) {
-        fmt::print(
-            stderr,
-            "ERROR: could not process shader code (is it a valid SPIR-V bytecode?)\n");
-        throw std::exception{};
-    }
-
-    auto &shaderModule = reflection.GetShaderModule();
-
-    const auto entry_point_name = std::string{shaderModule.entry_point_name};
-
-    fmt::print(stderr, "{}\n", entry_point_name);
-
-    auto result = SPV_REFLECT_RESULT_NOT_READY;
-    auto count  = uint32_t{0};
-
-    auto data = VertexReflectionData{};
-
-    result = reflection.EnumerateDescriptorBindings(&count, nullptr);
-    assert(result == SPV_REFLECT_RESULT_SUCCESS);
-    data.bindings.resize(count);
-
-    result = reflection.EnumerateDescriptorBindings(&count, data.bindings.data());
-    assert(result == SPV_REFLECT_RESULT_SUCCESS);
-
-    auto ToStringDescriptorType = [](SpvReflectDescriptorType value) -> std::string {
-        switch (value) {
-        case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
-            return "VK_DESCRIPTOR_TYPE_SAMPLER";
-        case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-            return "VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER";
-        case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-            return "VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE";
-        case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-            return "VK_DESCRIPTOR_TYPE_STORAGE_IMAGE";
-        case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
-            return "VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER";
-        case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
-            return "VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER";
-        case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-            return "VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER";
-        case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-            return "VK_DESCRIPTOR_TYPE_STORAGE_BUFFER";
-        case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
-            return "VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC";
-        case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
-            return "VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC";
-        case SPV_REFLECT_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
-            return "VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT";
-        case SPV_REFLECT_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
-            return "VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR";
-        }
-        // unhandled SpvReflectDescriptorType enum value
-        return "VK_DESCRIPTOR_TYPE_???";
-    };
-
-    auto ToStringResourceType = [](SpvReflectResourceType res_type) -> std::string {
-        switch (res_type) {
-        case SPV_REFLECT_RESOURCE_FLAG_UNDEFINED:
-            return "UNDEFINED";
-        case SPV_REFLECT_RESOURCE_FLAG_SAMPLER:
-            return "SAMPLER";
-        case SPV_REFLECT_RESOURCE_FLAG_CBV:
-            return "CBV";
-        case SPV_REFLECT_RESOURCE_FLAG_SRV:
-            return "SRV";
-        case SPV_REFLECT_RESOURCE_FLAG_UAV:
-            return "UAV";
-        }
-        // unhandled SpvReflectResourceType enum value
-        return "???";
-    };
-
-    for (auto p_binding : data.bindings) {
-        assert(result == SPV_REFLECT_RESULT_SUCCESS);
-        auto binding_name    = p_binding->name;
-        auto descriptor_type = ToStringDescriptorType(p_binding->descriptor_type);
-        auto resource_type   = ToStringResourceType(p_binding->resource_type);
-
-        fmt::print(stderr, "{} {} {}\n", binding_name, descriptor_type, resource_type);
-        if ((p_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
-            || (p_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-            || (p_binding->descriptor_type
-                == SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER)
-            || (p_binding->descriptor_type
-                == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)) {
-            auto dim     = p_binding->image.dim;
-            auto depth   = p_binding->image.depth;
-            auto arrayed = p_binding->image.arrayed;
-            auto ms      = p_binding->image.ms;
-            auto sampled = p_binding->image.sampled;
-
-            fmt::print(
-                stderr,
-                "dim {} depth {} arrayed {} ms {} sampled {}\n",
-                (int)dim,
-                depth,
-                arrayed,
-                ms,
-                sampled);
-        }
-    }
-
-    return data;
-}
 
 auto createPipeline(
     vk::raii::Device         &device,
     vk::Format                imageFormat,
     vk::Format                depthFormat,
-    vk::raii::ShaderModule   &shaderModule,
     vk::raii::PipelineLayout &pipelineLayout) -> vk::raii::Pipeline
 {
+    auto       shaderModule = createShaderModule(device);
     // The stages used by this pipeline
     const auto shaderStages = std::array{
         vk::PipelineShaderStageCreateInfo{
@@ -302,20 +163,6 @@ auto createPipeline(
     return vk::raii::Pipeline{device, nullptr, graphicsPipelineCreateInfo};
 }
 
-auto createShaderModule(vk::raii::Device &device) -> vk::raii::ShaderModule
-{
-    auto shaderCode = readShaders("shaders/shader.slang.spv");
-
-    auto data = reflectShader(shaderCode);
-
-    return vk::raii::ShaderModule{
-        device,
-        vk::ShaderModuleCreateInfo{
-            {},
-            shaderCode.size(),
-            reinterpret_cast<const uint32_t *>(shaderCode.data())}};
-}
-
 auto uploadBuffers(
     vk::raii::Device                 &device,
     vk::raii::CommandPool            &transientCommandPool,
@@ -379,6 +226,61 @@ auto uploadBuffers(
     endSingleTimeCommands(device, transientCommandPool, commandBuffer, queue);
 
     return {vertexBuffer, indexBuffer, textureImage, std::move(imageView)};
+}
+
+auto createDescriptorSetLayout(
+    vk::raii::Device &device,
+    uint64_t          maxFramesInFlight) -> vk::raii::DescriptorSetLayout
+{
+    const auto descriptorSetLayoutBindings = std::array{
+        vk::DescriptorSetLayoutBinding{
+            0,
+            vk::DescriptorType::eUniformBuffer,
+            1,
+            vk::ShaderStageFlagBits::eVertex},
+        vk::DescriptorSetLayoutBinding{
+            1,
+            vk::DescriptorType::eCombinedImageSampler,
+            1,
+            vk::ShaderStageFlagBits::eFragment}};
+
+    return {device, vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
+}
+
+auto createDescriptorPool(
+    vk::raii::Device &device,
+    uint64_t          maxFramesInFlight) -> vk::raii::DescriptorPool
+{
+    auto poolSizes = std::array{
+        vk::DescriptorPoolSize{
+            vk::DescriptorType::eUniformBuffer,
+            static_cast<uint32_t>(maxFramesInFlight)},
+        vk::DescriptorPoolSize{
+            vk::DescriptorType::eCombinedImageSampler,
+            static_cast<uint32_t>(maxFramesInFlight)}};
+
+    return {
+        device,
+        vk::DescriptorPoolCreateInfo{
+            vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+            static_cast<uint32_t>(maxFramesInFlight),
+            poolSizes}};
+}
+
+auto createDescriptorSets(
+    vk::raii::Device              &device,
+    vk::raii::DescriptorPool      &descriptorPool,
+    vk::raii::DescriptorSetLayout &descriptorSetLayout,
+    uint64_t maxFramesInFlight) -> std::vector<vk::raii::DescriptorSet>
+{
+
+    auto descriptorSetLayouts =
+        std::vector<vk::DescriptorSetLayout>(maxFramesInFlight, descriptorSetLayout);
+
+    auto descriptorSetAllocateInfo =
+        vk::DescriptorSetAllocateInfo{descriptorPool, descriptorSetLayouts};
+
+    return device.allocateDescriptorSets(descriptorSetAllocateInfo);
 }
 
 auto main(
@@ -507,12 +409,6 @@ auto main(
                     .front()));
     }
 
-    // create descriptor pool for ImGui (?)
-
-    // init ImGui
-
-    // create GBuffer
-
     auto asset = getGltfAsset(gltfDirectory / gltfFilename);
 
     auto
@@ -549,47 +445,16 @@ auto main(
                 | VMA_ALLOCATION_CREATE_MAPPED_BIT));
     }
 
-    auto shaderModule = createShaderModule(r.ctx.device);
+    auto descriptorSetLayout =
+        createDescriptorSetLayout(r.ctx.device, maxFramesInFlight);
 
-    const auto descriptorSetLayoutBindings = std::array{
-        vk::DescriptorSetLayoutBinding{
-            0,
-            vk::DescriptorType::eUniformBuffer,
-            1,
-            vk::ShaderStageFlagBits::eVertex},
-        vk::DescriptorSetLayoutBinding{
-            1,
-            vk::DescriptorType::eCombinedImageSampler,
-            1,
-            vk::ShaderStageFlagBits::eFragment}};
+    auto descriptorPool = createDescriptorPool(r.ctx.device, maxFramesInFlight);
 
-    auto descriptorSetLayout = vk::raii::DescriptorSetLayout{
+    auto descriptorSets = createDescriptorSets(
         r.ctx.device,
-        vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
-
-    auto descriptorSetLayouts =
-        std::vector<vk::DescriptorSetLayout>(maxFramesInFlight, descriptorSetLayout);
-
-    auto poolSizes = std::array{
-        vk::DescriptorPoolSize{
-            vk::DescriptorType::eUniformBuffer,
-            static_cast<uint32_t>(maxFramesInFlight)},
-        vk::DescriptorPoolSize{
-            vk::DescriptorType::eCombinedImageSampler,
-            static_cast<uint32_t>(maxFramesInFlight)}};
-
-    auto descriptorPool = vk::raii::DescriptorPool{
-        r.ctx.device,
-        vk::DescriptorPoolCreateInfo{
-            vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-            static_cast<uint32_t>(maxFramesInFlight),
-            poolSizes}};
-
-    auto descriptorSetAllocateInfo =
-        vk::DescriptorSetAllocateInfo{descriptorPool, descriptorSetLayouts};
-
-    auto descriptorSets =
-        r.ctx.device.allocateDescriptorSets(descriptorSetAllocateInfo);
+        descriptorPool,
+        descriptorSetLayout,
+        maxFramesInFlight);
 
     for (auto i : std::views::iota(0u, maxFramesInFlight)) {
         auto descriptorBufferInfo =
@@ -617,14 +482,17 @@ auto main(
         r.ctx.device.updateDescriptorSets(descriptorWrites, {});
     }
 
-    auto pipelineLayout =
-        vk::raii::PipelineLayout{r.ctx.device, {{}, descriptorSetLayouts}};
+    auto descriptorSetLayouts =
+        std::vector<vk::DescriptorSetLayout>(maxFramesInFlight, descriptorSetLayout);
+
+    auto pipelineLayout = vk::raii::PipelineLayout{
+        r.ctx.device,
+        vk::PipelineLayoutCreateInfo{{}, descriptorSetLayouts}};
 
     auto graphicsPipeline = createPipeline(
         r.ctx.device,
         r.ctx.imageFormat,
         r.ctx.depthFormat,
-        shaderModule,
         pipelineLayout);
 
     uint32_t frameRingCurrent = 0;
@@ -633,9 +501,30 @@ auto main(
 
     bool swapchainNeedRebuild = false;
 
-    bool      running = true;
-    SDL_Event e;
+    using namespace std::literals;
+
+    auto           start        = std::chrono::high_resolution_clock::now();
+    auto           previousTime = start;
+    auto           currentTime  = start;
+    auto           runningTime  = 0.0s;
+    bool           running      = true;
+    constexpr auto period       = 1.0s;
+    SDL_Event      e;
     while (running) {
+        currentTime = std::chrono::high_resolution_clock::now();
+        runningTime += currentTime - previousTime;
+
+        if (runningTime > period) {
+            auto fps =
+                totalFrames
+                / std::chrono::duration_cast<std::chrono::seconds>(currentTime - start)
+                      .count();
+            fmt::print(stderr, "{} fps\n", fps);
+            runningTime -= period;
+        }
+
+        previousTime = currentTime;
+
         if (totalFrames % 10 == 0) {
             // fmt::print(stderr, "\n{} ", totalFrames);
         }
@@ -771,7 +660,7 @@ auto main(
 
         cmdBuffer.endRendering();
 
-        // ???transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
+        // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
         cmdTransitionImageLayout(
             cmdBuffer,
             swapchainImages[nextImageIndex],

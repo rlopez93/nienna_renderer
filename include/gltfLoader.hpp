@@ -12,9 +12,9 @@ struct Vertex {
 };
 
 struct Scene {
-    alignas(16) fastgltf::math::fmat4x4 model{};
+    alignas(16) glm::mat4 model{};
     alignas(16) glm::mat4 view{};
-    alignas(16) fastgltf::math::fmat4x4 projection{};
+    alignas(16) glm::mat4 projection{};
 };
 
 auto getGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset;
@@ -27,7 +27,7 @@ auto getGltfAssetData(
         std::vector<Vertex>,
         std::vector<unsigned char>,
         vk::Extent2D,
-        fastgltf::math::fmat4x4,
         glm::mat4,
-        fastgltf::math::fmat4x4,
+        glm::mat4,
+        glm::mat4,
         vk::SamplerCreateInfo>;

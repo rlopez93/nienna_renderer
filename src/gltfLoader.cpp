@@ -49,6 +49,27 @@ auto getGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset
     return std::move(asset.get());
 }
 
+auto convM(const fastgltf::math::fmat4x4 &M) -> glm::mat4
+{
+    glm::mat4 N;
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            N[i][j] = M[i][j];
+        }
+    }
+    return N;
+}
+
+auto convQ(const fastgltf::math::fquat &Q) -> glm::quat
+{
+    return {Q.w(), Q.x(), Q.y(), Q.z()};
+}
+
+auto convV(const fastgltf::math::fvec3 &V) -> glm::vec3
+{
+    return {V.x(), V.y(), V.z()};
+}
+
 auto getGltfAssetData(
     fastgltf::Asset             &asset,
     const std::filesystem::path &directory)
@@ -57,18 +78,18 @@ auto getGltfAssetData(
         std::vector<Vertex>,
         std::vector<unsigned char>,
         vk::Extent2D,
-        fastgltf::math::fmat4x4,
         glm::mat4,
-        fastgltf::math::fmat4x4,
+        glm::mat4,
+        glm::mat4,
         vk::SamplerCreateInfo>
 {
     auto indices           = std::vector<uint16_t>{};
     auto vertices          = std::vector<Vertex>{};
     auto image_data        = std::vector<unsigned char>{};
     auto imageExtent       = vk::Extent2D{};
-    auto modelMatrix       = fastgltf::math::fmat4x4{};
+    auto modelMatrix       = glm::mat4(1.0f);
     auto viewMatrix        = glm::mat4(1.0f);
-    auto projectionMatrix  = fastgltf::math::fmat4x4{};
+    auto projectionMatrix  = glm::mat4(1.0f);
     auto samplerCreateInfo = vk::SamplerCreateInfo{};
 
     // auto &scenes = asset.scenes;
@@ -86,24 +107,6 @@ auto getGltfAssetData(
         fastgltf::math::fmat4x4{},
         [&](fastgltf::Node &node, fastgltf::math::fmat4x4 matrix) {
             if (node.cameraIndex.has_value()) {
-
-                auto convM = [](const fastgltf::math::fmat4x4 &M) {
-                    glm::mat4 N;
-                    for (int i = 0; i < 4; ++i) {
-                        for (int j = 0; j < 4; ++j) {
-                            N[i][j] = M[i][j];
-                        }
-                    }
-                    return N;
-                };
-
-                auto convQ = [](const fastgltf::math::fquat &Q) {
-                    return glm::quat(Q.w(), Q.x(), Q.y(), Q.z());
-                };
-
-                auto convV = [](const fastgltf::math::fvec3 &V) {
-                    return glm::vec3(V.x(), V.y(), V.z());
-                };
 
                 fastgltf::math::fvec3 _scale;
                 fastgltf::math::fquat _rotation;
@@ -160,11 +163,11 @@ auto getGltfAssetData(
                     auto y = cameraProjection.yfov;
                     auto n = cameraProjection.znear;
 
-                    projectionMatrix = [&] -> fastgltf::math::fmat4x4 {
+                    projectionMatrix = [&] -> glm::mat4 {
                         if (cameraProjection.zfar.has_value()) {
                             // finite perspective projection
                             float f = cameraProjection.zfar.value();
-                            return fastgltf::math::fmat4x4{
+                            return {
                                 1.0f / (a * tan(0.5f * y)),
                                 0,
                                 0,
@@ -185,7 +188,7 @@ auto getGltfAssetData(
 
                         else {
                             // infinite perspective projection
-                            return fastgltf::math::fmat4x4{
+                            return {
                                 1.0f / (a * tan(0.5f * y)),
                                 0,
                                 0,
@@ -253,7 +256,7 @@ auto getGltfAssetData(
                 auto &mesh = asset.meshes[node.meshIndex.value()];
                 fmt::print(stderr, "Mesh is: <{}>\n", mesh.name);
 
-                modelMatrix = matrix;
+                modelMatrix = convM(matrix);
 
                 fmt::print(
                     stderr,
