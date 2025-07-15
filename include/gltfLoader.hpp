@@ -2,6 +2,7 @@
 
 #include <fastgltf/core.hpp>
 #include <filesystem>
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/ext/matrix_float4x4.hpp>
 #include <vulkan/vulkan.hpp>
 
@@ -11,7 +12,7 @@ struct Vertex {
     glm::vec2 texCoord{};
 };
 
-struct Scene {
+struct SceneInfo {
     alignas(16) glm::mat4 model{};
     alignas(16) glm::mat4 view{};
     alignas(16) glm::mat4 projection{};

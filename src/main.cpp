@@ -5,6 +5,7 @@
 
 #include <SDL3/SDL_events.h>
 
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <fastgltf/core.hpp>
 #include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/math.hpp>
@@ -56,15 +57,18 @@ auto createPipeline(
             {}},
     };
 
-    const auto vertexBindingDescriptions =
-        std::array{vk::VertexInputBindingDescription{0, sizeof(Vertex)}};
+    const auto vertexBindingDescriptions = std::array{vk::VertexInputBindingDescription{
+        0,
+        sizeof(Vertex),
+        vk::VertexInputRate::eVertex}};
 
     const auto vertexAttributeDescriptions = std::array{
         vk::VertexInputAttributeDescription{
             0,
             0,
             vk::Format::eR32G32B32Sfloat,
-            offsetof(Vertex, position)},
+            offsetof(Vertex, position),
+        },
         vk::VertexInputAttributeDescription{
             1,
             0,
@@ -431,7 +435,7 @@ auto main(
 
     for (auto i : std::views::iota(0u, maxFramesInFlight)) {
         sceneBuffers.emplace_back(allocator.createBuffer(
-            sizeof(Scene),
+            sizeof(SceneInfo),
             vk::BufferUsageFlagBits2::eUniformBuffer
                 | vk::BufferUsageFlagBits2::eTransferDst,
             VMA_MEMORY_USAGE_AUTO,
@@ -452,7 +456,7 @@ auto main(
 
     for (auto i : std::views::iota(0u, maxFramesInFlight)) {
         auto descriptorBufferInfo =
-            vk::DescriptorBufferInfo{sceneBuffers[i].buffer, 0, sizeof(Scene)};
+            vk::DescriptorBufferInfo{sceneBuffers[i].buffer, 0, sizeof(SceneInfo)};
         auto descriptorImageInfo = vk::DescriptorImageInfo{
             sampler,
             textureImageView,
@@ -503,7 +507,8 @@ auto main(
     auto           runningTime  = 0.0s;
     bool           running      = true;
     constexpr auto period       = 1.0s;
-    SDL_Event      e;
+
+    SDL_Event e;
     while (running) {
         currentTime = std::chrono::high_resolution_clock::now();
         runningTime += currentTime - previousTime;
@@ -513,16 +518,20 @@ auto main(
                 totalFrames
                 / std::chrono::duration_cast<std::chrono::seconds>(currentTime - start)
                       .count();
-            fmt::print(stderr, "{} fps\n", fps);
+            fmt::println(stderr, "{} fps", fps);
             runningTime -= period;
         }
 
         previousTime = currentTime;
 
-        if (totalFrames % 10 == 0) {
-            // fmt::print(stderr, "\n{} ", totalFrames);
+        if (currentFrame != frameRingCurrent) {
+            fmt::println(
+                stderr,
+                "frame:{}, frame ring:{}",
+                currentFrame,
+                frameRingCurrent);
         }
-        // fmt::print(stderr, ".");
+
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) {
                 running = false;
@@ -568,7 +577,7 @@ auto main(
         }
 
         // update uniform buffers
-        auto scene = Scene{
+        auto scene = SceneInfo{
             .model      = modelMatrix,
             .view       = viewMatrix,
             .projection = projectionMatrix};
@@ -580,7 +589,7 @@ auto main(
             &scene,
             sceneBuffers[currentFrame].allocation,
             0,
-            sizeof(Scene));
+            sizeof(SceneInfo));
 
         // color attachment image to render to: vk::RenderingAttachmentInfo
         auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
