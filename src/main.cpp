@@ -58,28 +58,32 @@ auto createPipeline(
     };
 
     const auto vertexBindingDescriptions = std::array{vk::VertexInputBindingDescription{
-        0,
-        sizeof(Vertex),
-        vk::VertexInputRate::eVertex}};
+        //
+    }};
+    //     0,
+    //     sizeof(Vertex),
+    //     vk::VertexInputRate::eVertex}};
 
-    const auto vertexAttributeDescriptions = std::array{
-        vk::VertexInputAttributeDescription{
-            0,
-            0,
-            vk::Format::eR32G32B32Sfloat,
-            offsetof(Vertex, position),
-        },
-        vk::VertexInputAttributeDescription{
-            1,
-            0,
-            vk::Format::eR32G32B32Sfloat,
-            offsetof(Vertex, normal)},
-        vk::VertexInputAttributeDescription{
-            2,
-            0,
-            vk::Format::eR32G32Sfloat,
-            offsetof(Vertex, texCoord)}};
-
+    const auto vertexAttributeDescriptions =
+        std::array{vk::VertexInputAttributeDescription{
+            //
+        }};
+    //         0,
+    //         0,
+    //         vk::Format::eR32G32B32Sfloat,
+    //         offsetof(Vertex, position),
+    //     },
+    //     vk::VertexInputAttributeDescription{
+    //         1,
+    //         0,
+    //         vk::Format::eR32G32B32Sfloat,
+    //         offsetof(Vertex, normal)},
+    //     vk::VertexInputAttributeDescription{
+    //         2,
+    //         0,
+    //         vk::Format::eR32G32Sfloat,
+    //         offsetof(Vertex, texCoord)}};
+    //
     const auto vertexInputStateCreateInfo = vk::PipelineVertexInputStateCreateInfo{
         {},
         vertexBindingDescriptions,
@@ -167,70 +171,70 @@ auto createPipeline(
     return vk::raii::Pipeline{device, nullptr, graphicsPipelineCreateInfo};
 }
 
-auto uploadBuffers(
-    vk::raii::Device                 &device,
-    vk::raii::CommandPool            &transientCommandPool,
-    const std::vector<Vertex>        &vertexData,
-    const std::vector<uint16_t>      &indexData,
-    const std::vector<unsigned char> &textureData,
-    const vk::Extent2D                textureExtent,
-    vk::raii::Queue                  &queue,
-    Allocator                        &allocator)
-    -> std::tuple<
-        Buffer,
-        Buffer,
-        Image,
-        vk::raii::ImageView>
-{
-    auto commandBuffer = beginSingleTimeCommands(device, transientCommandPool);
-
-    // fmt::print(stderr, "\n\nvertexBuffer = createBufferAndUploadData()\n\n");
-    auto vertexBuffer = allocator.createBufferAndUploadData(
-        commandBuffer,
-        vertexData,
-        vk::BufferUsageFlagBits2::eVertexBuffer
-            | vk::BufferUsageFlagBits2::eStorageBuffer);
-    // fmt::print(stderr, "\n\nindexBuffer = createBufferAndUploadData()\n\n");
-    auto indexBuffer = allocator.createBufferAndUploadData(
-        commandBuffer,
-        indexData,
-        vk::BufferUsageFlagBits2::eIndexBuffer);
-    // fmt::print(
-    // stderr,
-    // "texture extent: {}x{}\n",
-    // textureExtent.width,
-    // textureExtent.height);
-    // fmt::print(stderr, "\n\ntextureImage = createImageAndUploadData()\n\n");
-    auto textureImage = allocator.createImageAndUploadData(
-        commandBuffer,
-        textureData,
-        vk::ImageCreateInfo{
-            {},
-            vk::ImageType::e2D,
-            vk::Format::eR8G8B8A8Srgb,
-            // vk::Format::eR8G8B8A8Unorm,
-            {static_cast<uint32_t>(textureExtent.width),
-             static_cast<uint32_t>(textureExtent.height),
-             1},
-            1,
-            1,
-            vk::SampleCountFlagBits::e1,
-            vk::ImageTiling::eOptimal,
-            vk::ImageUsageFlagBits::eSampled},
-        vk::ImageLayout::eShaderReadOnlyOptimal);
-    // fmt::print(stderr, "\n\nimageView = createImageView()\n\n");
-    auto imageView = device.createImageView(
-        vk::ImageViewCreateInfo{
-            {},
-            textureImage.image,
-            vk::ImageViewType::e2D,
-            vk::Format::eR8G8B8A8Srgb,
-            {},
-            vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
-    endSingleTimeCommands(device, transientCommandPool, commandBuffer, queue);
-
-    return {vertexBuffer, indexBuffer, textureImage, std::move(imageView)};
-}
+// auto uploadBuffers(
+//     vk::raii::Device                 &device,
+//     vk::raii::CommandPool            &transientCommandPool,
+//     const std::vector<Vertex>        &vertexData,
+//     const std::vector<uint16_t>      &indexData,
+//     const std::vector<unsigned char> &textureData,
+//     const vk::Extent2D                textureExtent,
+//     vk::raii::Queue                  &queue,
+//     Allocator                        &allocator)
+//     -> std::tuple<
+//         Buffer,
+//         Buffer,
+//         Image,
+//         vk::raii::ImageView>
+// {
+//     auto commandBuffer = beginSingleTimeCommands(device, transientCommandPool);
+//
+//     // fmt::print(stderr, "\n\nvertexBuffer = createBufferAndUploadData()\n\n");
+//     auto vertexBuffer = allocator.createBufferAndUploadData(
+//         commandBuffer,
+//         vertexData,
+//         vk::BufferUsageFlagBits2::eVertexBuffer
+//             | vk::BufferUsageFlagBits2::eStorageBuffer);
+//     // fmt::print(stderr, "\n\nindexBuffer = createBufferAndUploadData()\n\n");
+//     auto indexBuffer = allocator.createBufferAndUploadData(
+//         commandBuffer,
+//         indexData,
+//         vk::BufferUsageFlagBits2::eIndexBuffer);
+//     // fmt::print(
+//     // stderr,
+//     // "texture extent: {}x{}\n",
+//     // textureExtent.width,
+//     // textureExtent.height);
+//     // fmt::print(stderr, "\n\ntextureImage = createImageAndUploadData()\n\n");
+//     auto textureImage = allocator.createImageAndUploadData(
+//         commandBuffer,
+//         textureData,
+//         vk::ImageCreateInfo{
+//             {},
+//             vk::ImageType::e2D,
+//             vk::Format::eR8G8B8A8Srgb,
+//             // vk::Format::eR8G8B8A8Unorm,
+//             {static_cast<uint32_t>(textureExtent.width),
+//              static_cast<uint32_t>(textureExtent.height),
+//              1},
+//             1,
+//             1,
+//             vk::SampleCountFlagBits::e1,
+//             vk::ImageTiling::eOptimal,
+//             vk::ImageUsageFlagBits::eSampled},
+//         vk::ImageLayout::eShaderReadOnlyOptimal);
+//     // fmt::print(stderr, "\n\nimageView = createImageView()\n\n");
+//     auto imageView = device.createImageView(
+//         vk::ImageViewCreateInfo{
+//             {},
+//             textureImage.image,
+//             vk::ImageViewType::e2D,
+//             vk::Format::eR8G8B8A8Srgb,
+//             {},
+//             vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
+//     endSingleTimeCommands(device, transientCommandPool, commandBuffer, queue);
+//
+//     return {vertexBuffer, indexBuffer, textureImage, std::move(imageView)};
+// }
 
 auto createDescriptorSetLayout(
     vk::raii::Device &device,
@@ -408,334 +412,316 @@ auto main(
     }
 
     auto asset = getGltfAsset(gltfDirectory / gltfFilename);
-
-    auto
-        [indexData,
-         vertexData,
-         textureData,
-         textureExtent,
-         modelMatrix,
-         viewMatrix,
-         projectionMatrix,
-         samplerCreateInfo] = getGltfAssetData(asset, gltfDirectory);
-
-    auto sampler = vk::raii::Sampler{r.ctx.device, samplerCreateInfo};
-
-    auto [vertexBuffer, indexBuffer, textureImage, textureImageView] = uploadBuffers(
-        r.ctx.device,
-        transientCommandPool,
-        vertexData,
-        indexData,
-        textureData,
-        textureExtent,
-        r.ctx.graphicsQueue,
-        allocator);
-
-    auto sceneBuffers = std::vector<Buffer>{};
-
-    for (auto i : std::views::iota(0u, maxFramesInFlight)) {
-        sceneBuffers.emplace_back(allocator.createBuffer(
-            sizeof(SceneInfo),
-            vk::BufferUsageFlagBits2::eUniformBuffer
-                | vk::BufferUsageFlagBits2::eTransferDst,
-            VMA_MEMORY_USAGE_AUTO,
-            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-                | VMA_ALLOCATION_CREATE_MAPPED_BIT));
-    }
-
-    auto descriptorSetLayout =
-        createDescriptorSetLayout(r.ctx.device, maxFramesInFlight);
-
-    auto descriptorPool = createDescriptorPool(r.ctx.device, maxFramesInFlight);
-
-    auto descriptorSets = createDescriptorSets(
-        r.ctx.device,
-        descriptorPool,
-        descriptorSetLayout,
-        maxFramesInFlight);
-
-    for (auto i : std::views::iota(0u, maxFramesInFlight)) {
-        auto descriptorBufferInfo =
-            vk::DescriptorBufferInfo{sceneBuffers[i].buffer, 0, sizeof(SceneInfo)};
-        auto descriptorImageInfo = vk::DescriptorImageInfo{
-            sampler,
-            textureImageView,
-            vk::ImageLayout::eShaderReadOnlyOptimal};
-        auto descriptorWrites = std::array{
-            vk::WriteDescriptorSet{
-                descriptorSets[i],
-                0,
-                0,
-                1,
-                vk::DescriptorType::eUniformBuffer,
-                {},
-                &descriptorBufferInfo},
-            vk::WriteDescriptorSet{
-                descriptorSets[i],
-                1,
-                0,
-                1,
-                vk::DescriptorType::eCombinedImageSampler,
-                &descriptorImageInfo}};
-        r.ctx.device.updateDescriptorSets(descriptorWrites, {});
-    }
-
-    auto descriptorSetLayouts =
-        std::vector<vk::DescriptorSetLayout>(maxFramesInFlight, descriptorSetLayout);
-
-    auto pipelineLayout = vk::raii::PipelineLayout{
-        r.ctx.device,
-        vk::PipelineLayoutCreateInfo{{}, descriptorSetLayouts}};
-
-    auto graphicsPipeline = createPipeline(
-        r.ctx.device,
-        r.ctx.imageFormat,
-        r.ctx.depthFormat,
-        pipelineLayout);
-
-    uint32_t frameRingCurrent = 0;
-    uint32_t currentFrame     = 0;
-    uint32_t totalFrames      = 0;
-
-    bool swapchainNeedRebuild = false;
-
-    using namespace std::literals;
-
-    auto           start        = std::chrono::high_resolution_clock::now();
-    auto           previousTime = start;
-    auto           currentTime  = start;
-    auto           runningTime  = 0.0s;
-    bool           running      = true;
-    constexpr auto period       = 1.0s;
-
-    SDL_Event e;
-    while (running) {
-        currentTime = std::chrono::high_resolution_clock::now();
-        runningTime += currentTime - previousTime;
-
-        if (runningTime > period) {
-            auto fps =
-                totalFrames
-                / std::chrono::duration_cast<std::chrono::seconds>(currentTime - start)
-                      .count();
-            fmt::println(stderr, "{} fps", fps);
-            runningTime -= period;
-        }
-
-        previousTime = currentTime;
-
-        if (currentFrame != frameRingCurrent) {
-            fmt::println(
-                stderr,
-                "frame:{}, frame ring:{}",
-                currentFrame,
-                frameRingCurrent);
-        }
-
-        while (SDL_PollEvent(&e)) {
-            if (e.type == SDL_EVENT_QUIT) {
-                running = false;
-            }
-        }
-
-        // begin frame
-        // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
-
-        // check swapchain rebuild
-        if (swapchainNeedRebuild) {
-        }
-
-        // get current frame data
-        auto &cmdPool   = commandPools[frameRingCurrent];
-        auto &cmdBuffer = commandBuffers[frameRingCurrent];
-        auto  waitValue = frameNumbers[frameRingCurrent];
-
-        {
-            // wait semaphore frame (n - numFrames)
-            auto result = r.ctx.device.waitSemaphores(
-                vk::SemaphoreWaitInfo{{}, *frameTimelineSemaphore, waitValue},
-                std::numeric_limits<uint64_t>::max());
-        }
-
-        // reset current frame's command pool to reuse the command buffer
-        cmdPool.reset();
-        cmdBuffer.begin({});
-
-        auto [result, nextImageIndex] = r.ctx.swapchain.acquireNextImage(
-            std::numeric_limits<uint64_t>::max(),
-            imageAvailable[currentFrame]);
-
-        if (result == vk::Result::eErrorOutOfDateKHR) {
-            swapchainNeedRebuild = true;
-        } else if (!(result == vk::Result::eSuccess
-                     || result == vk::Result::eSuboptimalKHR)) {
-            throw std::exception{};
-        }
-
-        if (swapchainNeedRebuild) {
-            // continue;
-        }
-
-        // update uniform buffers
-        auto scene = SceneInfo{
-            .model      = modelMatrix,
-            .view       = viewMatrix,
-            .projection = projectionMatrix};
-
-        scene.projection[1][1] *= -1;
-
-        vmaCopyMemoryToAllocation(
-            allocator.allocator,
-            &scene,
-            sceneBuffers[currentFrame].allocation,
-            0,
-            sizeof(SceneInfo));
-
-        // color attachment image to render to: vk::RenderingAttachmentInfo
-        auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
-            swapchainImageViews[nextImageIndex],
-            vk::ImageLayout::eAttachmentOptimal,
-            {},
-            {},
-            {},
-            vk::AttachmentLoadOp::eClear,
-            vk::AttachmentStoreOp::eStore,
-            vk::ClearColorValue{std::array{0.0f, 0.0f, 1.0f, 1.0f}}};
-
-        // depth attachment buffer: vk::RenderingAttachmentInfo
-        auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
-            depthImageView,
-            vk::ImageLayout::eAttachmentOptimal,
-            {},
-            {},
-            {},
-            vk::AttachmentLoadOp::eClear,
-            vk::AttachmentStoreOp::eStore,
-            vk::ClearDepthStencilValue{1.0f, 0}};
-
-        // vk::RenderingInfo
-        auto renderingInfo = vk::RenderingInfo{
-            {},
-            vk::Rect2D{{}, r.ctx.windowExtent},
-            1,
-            {},
-            renderingColorAttachmentInfo,
-            &renderingDepthAttachmentInfo};
-
-        // transition swapchain image layout:
-
-        cmdTransitionImageLayout(
-            cmdBuffer,
-            swapchainImages[nextImageIndex],
-            vk::ImageLayout::eUndefined,
-            vk::ImageLayout::eColorAttachmentOptimal);
-
-        cmdBuffer.beginRendering(renderingInfo);
-
-        cmdBuffer.setViewportWithCount(
-            vk::Viewport(
-                0.0f,
-                0.0f,
-                r.ctx.windowExtent.width,
-                r.ctx.windowExtent.height,
-                0.0f,
-                1.0f));
-        cmdBuffer.setScissorWithCount(
-            vk::Rect2D{vk::Offset2D(0, 0), r.ctx.windowExtent});
-
-        cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
-
-        // bind texture resources passed to shader
-        cmdBuffer.bindDescriptorSets2(
-            vk::BindDescriptorSetsInfo{
-                vk::ShaderStageFlagBits::eAllGraphics,
-                pipelineLayout,
-                0,
-                *descriptorSets[currentFrame]});
-
-        // bind vertex data
-        cmdBuffer.bindVertexBuffers(0, vertexBuffer.buffer, {0});
-
-        // bind index data
-        cmdBuffer.bindIndexBuffer(indexBuffer.buffer, 0, vk::IndexType::eUint16);
-
-        cmdBuffer.drawIndexed(indexData.size(), 1, 0, 0, 0);
-
-        cmdBuffer.endRendering();
-
-        // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
-        cmdTransitionImageLayout(
-            cmdBuffer,
-            swapchainImages[nextImageIndex],
-            vk::ImageLayout::eColorAttachmentOptimal,
-            vk::ImageLayout::ePresentSrcKHR);
-        cmdBuffer.end();
-
-        // end frame
-
-        // prepare to submit the current frame for rendering
-        // add the swapchain semaphore to wait for the image to be available
-
-        uint64_t signalFrameValue      = waitValue + maxFramesInFlight;
-        frameNumbers[frameRingCurrent] = signalFrameValue;
-
-        auto waitSemaphore = vk::SemaphoreSubmitInfo{
-            imageAvailable[currentFrame],
-            {},
-            vk::PipelineStageFlagBits2::eColorAttachmentOutput};
-
-        auto signalSemaphores = std::array{
-            vk::SemaphoreSubmitInfo{
-                renderFinished[nextImageIndex],
-                {},
-                vk::PipelineStageFlagBits2::eColorAttachmentOutput},
-            vk::SemaphoreSubmitInfo{
-                frameTimelineSemaphore,
-                signalFrameValue,
-                vk::PipelineStageFlagBits2::eColorAttachmentOutput}};
-
-        auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{cmdBuffer};
-
-        // fmt::print(stderr, "\n\nBefore vkQueueSubmit2()\n\n");
-        r.ctx.graphicsQueue.submit2(
-            vk::SubmitInfo2{
-                {},
-                waitSemaphore,
-                commandBufferSubmitInfo,
-                signalSemaphores});
-        // fmt::print(stderr, "\n\nAfter vkQueueSubmit2()\n\n");
-
-        // present frame
-        auto presentResult = r.ctx.presentQueue.presentKHR(
-            vk::PresentInfoKHR{
-                *renderFinished[nextImageIndex],
-                *r.ctx.swapchain,
-                nextImageIndex});
-
-        if (presentResult == vk::Result::eErrorOutOfDateKHR) {
-            swapchainNeedRebuild = true;
-        }
-
-        else if (!(result == vk::Result::eSuccess
-                   || result == vk::Result::eSuboptimalKHR)) {
-            throw std::exception{};
-        }
-
-        // advance to the next frame in the swapchain
-        currentFrame = (currentFrame + 1) % maxFramesInFlight;
-
-        // move to the next frame
-        frameRingCurrent = (frameRingCurrent + 1) % maxFramesInFlight;
-
-        // fmt::print(
-        //     stderr,
-        //     "imageIndex: {}, currentFrame: {}, frameRingCurrent: {}, totalFrames:
-        //     {}\n", nextImageIndex, currentFrame, nextImageIndex, totalFrames);
-        //
-        ++totalFrames;
-    }
-
-    r.ctx.device.waitIdle();
+    auto scene = getSceneData(asset, gltfDirectory);
 
     return 0;
 }
+
+// auto sampler = vk::raii::Sampler{r.ctx.device, samplerCreateInfo};
+
+// auto [vertexBuffer, indexBuffer, textureImage, textureImageView] = uploadBuffers(
+//     r.ctx.device,
+//     transientCommandPool,
+//     vertexData,
+//     indexData,
+//     textureData,
+//     textureExtent,
+//     r.ctx.graphicsQueue,
+//     allocator);
+
+// auto sceneBuffers = std::vector<Buffer>{};
+//
+// for (auto i : std::views::iota(0u, maxFramesInFlight)) {
+//     sceneBuffers.emplace_back(allocator.createBuffer(
+//         sizeof(SceneInfo),
+//         vk::BufferUsageFlagBits2::eUniformBuffer
+//             | vk::BufferUsageFlagBits2::eTransferDst,
+//         VMA_MEMORY_USAGE_AUTO,
+//         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+//             | VMA_ALLOCATION_CREATE_MAPPED_BIT));
+// }
+//
+// auto descriptorSetLayout = createDescriptorSetLayout(r.ctx.device,
+// maxFramesInFlight);
+//
+// auto descriptorPool = createDescriptorPool(r.ctx.device, maxFramesInFlight);
+//
+// auto descriptorSets = createDescriptorSets(
+//     r.ctx.device, descriptorPool, descriptorSetLayout, maxFramesInFlight);
+//
+// for (auto i : std::views::iota(0u, maxFramesInFlight)) {
+//     auto descriptorBufferInfo =
+//         vk::DescriptorBufferInfo{sceneBuffers[i].buffer, 0, sizeof(SceneInfo)};
+//     auto descriptorImageInfo = vk::DescriptorImageInfo{
+//         sampler,
+//         textureImageView,
+//         vk::ImageLayout::eShaderReadOnlyOptimal};
+//     auto descriptorWrites = std::array{
+//         vk::WriteDescriptorSet{
+//             descriptorSets[i],
+//             0,
+//             0,
+//             1,
+//             vk::DescriptorType::eUniformBuffer,
+//             {},
+//             &descriptorBufferInfo},
+//         vk::WriteDescriptorSet{
+//             descriptorSets[i],
+//             1,
+//             0,
+//             1,
+//             vk::DescriptorType::eCombinedImageSampler,
+//             &descriptorImageInfo}};
+//     r.ctx.device.updateDescriptorSets(descriptorWrites, {});
+// }
+//
+// auto descriptorSetLayouts =
+//     std::vector<vk::DescriptorSetLayout>(maxFramesInFlight, descriptorSetLayout);
+//
+// auto pipelineLayout = vk::raii::PipelineLayout{
+//     r.ctx.device, vk::PipelineLayoutCreateInfo{{}, descriptorSetLayouts}};
+//
+// auto graphicsPipeline =
+//     createPipeline(r.ctx.device, r.ctx.imageFormat, r.ctx.depthFormat,
+//     pipelineLayout);
+//
+// uint32_t frameRingCurrent = 0;
+// uint32_t currentFrame     = 0;
+// uint32_t totalFrames      = 0;
+//
+// bool swapchainNeedRebuild = false;
+//
+// using namespace std::literals;
+//
+// auto           start        = std::chrono::high_resolution_clock::now();
+// auto           previousTime = start;
+// auto           currentTime  = start;
+// auto           runningTime  = 0.0s;
+// bool           running      = true;
+// constexpr auto period       = 1.0s;
+//
+// SDL_Event e;
+// while (running) {
+//     currentTime = std::chrono::high_resolution_clock::now();
+//     runningTime += currentTime - previousTime;
+//
+//     if (runningTime > period) {
+//         auto fps = totalFrames
+//                  / std::chrono::duration_cast<std::chrono::seconds>(currentTime -
+//                  start)
+//                        .count();
+//         fmt::println(stderr, "{} fps", fps);
+//         runningTime -= period;
+//     }
+//
+//     previousTime = currentTime;
+//
+//     if (currentFrame != frameRingCurrent) {
+//         fmt::println(stderr, "frame:{}, frame ring:{}", currentFrame,
+//         frameRingCurrent);
+//     }
+//
+//     while (SDL_PollEvent(&e)) {
+//         if (e.type == SDL_EVENT_QUIT) {
+//             running = false;
+//         }
+//     }
+//
+//     // begin frame
+//     // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
+//
+//     // check swapchain rebuild
+//     if (swapchainNeedRebuild) {
+//     }
+//
+//     // get current frame data
+//     auto &cmdPool   = commandPools[frameRingCurrent];
+//     auto &cmdBuffer = commandBuffers[frameRingCurrent];
+//     auto  waitValue = frameNumbers[frameRingCurrent];
+//
+//     {
+//         // wait semaphore frame (n - numFrames)
+//         auto result = r.ctx.device.waitSemaphores(
+//             vk::SemaphoreWaitInfo{{}, *frameTimelineSemaphore, waitValue},
+//             std::numeric_limits<uint64_t>::max());
+//     }
+//
+//     // reset current frame's command pool to reuse the command buffer
+//     cmdPool.reset();
+//     cmdBuffer.begin({});
+//
+//     auto [result, nextImageIndex] = r.ctx.swapchain.acquireNextImage(
+//         std::numeric_limits<uint64_t>::max(),
+//         imageAvailable[currentFrame]);
+//
+//     if (result == vk::Result::eErrorOutOfDateKHR) {
+//         swapchainNeedRebuild = true;
+//     } else if (!(result == vk::Result::eSuccess
+//                  || result == vk::Result::eSuboptimalKHR)) {
+//         throw std::exception{};
+//     }
+//
+//     if (swapchainNeedRebuild) {
+//         // continue;
+//     }
+//
+//     // update uniform buffers
+//     auto scene = SceneInfo{
+//         .model      = modelMatrix,
+//         .view       = viewMatrix,
+//         .projection = projectionMatrix};
+//
+//     scene.projection[1][1] *= -1;
+//
+//     vmaCopyMemoryToAllocation(
+//         allocator.allocator,
+//         &scene,
+//         sceneBuffers[currentFrame].allocation,
+//         0,
+//         sizeof(SceneInfo));
+//
+//     // color attachment image to render to: vk::RenderingAttachmentInfo
+//     auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
+//         swapchainImageViews[nextImageIndex],
+//         vk::ImageLayout::eAttachmentOptimal,
+//         {},
+//         {},
+//         {},
+//         vk::AttachmentLoadOp::eClear,
+//         vk::AttachmentStoreOp::eStore,
+//         vk::ClearColorValue{std::array{0.0f, 0.0f, 1.0f, 1.0f}}};
+//
+//     // depth attachment buffer: vk::RenderingAttachmentInfo
+//     auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
+//         depthImageView,
+//         vk::ImageLayout::eAttachmentOptimal,
+//         {},
+//         {},
+//         {},
+//         vk::AttachmentLoadOp::eClear,
+//         vk::AttachmentStoreOp::eStore,
+//         vk::ClearDepthStencilValue{1.0f, 0}};
+//
+//     // vk::RenderingInfo
+//     auto renderingInfo = vk::RenderingInfo{
+//         {},
+//         vk::Rect2D{{}, r.ctx.windowExtent},
+//         1,
+//         {},
+//         renderingColorAttachmentInfo,
+//         &renderingDepthAttachmentInfo};
+//
+//     // transition swapchain image layout:
+//
+//     cmdTransitionImageLayout(
+//         cmdBuffer,
+//         swapchainImages[nextImageIndex],
+//         vk::ImageLayout::eUndefined,
+//         vk::ImageLayout::eColorAttachmentOptimal);
+//
+//     cmdBuffer.beginRendering(renderingInfo);
+//
+//     cmdBuffer.setViewportWithCount(
+//         vk::Viewport(
+//             0.0f,
+//             0.0f,
+//             r.ctx.windowExtent.width,
+//             r.ctx.windowExtent.height,
+//             0.0f,
+//             1.0f));
+//     cmdBuffer.setScissorWithCount(vk::Rect2D{vk::Offset2D(0, 0),
+//     r.ctx.windowExtent});
+//
+//     cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
+//
+//     // bind texture resources passed to shader
+//     cmdBuffer.bindDescriptorSets2(
+//         vk::BindDescriptorSetsInfo{
+//             vk::ShaderStageFlagBits::eAllGraphics,
+//             pipelineLayout,
+//             0,
+//             *descriptorSets[currentFrame]});
+//
+//     // bind vertex data
+//     cmdBuffer.bindVertexBuffers(0, vertexBuffer.buffer, {0});
+//
+//     // bind index data
+//     cmdBuffer.bindIndexBuffer(indexBuffer.buffer, 0, vk::IndexType::eUint16);
+//
+//     cmdBuffer.drawIndexed(indexData.size(), 1, 0, 0, 0);
+//
+//     cmdBuffer.endRendering();
+//
+//     // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
+//     cmdTransitionImageLayout(
+//         cmdBuffer,
+//         swapchainImages[nextImageIndex],
+//         vk::ImageLayout::eColorAttachmentOptimal,
+//         vk::ImageLayout::ePresentSrcKHR);
+//     cmdBuffer.end();
+//
+//     // end frame
+//
+//     // prepare to submit the current frame for rendering
+//     // add the swapchain semaphore to wait for the image to be available
+//
+//     uint64_t signalFrameValue      = waitValue + maxFramesInFlight;
+//     frameNumbers[frameRingCurrent] = signalFrameValue;
+//
+//     auto waitSemaphore = vk::SemaphoreSubmitInfo{
+//         imageAvailable[currentFrame],
+//         {},
+//         vk::PipelineStageFlagBits2::eColorAttachmentOutput};
+//
+//     auto signalSemaphores = std::array{
+//         vk::SemaphoreSubmitInfo{
+//             renderFinished[nextImageIndex],
+//             {},
+//             vk::PipelineStageFlagBits2::eColorAttachmentOutput},
+//         vk::SemaphoreSubmitInfo{
+//             frameTimelineSemaphore,
+//             signalFrameValue,
+//             vk::PipelineStageFlagBits2::eColorAttachmentOutput}};
+//
+//     auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{cmdBuffer};
+//
+//     // fmt::print(stderr, "\n\nBefore vkQueueSubmit2()\n\n");
+//     r.ctx.graphicsQueue.submit2(
+//         vk::SubmitInfo2{{}, waitSemaphore, commandBufferSubmitInfo,
+//         signalSemaphores});
+//     // fmt::print(stderr, "\n\nAfter vkQueueSubmit2()\n\n");
+//
+//     // present frame
+//     auto presentResult = r.ctx.presentQueue.presentKHR(
+//         vk::PresentInfoKHR{
+//             *renderFinished[nextImageIndex],
+//             *r.ctx.swapchain,
+//             nextImageIndex});
+//
+//     if (presentResult == vk::Result::eErrorOutOfDateKHR) {
+//         swapchainNeedRebuild = true;
+//     }
+//
+//     else if (!(result == vk::Result::eSuccess
+//                || result == vk::Result::eSuboptimalKHR)) {
+//         throw std::exception{};
+//     }
+//
+//     // advance to the next frame in the swapchain
+//     currentFrame = (currentFrame + 1) % maxFramesInFlight;
+//
+//     // move to the next frame
+//     frameRingCurrent = (frameRingCurrent + 1) % maxFramesInFlight;
+//
+//     // fmt::print(
+//     //     stderr,
+//     //     "imageIndex: {}, currentFrame: {}, frameRingCurrent: {}, totalFrames:
+//     //     {}\n", nextImageIndex, currentFrame, nextImageIndex, totalFrames);
+//     //
+//     ++totalFrames;
+// }
+//
+// r.ctx.device.waitIdle();
+//
+// return 0;
+// }

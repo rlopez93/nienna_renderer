@@ -2,33 +2,53 @@
 
 #include <fastgltf/core.hpp>
 #include <filesystem>
+
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/ext/matrix_float4x4.hpp>
+#include <glm/ext/matrix_transform.hpp>
+
+#include <glm/ext/matrix_clip_space.hpp>
 #include <vulkan/vulkan.hpp>
 
-struct Vertex {
-    glm::vec3 position{};
-    glm::vec3 normal{};
-    glm::vec2 texCoord{};
+struct Texture {
+    std::filesystem::path      name;
+    std::vector<unsigned char> data;
+    vk::Extent2D               extent;
 };
 
-struct SceneInfo {
-    alignas(16) glm::mat4 model{};
-    alignas(16) glm::mat4 view{};
-    alignas(16) glm::mat4 projection{};
+struct Primitive {
+    glm::vec3                position;
+    glm::vec3                normal;
+    glm::vec4                tangent;
+    std::array<glm::vec2, 2> texCoord;
+    glm::vec4                color{1.0f, 1.0f, 1.0f, 1.0f};
+};
+
+struct Transform {
+    glm::mat4 modelMatrix{1.0f};
+    glm::mat4 viewMatrix = glm::lookAt(
+        glm::vec3{0.0f, 0.0f, 3.0f},
+        glm::vec3{0.0f, 0.0f, -1.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f});
+    glm::mat4 projectionMatrix = glm::perspectiveRH_ZO(0.66f, 1.5f, 1.0f, 1000.0f);
+};
+
+struct Mesh {
+    std::vector<Primitive> primitives;
+    std::vector<uint16_t>  indices;
+    Transform              transform;
+    glm::vec4              color{1.0f, 1.0f, 1.0f, 1.0f};
+};
+
+struct Scene {
+    std::vector<Mesh>    meshes;
+    std::vector<Texture> textures;
+    Transform            transform;
 };
 
 auto getGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset;
 
-auto getGltfAssetData(
+auto getSceneData(
     fastgltf::Asset             &asset,
-    const std::filesystem::path &path)
-    -> std::tuple<
-        std::vector<uint16_t>,
-        std::vector<Vertex>,
-        std::vector<unsigned char>,
-        vk::Extent2D,
-        glm::mat4,
-        glm::mat4,
-        glm::mat4,
-        vk::SamplerCreateInfo>;
+    const std::filesystem::path &directory) -> Scene;
