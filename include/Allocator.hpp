@@ -72,7 +72,7 @@ struct Allocator {
 
         fmt::print(stderr, "size {}\n", vectorData.size() * sizeof(T));
 
-        // fmt::print(stderr, "\n\ncalling createBuffer()...\n\n");
+        fmt::print(stderr, "\n\ncalling createBuffer()...\n\n");
         // Create a staging buffer
         Buffer stagingBuffer = createBuffer(
             bufferSize,

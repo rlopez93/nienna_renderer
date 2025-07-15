@@ -287,23 +287,17 @@ auto main(
     int    argc,
     char **argv) -> int
 {
-    auto gltfDirectory = [&] -> std::filesystem::path {
+    auto filePath = [&] -> std::filesystem::path {
         if (argc < 2) {
-            return "resources/Duck/glTF/";
+            return "resources/Duck/glTF/Duck.gltf";
         } else {
             return std::string{argv[1]};
         }
     }();
 
-    auto gltfFilename = [&] -> std::filesystem::path {
-        if (argc < 3) {
-            return "Duck.gltf";
-        } else {
-            return std::string{argv[2]};
-        }
-    }();
-
-    auto shaderPath = std::filesystem::path("shaders/shader.vert.spv");
+    auto gltfDirectory = filePath.parent_path();
+    auto gltfFilename  = filePath.filename();
+    auto shaderPath    = std::filesystem::path("shaders/shader.vert.spv");
 
     Renderer  r;
     Allocator allocator{
