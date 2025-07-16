@@ -22,6 +22,7 @@ target_sources(nienna PRIVATE
     include/stb_image.h src/stb_image.cpp
     include/gltfLoader.hpp src/gltfLoader.cpp
     include/Shader.hpp src/Shader.cpp
+    include/Descriptor.hpp src/Descriptor.cpp
 )
 
 target_include_directories(nienna PUBLIC

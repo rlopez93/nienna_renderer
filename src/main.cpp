@@ -29,68 +29,104 @@
 #include <variant>
 
 #include "Allocator.hpp"
+#include "Descriptor.hpp"
 #include "Renderer.hpp"
 #include "Shader.hpp"
 #include "Utility.hpp"
 #include "gltfLoader.hpp"
 
-auto createPipeline(vk::raii::Device &device, vk::Format imageFormat,
-                    vk::Format depthFormat, vk::raii::PipelineLayout &pipelineLayout)
-    -> vk::raii::Pipeline
+auto createPipeline(
+    vk::raii::Device         &device,
+    vk::Format                imageFormat,
+    vk::Format                depthFormat,
+    vk::raii::PipelineLayout &pipelineLayout) -> vk::raii::Pipeline
 {
     auto       shaderModule = createShaderModule(device);
     // The stages used by this pipeline
     const auto shaderStages = std::array{
         vk::PipelineShaderStageCreateInfo{
-            {}, vk::ShaderStageFlagBits::eVertex, shaderModule, "vertexMain", {}},
+            {},
+            vk::ShaderStageFlagBits::eVertex,
+            shaderModule,
+            "vertexMain",
+            {}},
         vk::PipelineShaderStageCreateInfo{
-            {}, vk::ShaderStageFlagBits::eFragment, shaderModule, "fragmentMain", {}},
+            {},
+            vk::ShaderStageFlagBits::eFragment,
+            shaderModule,
+            "fragmentMain",
+            {}},
     };
 
     const auto vertexBindingDescriptions = std::array{vk::VertexInputBindingDescription{
-        0, sizeof(Primitive), vk::VertexInputRate::eVertex}};
+        0,
+        sizeof(Primitive),
+        vk::VertexInputRate::eVertex}};
 
     const auto vertexAttributeDescriptions = std::array{
-        vk::VertexInputAttributeDescription{0, 0, vk::Format::eR32G32B32Sfloat,
-                                            offsetof(Primitive, position)},
+        vk::VertexInputAttributeDescription{
+            0,
+            0,
+            vk::Format::eR32G32B32Sfloat,
+            offsetof(Primitive, position)},
 
-        vk::VertexInputAttributeDescription{1, 0, vk::Format::eR32G32B32Sfloat,
-                                            offsetof(Primitive, normal)},
-        vk::VertexInputAttributeDescription{2, 0, vk::Format::eR32G32B32A32Sfloat,
-                                            offsetof(Primitive, tangent)},
-        vk::VertexInputAttributeDescription{4, 0, vk::Format::eR32G32Sfloat,
-                                            offsetof(Primitive, uv)},
-        vk::VertexInputAttributeDescription{5, 0, vk::Format::eR32G32B32A32Sfloat,
-                                            offsetof(Primitive, color)},
+        vk::VertexInputAttributeDescription{
+            1,
+            0,
+            vk::Format::eR32G32B32Sfloat,
+            offsetof(Primitive, normal)},
+        vk::VertexInputAttributeDescription{
+            2,
+            0,
+            vk::Format::eR32G32B32A32Sfloat,
+            offsetof(Primitive, tangent)},
+        vk::VertexInputAttributeDescription{
+            3,
+            0,
+            vk::Format::eR32G32Sfloat,
+            offsetof(Primitive, uv)},
+        vk::VertexInputAttributeDescription{
+            5,
+            0,
+            vk::Format::eR32G32B32A32Sfloat,
+            offsetof(Primitive, color)},
     };
 
     const auto vertexInputStateCreateInfo = vk::PipelineVertexInputStateCreateInfo{
-        {}, vertexBindingDescriptions, vertexAttributeDescriptions};
+        {},
+        vertexBindingDescriptions,
+        vertexAttributeDescriptions};
 
     const auto inputAssemblyCreateInfo = vk::PipelineInputAssemblyStateCreateInfo{
-        {}, vk::PrimitiveTopology::eTriangleList, false};
+        {},
+        vk::PrimitiveTopology::eTriangleList,
+        false};
 
     const auto pipelineViewportStateCreateInfo = vk::PipelineViewportStateCreateInfo{};
 
     const auto pipelineRasterizationStateCreateInfo =
-        vk::PipelineRasterizationStateCreateInfo{{},
-                                                 {},
-                                                 {},
-                                                 vk::PolygonMode::eFill,
-                                                 vk::CullModeFlags::BitsType::eBack,
-                                                 vk::FrontFace::eCounterClockwise,
-                                                 {},
-                                                 {},
-                                                 {},
-                                                 {},
-                                                 1.0f};
+        vk::PipelineRasterizationStateCreateInfo{
+            {},
+            {},
+            {},
+            vk::PolygonMode::eFill,
+            vk::CullModeFlags::BitsType::eBack,
+            vk::FrontFace::eCounterClockwise,
+            {},
+            {},
+            {},
+            {},
+            1.0f};
 
     const auto pipelineMultisampleStateCreateInfo =
         vk::PipelineMultisampleStateCreateInfo{};
 
     const auto pipelineDepthStencilStateCreateInfo =
         vk::PipelineDepthStencilStateCreateInfo{
-            {}, true, true, vk::CompareOp::eLessOrEqual};
+            {},
+            true,
+            true,
+            vk::CompareOp::eLessOrEqual};
 
     const auto colorBlendAttachmentState = vk::PipelineColorBlendAttachmentState{
         {},
@@ -105,10 +141,15 @@ auto createPipeline(vk::raii::Device &device, vk::Format imageFormat,
 
     const auto pipelineColorBlendStateCreateInfo =
         vk::PipelineColorBlendStateCreateInfo{
-            {}, {}, vk::LogicOp::eCopy, 1, &colorBlendAttachmentState};
+            {},
+            {},
+            vk::LogicOp::eCopy,
+            1,
+            &colorBlendAttachmentState};
 
-    const auto dynamicStates = std::array{vk::DynamicState::eViewportWithCount,
-                                          vk::DynamicState::eScissorWithCount};
+    const auto dynamicStates = std::array{
+        vk::DynamicState::eViewportWithCount,
+        vk::DynamicState::eScissorWithCount};
 
     const auto pipelineDynamicStateCreateInfo =
         vk::PipelineDynamicStateCreateInfo{{}, dynamicStates};
@@ -116,53 +157,113 @@ auto createPipeline(vk::raii::Device &device, vk::Format imageFormat,
     auto pipelineRenderingCreateInfo =
         vk::PipelineRenderingCreateInfo{{}, imageFormat, depthFormat};
 
-    auto graphicsPipelineCreateInfo =
-        vk::GraphicsPipelineCreateInfo{{},
-                                       shaderStages,
-                                       &vertexInputStateCreateInfo,
-                                       &inputAssemblyCreateInfo,
-                                       {},
-                                       &pipelineViewportStateCreateInfo,
-                                       &pipelineRasterizationStateCreateInfo,
-                                       &pipelineMultisampleStateCreateInfo,
-                                       &pipelineDepthStencilStateCreateInfo,
-                                       &pipelineColorBlendStateCreateInfo,
-                                       &pipelineDynamicStateCreateInfo,
-                                       *pipelineLayout,
-                                       {},
-                                       {},
-                                       {},
-                                       {},
-                                       &pipelineRenderingCreateInfo};
+    auto graphicsPipelineCreateInfo = vk::GraphicsPipelineCreateInfo{
+        {},
+        shaderStages,
+        &vertexInputStateCreateInfo,
+        &inputAssemblyCreateInfo,
+        {},
+        &pipelineViewportStateCreateInfo,
+        &pipelineRasterizationStateCreateInfo,
+        &pipelineMultisampleStateCreateInfo,
+        &pipelineDepthStencilStateCreateInfo,
+        &pipelineColorBlendStateCreateInfo,
+        &pipelineDynamicStateCreateInfo,
+        *pipelineLayout,
+        {},
+        {},
+        {},
+        {},
+        &pipelineRenderingCreateInfo};
 
     return vk::raii::Pipeline{device, nullptr, graphicsPipelineCreateInfo};
 }
 
-auto createBuffers(vk::raii::Device &device, vk::raii::CommandPool &cmdPool,
-                   Allocator &allocator, vk::raii::Queue &queue, const Scene &scene)
+auto createBuffers(
+    vk::raii::Device      &device,
+    vk::raii::CommandPool &cmdPool,
+    Allocator             &allocator,
+    vk::raii::Queue       &queue,
+    const Scene           &scene,
+    uint64_t               maxFramesInFlight)
+    -> std::tuple<
+        std::vector<Buffer>,
+        std::vector<Buffer>,
+        std::vector<Buffer>,
+        std::vector<Image>,
+        std::vector<vk::raii::ImageView>>
 {
+    auto primitiveBuffers    = std::vector<Buffer>{};
+    auto indexBuffers        = std::vector<Buffer>{};
+    auto sceneBuffers        = std::vector<Buffer>{};
+    auto textureImageBuffers = std::vector<Image>{};
+    auto textureImageViews   = std::vector<vk::raii::ImageView>{};
+
     auto cmd = beginSingleTimeCommands(device, cmdPool);
 
-    std::vector<Primitive> primitivesData;
-    std::vector<uint16_t>  indicesData;
-
-    vk::DeviceSize primitiveOffset = 0;
-    vk::DeviceSize indicesOffset   = 0;
+    assert(scene.meshes.size() == 1);
     for (const auto &mesh : scene.meshes) {
-        primitivesData.append_range(mesh.primitives);
-        primitiveOffset += sizeof(Primitive) * mesh.primitives.size();
+        primitiveBuffers.emplace_back(allocator.createBufferAndUploadData(
+            cmd,
+            mesh.primitives,
+            vk::BufferUsageFlagBits2::eVertexBuffer));
 
-        indicesData.append_range(mesh.indices | std::ranges::transform());
-        indicesOffset += sizeof(uint16_t) * mesh.indices.size();
+        indexBuffers.emplace_back(allocator.createBufferAndUploadData(
+            cmd,
+            mesh.indices,
+            vk::BufferUsageFlagBits2::eIndexBuffer));
     }
 
-    auto primitivesBuffer = allocator.createBufferAndUploadData(
-        cmd, primitivesData, vk::BufferUsageFlagBits2::eVertexBuffer);
+    for (auto i : std::views::iota(0u, maxFramesInFlight)) {
+        sceneBuffers.emplace_back(allocator.createBuffer(
+            sizeof(Transform),
+            vk::BufferUsageFlagBits2::eUniformBuffer
+                | vk::BufferUsageFlagBits2::eTransferDst,
+            VMA_MEMORY_USAGE_AUTO,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                | VMA_ALLOCATION_CREATE_MAPPED_BIT));
+    }
 
-    auto indicesBuffer = allocator.createBufferAndUploadData(
-        cmd, indicesData, vk::BufferUsageFlagBits2::eIndexBuffer);
+    for (const auto &texture : scene.textures) {
+        textureImageBuffers.emplace_back(allocator.createImageAndUploadData(
+            cmd,
+            texture.data,
+            vk::ImageCreateInfo{
+                {},
+                vk::ImageType::e2D,
+                vk::Format::eR8G8B8A8Srgb,
+                // vk::Format::eR8G8B8A8Unorm,
+                vk::Extent3D(texture.extent, 1),
+                1,
+                1,
+                vk::SampleCountFlagBits::e1,
+                vk::ImageTiling::eOptimal,
+                vk::ImageUsageFlagBits::eSampled},
+            vk::ImageLayout::eShaderReadOnlyOptimal));
+
+        textureImageViews.emplace_back(device.createImageView(
+            vk::ImageViewCreateInfo{
+                {},
+                textureImageBuffers.back().image,
+                vk::ImageViewType::e2D,
+                vk::Format::eR8G8B8A8Srgb,
+                {},
+                vk::ImageSubresourceRange{
+                    vk::ImageAspectFlagBits::eColor,
+                    0,
+                    1,
+                    0,
+                    1}}));
+    }
 
     endSingleTimeCommands(device, cmdPool, cmd, queue);
+
+    return {
+        primitiveBuffers,
+        indexBuffers,
+        sceneBuffers,
+        textureImageBuffers,
+        std::move(textureImageViews)};
 }
 
 // auto uploadBuffers(
@@ -231,49 +332,9 @@ auto createBuffers(vk::raii::Device &device, vk::raii::CommandPool &cmdPool,
 //     return {vertexBuffer, indexBuffer, textureImage, std::move(imageView)};
 // }
 
-auto createDescriptorSetLayout(vk::raii::Device &device, uint64_t maxFramesInFlight)
-    -> vk::raii::DescriptorSetLayout
-{
-    const auto descriptorSetLayoutBindings = std::array{
-        vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eUniformBuffer, 1,
-                                       vk::ShaderStageFlagBits::eVertex},
-        vk::DescriptorSetLayoutBinding{1, vk::DescriptorType::eCombinedImageSampler, 1,
-                                       vk::ShaderStageFlagBits::eFragment}};
-
-    return {device, vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
-}
-
-auto createDescriptorPool(vk::raii::Device &device, uint64_t maxFramesInFlight)
-    -> vk::raii::DescriptorPool
-{
-    auto poolSizes =
-        std::array{vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer,
-                                          static_cast<uint32_t>(maxFramesInFlight)},
-                   vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler,
-                                          static_cast<uint32_t>(maxFramesInFlight)}};
-
-    return {device, vk::DescriptorPoolCreateInfo{
-                        vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-                        static_cast<uint32_t>(maxFramesInFlight), poolSizes}};
-}
-
-auto createDescriptorSets(vk::raii::Device              &device,
-                          vk::raii::DescriptorPool      &descriptorPool,
-                          vk::raii::DescriptorSetLayout &descriptorSetLayout,
-                          uint64_t                       maxFramesInFlight)
-    -> std::vector<vk::raii::DescriptorSet>
-{
-
-    auto descriptorSetLayouts =
-        std::vector<vk::DescriptorSetLayout>(maxFramesInFlight, descriptorSetLayout);
-
-    auto descriptorSetAllocateInfo =
-        vk::DescriptorSetAllocateInfo{descriptorPool, descriptorSetLayouts};
-
-    return device.allocateDescriptorSets(descriptorSetAllocateInfo);
-}
-
-auto main(int argc, char **argv) -> int
+auto main(
+    int    argc,
+    char **argv) -> int
 {
     auto filePath = [&] -> std::filesystem::path {
         if (argc < 2) {
@@ -288,8 +349,11 @@ auto main(int argc, char **argv) -> int
     auto shaderPath    = std::filesystem::path("shaders/shader.vert.spv");
 
     Renderer  r;
-    Allocator allocator{r.ctx.instance, r.ctx.physicalDevice, r.ctx.device,
-                        vk::ApiVersion14};
+    Allocator allocator{
+        r.ctx.instance,
+        r.ctx.physicalDevice,
+        r.ctx.device,
+        vk::ApiVersion14};
 
     // get swapchain images
     auto swapchainImages     = r.ctx.swapchain.getImages();
@@ -302,12 +366,13 @@ auto main(int argc, char **argv) -> int
     for (auto image : swapchainImages) {
         swapchainImageViews.emplace_back(
             r.ctx.device,
-            vk::ImageViewCreateInfo{{},
-                                    image,
-                                    vk::ImageViewType::e2D,
-                                    r.ctx.imageFormat,
-                                    {},
-                                    {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
+            vk::ImageViewCreateInfo{
+                {},
+                image,
+                vk::ImageViewType::e2D,
+                r.ctx.imageFormat,
+                {},
+                {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
     }
 
     for (auto i : std::views::iota(0u, maxFramesInFlight)) {
@@ -316,23 +381,25 @@ auto main(int argc, char **argv) -> int
     }
 
     auto depthImage = allocator.createImage(
-        vk::ImageCreateInfo{{},
-                            vk::ImageType::e2D,
-                            r.ctx.depthFormat,
-                            vk::Extent3D(r.ctx.windowExtent, 1),
-                            1,
-                            1
+        vk::ImageCreateInfo{
+            {},
+            vk::ImageType::e2D,
+            r.ctx.depthFormat,
+            vk::Extent3D(r.ctx.windowExtent, 1),
+            1,
+            1
 
         }
             .setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment));
 
-    auto depthImageView = r.ctx.device.createImageView(vk::ImageViewCreateInfo{
-        {},
-        depthImage.image,
-        vk::ImageViewType::e2D,
-        r.ctx.depthFormat,
-        {},
-        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}});
+    auto depthImageView = r.ctx.device.createImageView(
+        vk::ImageViewCreateInfo{
+            {},
+            depthImage.image,
+            vk::ImageViewType::e2D,
+            r.ctx.depthFormat,
+            {},
+            vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}});
 
     // create transient command pool for single-time commands
     auto transientCommandPool = vk::raii::CommandPool{
@@ -343,13 +410,19 @@ auto main(int argc, char **argv) -> int
     auto commandBuffer = beginSingleTimeCommands(r.ctx.device, transientCommandPool);
 
     for (auto image : swapchainImages) {
-        cmdTransitionImageLayout(commandBuffer, image, vk::ImageLayout::eUndefined,
-                                 vk::ImageLayout::ePresentSrcKHR,
-                                 vk::ImageAspectFlagBits::eColor);
+        cmdTransitionImageLayout(
+            commandBuffer,
+            image,
+            vk::ImageLayout::eUndefined,
+            vk::ImageLayout::ePresentSrcKHR,
+            vk::ImageAspectFlagBits::eColor);
     }
 
-    endSingleTimeCommands(r.ctx.device, transientCommandPool, commandBuffer,
-                          r.ctx.graphicsQueue);
+    endSingleTimeCommands(
+        r.ctx.device,
+        transientCommandPool,
+        commandBuffer,
+        r.ctx.graphicsQueue);
 
     auto commandPools   = std::vector<vk::raii::CommandPool>{};
     auto commandBuffers = std::vector<vk::raii::CommandBuffer>{};
@@ -365,13 +438,18 @@ auto main(int argc, char **argv) -> int
 
     for (auto n : std::views::iota(0u, maxFramesInFlight)) {
         commandPools.emplace_back(
-            r.ctx.device, vk::CommandPoolCreateInfo{{}, r.ctx.graphicsQueueIndex});
-
-        commandBuffers.emplace_back(std::move(vk::raii::CommandBuffers{
             r.ctx.device,
-            vk::CommandBufferAllocateInfo{commandPools.back(),
-                                          vk::CommandBufferLevel::ePrimary, 1}}
-                                                  .front()));
+            vk::CommandPoolCreateInfo{{}, r.ctx.graphicsQueueIndex});
+
+        commandBuffers.emplace_back(
+            std::move(
+                vk::raii::CommandBuffers{
+                    r.ctx.device,
+                    vk::CommandBufferAllocateInfo{
+                        commandPools.back(),
+                        vk::CommandBufferLevel::ePrimary,
+                        1}}
+                    .front()));
     }
 
     auto asset = getGltfAsset(gltfDirectory / gltfFilename);
@@ -380,25 +458,80 @@ auto main(int argc, char **argv) -> int
     auto sampler = vk::raii::Sampler{r.ctx.device, vk::SamplerCreateInfo{}};
 
     // TODO create vertex/index buffers
-    // TODO create texture image buffers
-    // TODO create uniform buffers
+    auto
+        [primitiveBuffers,
+         indexBuffers,
+         sceneBuffers,
+         textureImageBuffers,
+         textureImageViews] =
+            createBuffers(
+                r.ctx.device,
+                transientCommandPool,
+                allocator,
+                r.ctx.graphicsQueue,
+                scene,
+                maxFramesInFlight);
+
+    fmt::println(stderr, "textures.size(): {}", textureImageBuffers.size());
+
+    assert(textureImageBuffers.size() < 2);
+
+    Descriptor descriptor;
 
     auto descriptorSetLayout =
-        createDescriptorSetLayout(r.ctx.device, maxFramesInFlight);
+        descriptor.createDescriptorSetLayout(r.ctx.device, maxFramesInFlight);
 
-    auto descriptorPool = createDescriptorPool(r.ctx.device, maxFramesInFlight);
+    auto descriptorPool =
+        descriptor.createDescriptorPool(r.ctx.device, maxFramesInFlight);
 
-    auto descriptorSets = createDescriptorSets(r.ctx.device, descriptorPool,
-                                               descriptorSetLayout, maxFramesInFlight);
+    auto descriptorSets = descriptor.createDescriptorSets(
+        r.ctx.device,
+        descriptorPool,
+        descriptorSetLayout,
+        maxFramesInFlight);
+
+    for (const auto &textureImageView : textureImageViews) {
+        for (const auto &[sceneBuffer, descriptorSet] :
+             std::views::zip(sceneBuffers, descriptorSets)) {
+
+            auto descriptorBufferInfo =
+                vk::DescriptorBufferInfo{sceneBuffer.buffer, 0, sizeof(Transform)};
+            auto descriptorImageInfo = vk::DescriptorImageInfo{
+                sampler,
+                textureImageView,
+                vk::ImageLayout::eShaderReadOnlyOptimal};
+            auto descriptorWrites = std::array{
+                vk::WriteDescriptorSet{
+                    descriptorSet,
+                    0,
+                    0,
+                    1,
+                    vk::DescriptorType::eUniformBuffer,
+                    {},
+                    &descriptorBufferInfo},
+                vk::WriteDescriptorSet{
+                    descriptorSet,
+                    1,
+                    0,
+                    1,
+                    vk::DescriptorType::eCombinedImageSampler,
+                    &descriptorImageInfo}};
+            r.ctx.device.updateDescriptorSets(descriptorWrites, {});
+        }
+    }
 
     auto descriptorSetLayouts =
         std::vector<vk::DescriptorSetLayout>(maxFramesInFlight, descriptorSetLayout);
 
     auto pipelineLayout = vk::raii::PipelineLayout{
-        r.ctx.device, vk::PipelineLayoutCreateInfo{{}, descriptorSetLayouts}};
+        r.ctx.device,
+        vk::PipelineLayoutCreateInfo{{}, descriptorSetLayouts}};
 
-    auto graphicsPipeline = createPipeline(r.ctx.device, r.ctx.imageFormat,
-                                           r.ctx.depthFormat, pipelineLayout);
+    auto graphicsPipeline = createPipeline(
+        r.ctx.device,
+        r.ctx.imageFormat,
+        r.ctx.depthFormat,
+        pipelineLayout);
 
     uint32_t frameRingCurrent = 0;
     uint32_t currentFrame     = 0;
@@ -432,8 +565,11 @@ auto main(int argc, char **argv) -> int
         previousTime = currentTime;
 
         if (currentFrame != frameRingCurrent) {
-            fmt::println(stderr, "frame:{}, frame ring:{}", currentFrame,
-                         frameRingCurrent);
+            fmt::println(
+                stderr,
+                "frame:{}, frame ring:{}",
+                currentFrame,
+                frameRingCurrent);
         }
 
         while (SDL_PollEvent(&e)) {
@@ -466,7 +602,8 @@ auto main(int argc, char **argv) -> int
         cmdBuffer.begin({});
 
         auto [result, nextImageIndex] = r.ctx.swapchain.acquireNextImage(
-            std::numeric_limits<uint64_t>::max(), imageAvailable[currentFrame]);
+            std::numeric_limits<uint64_t>::max(),
+            imageAvailable[currentFrame]);
 
         if (result == vk::Result::eErrorOutOfDateKHR) {
             swapchainNeedRebuild = true;
@@ -480,19 +617,21 @@ auto main(int argc, char **argv) -> int
         }
 
         // update uniform buffers
-        // auto scene = Transform{
-        //     .model      = modelMatrix,
-        //     .view       = viewMatrix,
-        //     .projection = projectionMatrix};
 
-        // scene.projection[1][1] *= -1;
+        // for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
+        const auto &mesh      = scene.meshes[0];
+        const auto  meshIndex = 0u;
+        auto        transform = Transform{
+                   .modelMatrix          = mesh.modelMatrix,
+                   .viewProjectionMatrix = scene.viewProjectionMatrix};
+        transform.viewProjectionMatrix[1][1] *= -1;
 
-        // vmaCopyMemoryToAllocation(
-        //     allocator.allocator,
-        //     &scene,
-        //     sceneBuffers[currentFrame].allocation,
-        //     0,
-        //     sizeof(SceneInfo));
+        vmaCopyMemoryToAllocation(
+            allocator.allocator,
+            &transform,
+            sceneBuffers[currentFrame].allocation,
+            0,
+            sizeof(Transform));
 
         // color attachment image to render to: vk::RenderingAttachmentInfo
         auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
@@ -506,61 +645,76 @@ auto main(int argc, char **argv) -> int
             vk::ClearColorValue{std::array{0.0f, 0.0f, 1.0f, 1.0f}}};
 
         // depth attachment buffer: vk::RenderingAttachmentInfo
-        auto renderingDepthAttachmentInfo =
-            vk::RenderingAttachmentInfo{depthImageView,
-                                        vk::ImageLayout::eAttachmentOptimal,
-                                        {},
-                                        {},
-                                        {},
-                                        vk::AttachmentLoadOp::eClear,
-                                        vk::AttachmentStoreOp::eStore,
-                                        vk::ClearDepthStencilValue{1.0f, 0}};
+        auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
+            depthImageView,
+            vk::ImageLayout::eAttachmentOptimal,
+            {},
+            {},
+            {},
+            vk::AttachmentLoadOp::eClear,
+            vk::AttachmentStoreOp::eStore,
+            vk::ClearDepthStencilValue{1.0f, 0}};
 
-        // vk::RenderingInfo
+        // rendering info for dynamic rendering
         auto renderingInfo = vk::RenderingInfo{
-            {}, vk::Rect2D{{}, r.ctx.windowExtent}, 1,
-            {}, renderingColorAttachmentInfo,       &renderingDepthAttachmentInfo};
+            {},
+            vk::Rect2D{{}, r.ctx.windowExtent},
+            1,
+            {},
+            renderingColorAttachmentInfo,
+            &renderingDepthAttachmentInfo};
 
-        // transition swapchain image layout:
-
-        cmdTransitionImageLayout(cmdBuffer, swapchainImages[nextImageIndex],
-                                 vk::ImageLayout::eUndefined,
-                                 vk::ImageLayout::eColorAttachmentOptimal);
+        // transition swapchain image layout
+        cmdTransitionImageLayout(
+            cmdBuffer,
+            swapchainImages[nextImageIndex],
+            vk::ImageLayout::eUndefined,
+            vk::ImageLayout::eColorAttachmentOptimal);
 
         cmdBuffer.beginRendering(renderingInfo);
 
         cmdBuffer.setViewportWithCount(
-            vk::Viewport(0.0f, 0.0f, r.ctx.windowExtent.width,
-                         r.ctx.windowExtent.height, 0.0f, 1.0f));
+            vk::Viewport(
+                0.0f,
+                0.0f,
+                r.ctx.windowExtent.width,
+                r.ctx.windowExtent.height,
+                0.0f,
+                1.0f));
         cmdBuffer.setScissorWithCount(
             vk::Rect2D{vk::Offset2D(0, 0), r.ctx.windowExtent});
 
         cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
         // bind texture resources passed to shader
-        cmdBuffer.bindDescriptorSets2(vk::BindDescriptorSetsInfo{
-            vk::ShaderStageFlagBits::eFragment, pipelineLayout, 0,
-            *descriptorSets[currentFrame]});
-
-        // cmdBuffer.bindVertexBuffers(uint32_t firstBinding, const ArrayProxy<const
-        // vk::Buffer> &buffers, const ArrayProxy<const vk::DeviceSize> &offsets)
+        cmdBuffer.bindDescriptorSets2(
+            vk::BindDescriptorSetsInfo{
+                vk::ShaderStageFlagBits::eAllGraphics,
+                pipelineLayout,
+                0,
+                *descriptorSets[currentFrame]});
 
         // bind vertex data
-        // cmdBuffer.bindVertexBuffers(0, vertexBuffer.buffer, {0});
+        cmdBuffer.bindVertexBuffers(0, primitiveBuffers[meshIndex].buffer, {0});
 
         // bind index data
-        // cmdBuffer.bindIndexBuffer(indexBuffer.buffer, 0, vk::IndexType::eUint16);
+        cmdBuffer.bindIndexBuffer(
+            indexBuffers[meshIndex].buffer,
+            0,
+            vk::IndexType::eUint16);
 
-        // cmdBuffer.drawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t
-        // firstIndex, int32_t vertexOffset, uint32_t firstInstance)
-        // cmdBuffer.drawIndexed(indexData.size(), 1, 0, 0, 0);
+        // render draw call
+        cmdBuffer.drawIndexed(scene.meshes[meshIndex].indices.size(), 1, 0, 0, 0);
 
         cmdBuffer.endRendering();
+        // }
 
         // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
-        cmdTransitionImageLayout(cmdBuffer, swapchainImages[nextImageIndex],
-                                 vk::ImageLayout::eColorAttachmentOptimal,
-                                 vk::ImageLayout::ePresentSrcKHR);
+        cmdTransitionImageLayout(
+            cmdBuffer,
+            swapchainImages[nextImageIndex],
+            vk::ImageLayout::eColorAttachmentOptimal,
+            vk::ImageLayout::ePresentSrcKHR);
         cmdBuffer.end();
 
         // end frame
@@ -571,29 +725,38 @@ auto main(int argc, char **argv) -> int
         uint64_t signalFrameValue      = waitValue + maxFramesInFlight;
         frameNumbers[frameRingCurrent] = signalFrameValue;
 
-        auto waitSemaphore =
-            vk::SemaphoreSubmitInfo{imageAvailable[currentFrame],
-                                    {},
-                                    vk::PipelineStageFlagBits2::eColorAttachmentOutput};
+        auto waitSemaphore = vk::SemaphoreSubmitInfo{
+            imageAvailable[currentFrame],
+            {},
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput};
 
         auto signalSemaphores = std::array{
-            vk::SemaphoreSubmitInfo{renderFinished[nextImageIndex],
-                                    {},
-                                    vk::PipelineStageFlagBits2::eColorAttachmentOutput},
             vk::SemaphoreSubmitInfo{
-                frameTimelineSemaphore, signalFrameValue,
+                renderFinished[nextImageIndex],
+                {},
+                vk::PipelineStageFlagBits2::eColorAttachmentOutput},
+            vk::SemaphoreSubmitInfo{
+                frameTimelineSemaphore,
+                signalFrameValue,
                 vk::PipelineStageFlagBits2::eColorAttachmentOutput}};
 
         auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{cmdBuffer};
 
         // fmt::print(stderr, "\n\nBefore vkQueueSubmit2()\n\n");
-        r.ctx.graphicsQueue.submit2(vk::SubmitInfo2{
-            {}, waitSemaphore, commandBufferSubmitInfo, signalSemaphores});
+        r.ctx.graphicsQueue.submit2(
+            vk::SubmitInfo2{
+                {},
+                waitSemaphore,
+                commandBufferSubmitInfo,
+                signalSemaphores});
         // fmt::print(stderr, "\n\nAfter vkQueueSubmit2()\n\n");
 
         // present frame
-        auto presentResult = r.ctx.presentQueue.presentKHR(vk::PresentInfoKHR{
-            *renderFinished[nextImageIndex], *r.ctx.swapchain, nextImageIndex});
+        auto presentResult = r.ctx.presentQueue.presentKHR(
+            vk::PresentInfoKHR{
+                *renderFinished[nextImageIndex],
+                *r.ctx.swapchain,
+                nextImageIndex});
 
         if (presentResult == vk::Result::eErrorOutOfDateKHR) {
             swapchainNeedRebuild = true;
@@ -622,15 +785,6 @@ auto main(int argc, char **argv) -> int
 
     return 0;
 }
-// auto [vertexBuffer, indexBuffer, textureImage, textureImageView] = uploadBuffers(
-//     r.ctx.device,
-//     transientCommandPool,
-//     vertexData,
-//     indexData,
-//     textureData,
-//     textureExtent,
-//     r.ctx.graphicsQueue,
-//     allocator);
 
 // auto sceneBuffers = std::vector<Buffer>{};
 //
@@ -644,13 +798,6 @@ auto main(int argc, char **argv) -> int
 //             | VMA_ALLOCATION_CREATE_MAPPED_BIT));
 // }
 //
-// auto descriptorSetLayout = createDescriptorSetLayout(r.ctx.device,
-// maxFramesInFlight);
-//
-// auto descriptorPool = createDescriptorPool(r.ctx.device, maxFramesInFlight);
-//
-// auto descriptorSets = createDescriptorSets(
-//     r.ctx.device, descriptorPool, descriptorSetLayout, maxFramesInFlight);
 // for (auto i : std::views::iota(0u, maxFramesInFlight)) {
 //     auto descriptorBufferInfo =
 //         vk::DescriptorBufferInfo{sceneBuffers[i].buffer, 0, sizeof(SceneInfo)};

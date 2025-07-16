@@ -16,11 +16,10 @@ struct FragmentPrimitive
     float4 color;
 }
 
-struct Transform 
+struct Transform
 {
     float4x4 modelMatrix;
-    float4x4 viewMatrix;
-    float4x4 projectionMatrix;
+    float4x4 viewProjectionMatrix;
 }
 
 struct FragmentOutput
@@ -34,7 +33,14 @@ ConstantBuffer<Transform> transform;
 FragmentPrimitive vertexMain(Primitive input)
 {
 	FragmentPrimitive output;
-	output.position = mul(transform.projectionMatrix, mul(transform.viewMatrix, mul(transform.modelMatrix, float4(input.position, 1.0))));
+	output.position =
+        mul(
+            transform.viewProjectionMatrix,
+            mul(
+                transform.modelMatrix,
+                float4(input.position, 1.0)
+            )
+        );
     output.normal = input.normal;
     output.tangent = input.tangent;
     output.uv = input.uv;
@@ -48,7 +54,8 @@ Sampler2D texture;
 FragmentOutput fragmentMain(FragmentPrimitive input) : SV_TARGET
 {
 	FragmentOutput output;
-	output.color = mul(input.color, texture.Sample(input.uv[0]));
+    output.color = input.color;
+	output.color = texture.Sample(input.uv[0]);
 
 	return output;
 }

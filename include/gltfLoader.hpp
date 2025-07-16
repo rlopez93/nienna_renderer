@@ -25,28 +25,32 @@ struct Primitive {
     glm::vec4                color{1.0f, 1.0f, 1.0f, 1.0f};
 };
 
-struct Transform {
-    glm::mat4 modelMatrix{1.0f};
-    glm::mat4 viewMatrix =
-        glm::lookAt(glm::vec3{0.0f, 0.0f, 3.0f}, glm::vec3{0.0f, 0.0f, -1.0f},
-                    glm::vec3{0.0f, 1.0f, 0.0f});
-    glm::mat4 projectionMatrix = glm::perspectiveRH_ZO(0.66f, 1.5f, 1.0f, 1000.0f);
-};
-
 struct Mesh {
     std::vector<Primitive> primitives;
     std::vector<uint16_t>  indices;
-    Transform              transform;
     glm::vec4              color{1.0f, 1.0f, 1.0f, 1.0f};
+    glm::mat4              modelMatrix = glm::identity<glm::mat4>();
 };
 
 struct Scene {
     std::vector<Mesh>    meshes;
     std::vector<Texture> textures;
-    Transform            transform;
+    glm::mat4            viewProjectionMatrix =
+
+        glm::perspectiveRH_ZO(0.66f, 1.5f, 1.0f, 1000.0f)
+        * glm::lookAt(
+            glm::vec3{0.0f, 0.0f, 3.0f},
+            glm::vec3{0.0f, 0.0f, -1.0f},
+            glm::vec3{0.0f, 1.0f, 0.0f});
+};
+
+struct Transform {
+    glm::mat4 modelMatrix;
+    glm::mat4 viewProjectionMatrix;
 };
 
 auto getGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset;
 
-auto getSceneData(fastgltf::Asset &asset, const std::filesystem::path &directory)
-    -> Scene;
+auto getSceneData(
+    fastgltf::Asset             &asset,
+    const std::filesystem::path &directory) -> Scene;
