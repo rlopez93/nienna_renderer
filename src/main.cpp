@@ -414,10 +414,10 @@ auto main(
     auto asset = getGltfAsset(gltfDirectory / gltfFilename);
     auto scene = getSceneData(asset, gltfDirectory);
 
+    auto sampler = vk::raii::Sampler{r.ctx.device, vk::SamplerCreateInfo{}};
+
     return 0;
 }
-
-// auto sampler = vk::raii::Sampler{r.ctx.device, samplerCreateInfo};
 
 // auto [vertexBuffer, indexBuffer, textureImage, textureImageView] = uploadBuffers(
 //     r.ctx.device,
@@ -448,7 +448,11 @@ auto main(
 //
 // auto descriptorSets = createDescriptorSets(
 //     r.ctx.device, descriptorPool, descriptorSetLayout, maxFramesInFlight);
-//
+void f()
+{
+    auto g = vk::DescriptorBufferInfo{};
+}
+
 // for (auto i : std::views::iota(0u, maxFramesInFlight)) {
 //     auto descriptorBufferInfo =
 //         vk::DescriptorBufferInfo{sceneBuffers[i].buffer, 0, sizeof(SceneInfo)};
