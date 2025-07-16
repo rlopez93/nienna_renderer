@@ -36,20 +36,16 @@ auto getGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset
 
     auto gltfFile = fastgltf::GltfDataBuffer::FromPath(gltfPath);
     if (!bool(gltfFile)) {
-        fmt::println(
-            stderr,
-            "Failed to open glTF file: {}",
-            fastgltf::getErrorMessage(gltfFile.error()));
+        fmt::println(stderr, "Failed to open glTF file: {}",
+                     fastgltf::getErrorMessage(gltfFile.error()));
         throw std::exception{};
     }
 
     auto asset = parser.loadGltf(gltfFile.get(), gltfPath.parent_path(), gltfOptions);
 
     if (fastgltf::getErrorName(asset.error()) != "None") {
-        fmt::println(
-            stderr,
-            "Failed to open glTF file: {}",
-            fastgltf::getErrorMessage(gltfFile.error()));
+        fmt::println(stderr, "Failed to open glTF file: {}",
+                     fastgltf::getErrorMessage(gltfFile.error()));
     }
 
     return std::move(asset.get());
@@ -81,11 +77,8 @@ template <class... Ts> struct overloads : Ts... {
     using Ts::operator()...;
 };
 
-auto getCamera(
-    const fastgltf::Camera        &camera,
-    const fastgltf::math::fmat4x4 &matrix,
-    glm::mat4                     &projectionMatrix,
-    glm::mat4                     &viewMatrix) -> bool
+auto getCamera(const fastgltf::Camera &camera, const fastgltf::math::fmat4x4 &matrix,
+               glm::mat4 &projectionMatrix, glm::mat4 &viewMatrix) -> bool
 {
 
     fastgltf::math::fvec3 _scale;
@@ -97,42 +90,35 @@ auto getCamera(
     glm::quat rotation    = toGLM(_rotation);
     glm::vec3 translation = toGLM(_translation);
 
-    viewMatrix = glm::inverse(
-        glm::translate(glm::mat4(1.0f), translation) * glm::mat4_cast(rotation));
+    viewMatrix = glm::inverse(glm::translate(glm::mat4(1.0f), translation)
+                              * glm::mat4_cast(rotation));
 
-    return camera.camera.visit(
-        overloads{
-            [&projectionMatrix](const fastgltf::Camera::Perspective &cameraProjection) {
-                if (cameraProjection.zfar.has_value()) {
-                    fmt::println(stderr, "finite perspective projection\n");
-                    projectionMatrix = glm::perspectiveRH_ZO(
-                        cameraProjection.yfov,
-                        cameraProjection.aspectRatio.value_or(1.5f),
-                        cameraProjection.znear,
-                        cameraProjection.zfar.value());
-                } else {
-                    fmt::println(stderr, "infinite perspective projection\n");
-                    projectionMatrix = glm::infinitePerspectiveRH_ZO(
-                        cameraProjection.yfov,
-                        cameraProjection.aspectRatio.value_or(1.5f),
-                        cameraProjection.znear);
-                }
+    return camera.camera.visit(overloads{
+        [&projectionMatrix](const fastgltf::Camera::Perspective &cameraProjection) {
+            if (cameraProjection.zfar.has_value()) {
+                fmt::println(stderr, "finite perspective projection\n");
+                projectionMatrix = glm::perspectiveRH_ZO(
+                    cameraProjection.yfov, cameraProjection.aspectRatio.value_or(1.5f),
+                    cameraProjection.znear, cameraProjection.zfar.value());
+            } else {
+                fmt::println(stderr, "infinite perspective projection\n");
+                projectionMatrix = glm::infinitePerspectiveRH_ZO(
+                    cameraProjection.yfov, cameraProjection.aspectRatio.value_or(1.5f),
+                    cameraProjection.znear);
+            }
 
-                return true;
-            },
-            [](const fastgltf::Camera::Orthographic &cameraOrthographic) {
-                throw std::logic_error{"Orthographic camera"};
-                return false;
-            }});
+            return true;
+        },
+        [](const fastgltf::Camera::Orthographic &cameraOrthographic) {
+            throw std::logic_error{"Orthographic camera"};
+            return false;
+        }});
 
     return true;
 }
 
-auto getMaterial(
-    fastgltf::Asset             &asset,
-    fastgltf::Primitive         &primitive,
-    const std::filesystem::path &directory,
-    std::vector<Texture>        &textures)
+auto getMaterial(fastgltf::Asset &asset, fastgltf::Primitive &primitive,
+                 const std::filesystem::path &directory, std::vector<Texture> &textures)
 {
     auto &material = asset.materials[primitive.materialIndex.value()];
 
@@ -149,43 +135,42 @@ auto getMaterial(
 
         namespace sources = fastgltf::sources;
 
-        const auto visitor = overloads{
-            [](std::monostate) { throw std::logic_error{"std::monostate"}; },
-            [&directory, &textures](const sources::URI &imageURI) {
-                const auto path = directory / imageURI.uri.fspath();
-                fmt::println(stderr, "\"{}\"", path.c_str());
-                int  x, y, n;
-                auto stbiData = stbi_load(path.c_str(), &x, &y, &n, 4);
+        const auto visitor =
+            overloads{[](std::monostate) { throw std::logic_error{"std::monostate"}; },
+                      [&directory, &textures](const sources::URI &imageURI) {
+                          const auto path = directory / imageURI.uri.fspath();
+                          fmt::println(stderr, "\"{}\"", path.c_str());
+                          int  x, y, n;
+                          auto stbiData = stbi_load(path.c_str(), &x, &y, &n, 4);
 
-                fmt::println(stderr, "channels in file: {}", n);
-                assert(stbiData);
+                          fmt::println(stderr, "channels in file: {}", n);
+                          assert(stbiData);
 
-                textures.push_back(
-                    Texture{
-                        .name   = imageURI.uri.fspath().filename(),
-                        .data   = std::vector(stbiData, stbiData + (x * y * 4)),
-                        .extent = vk::Extent2D(x, y)});
+                          textures.push_back(Texture{
+                              .name   = imageURI.uri.fspath().filename(),
+                              .data   = std::vector(stbiData, stbiData + (x * y * 4)),
+                              .extent = vk::Extent2D(x, y)});
 
-                stbi_image_free(stbiData);
-            },
-            [](const sources::BufferView &view) {
-                throw std::logic_error{"sources::BufferView"};
-            },
-            [](const sources::Array &data) {
-                throw std::logic_error{"sources::Array"};
-            },
-            [](const sources::Vector &data) {
-                throw std::logic_error{"sources::Vector"};
-            },
-            [](const sources::CustomBuffer &buf) {
-                throw std::logic_error{"sources::CustomBuffer"};
-            },
-            [](const sources::ByteView &byteView) {
-                throw std::logic_error{"sources::byteView"};
-            },
-            [](const sources::Fallback &fallback) {
-                throw std::logic_error{"sources::Fallback"};
-            }};
+                          stbi_image_free(stbiData);
+                      },
+                      [](const sources::BufferView &view) {
+                          throw std::logic_error{"sources::BufferView"};
+                      },
+                      [](const sources::Array &data) {
+                          throw std::logic_error{"sources::Array"};
+                      },
+                      [](const sources::Vector &data) {
+                          throw std::logic_error{"sources::Vector"};
+                      },
+                      [](const sources::CustomBuffer &buf) {
+                          throw std::logic_error{"sources::CustomBuffer"};
+                      },
+                      [](const sources::ByteView &byteView) {
+                          throw std::logic_error{"sources::byteView"};
+                      },
+                      [](const sources::Fallback &fallback) {
+                          throw std::logic_error{"sources::Fallback"};
+                      }};
 
         image.data.visit(visitor);
 
@@ -207,10 +192,7 @@ auto getMaterial(
         // fastgltf::Sampler
     }
 }
-void getAttributes(
-    fastgltf::Asset     &asset,
-    fastgltf::Primitive &primitive,
-    Mesh                &mesh)
+void getAttributes(fastgltf::Asset &asset, fastgltf::Primitive &primitive, Mesh &mesh)
 
 {
     auto &positionAccessor =
@@ -218,9 +200,7 @@ void getAttributes(
     mesh.primitives.resize(positionAccessor.count);
 
     fastgltf::iterateAccessorWithIndex<glm::vec3>(
-        asset,
-        positionAccessor,
-        [&](glm::vec3 position, std::size_t idx) {
+        asset, positionAccessor, [&](glm::vec3 position, std::size_t idx) {
             mesh.primitives[idx].position = position;
         });
 
@@ -229,8 +209,7 @@ void getAttributes(
         mesh.indices.resize(indexAccessor.count);
 
         fastgltf::iterateAccessorWithIndex<std::uint16_t>(
-            asset,
-            indexAccessor,
+            asset, indexAccessor,
             [&](std::uint16_t index, std::size_t idx) { mesh.indices[idx] = index; });
     }
 
@@ -269,71 +248,53 @@ void getAttributes(
 
         if (attribute.name == "NORMAL") {
             fastgltf::iterateAccessorWithIndex<glm::vec3>(
-                asset,
-                accessor,
-                [&](glm::vec3 normal, std::size_t idx) {
+                asset, accessor, [&](glm::vec3 normal, std::size_t idx) {
                     mesh.primitives[idx].normal = normal;
                 });
         }
 
         else if (attribute.name == "TANGENT") {
             fastgltf::iterateAccessorWithIndex<glm::vec4>(
-                asset,
-                accessor,
-                [&](glm::vec4 tangent, std::size_t idx) {
+                asset, accessor, [&](glm::vec4 tangent, std::size_t idx) {
                     mesh.primitives[idx].tangent = tangent;
                 });
         }
 
         else if (attribute.name == "TEXCOORD_0") {
             fastgltf::iterateAccessorWithIndex<glm::vec2>(
-                asset,
-                accessor,
-                [&](glm::vec2 texCoord, std::size_t idx) {
-                    mesh.primitives[idx].texCoord[0] = texCoord;
+                asset, accessor, [&](glm::vec2 uv, std::size_t idx) {
+                    mesh.primitives[idx].uv[0] = uv;
                 });
         }
 
         else if (attribute.name == "TEXCOORD_1") {
             fastgltf::iterateAccessorWithIndex<glm::vec2>(
-                asset,
-                accessor,
-                [&](glm::vec2 texCoord, std::size_t idx) {
-                    mesh.primitives[idx].texCoord[1] = texCoord;
+                asset, accessor, [&](glm::vec2 uv, std::size_t idx) {
+                    mesh.primitives[idx].uv[1] = uv;
                 });
         }
 
         else if (attribute.name == "COLOR_0") {
             fastgltf::iterateAccessorWithIndex<glm::vec4>(
-                asset,
-                accessor,
-                [&](glm::vec4 color, std::size_t idx) {
+                asset, accessor, [&](glm::vec4 color, std::size_t idx) {
                     mesh.primitives[idx].color = color;
                 });
         }
     }
 }
 
-auto getSceneData(
-    fastgltf::Asset             &asset,
-    const std::filesystem::path &directory) -> Scene
+auto getSceneData(fastgltf::Asset &asset, const std::filesystem::path &directory)
+    -> Scene
 {
-    auto scene       = Scene{};
-    auto imageData   = std::vector<uint16_t>{};
-    auto imageExtent = vk::Extent2D{};
+    auto scene = Scene{};
 
     fastgltf::iterateSceneNodes(
-        asset,
-        0,
-        fastgltf::math::fmat4x4{},
+        asset, 0, fastgltf::math::fmat4x4{},
         [&](fastgltf::Node &node, fastgltf::math::fmat4x4 matrix) {
-            //
             if (node.cameraIndex.has_value()) {
-                (void)getCamera(
-                    asset.cameras[node.cameraIndex.value()],
-                    matrix,
-                    scene.transform.viewMatrix,
-                    scene.transform.projectionMatrix);
+                (void)getCamera(asset.cameras[node.cameraIndex.value()], matrix,
+                                scene.transform.viewMatrix,
+                                scene.transform.projectionMatrix);
             }
 
             if (node.meshIndex.has_value()) {

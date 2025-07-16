@@ -39,11 +39,8 @@ struct ImageResource : Image {
 };
 
 struct Allocator {
-    Allocator(
-        vk::raii::Instance       &instance,
-        vk::raii::PhysicalDevice &physicalDevice,
-        vk::raii::Device         &device,
-        uint32_t                  api);
+    Allocator(vk::raii::Instance &instance, vk::raii::PhysicalDevice &physicalDevice,
+              vk::raii::Device &device, uint32_t api);
 
     ~Allocator()
     {
@@ -51,11 +48,9 @@ struct Allocator {
     }
 
     [[nodiscard]]
-    auto createBuffer(
-        vk::DeviceSize           deviceSize,
-        vk::BufferUsageFlags2    usage,
-        VmaMemoryUsage           memoryUsage = VMA_MEMORY_USAGE_AUTO,
-        VmaAllocationCreateFlags flags       = {}) const -> Buffer;
+    auto createBuffer(vk::DeviceSize deviceSize, vk::BufferUsageFlags2 usage,
+                      VmaMemoryUsage           memoryUsage = VMA_MEMORY_USAGE_AUTO,
+                      VmaAllocationCreateFlags flags       = {}) const -> Buffer;
 
     void destroyBuffer(Buffer buffer) const;
 
@@ -74,23 +69,18 @@ struct Allocator {
 
         fmt::print(stderr, "\n\ncalling createBuffer()...\n\n");
         // Create a staging buffer
-        Buffer stagingBuffer = createBuffer(
-            bufferSize,
-            vk::BufferUsageFlagBits2::eTransferSrc,
-            VMA_MEMORY_USAGE_CPU_TO_GPU,
-            VMA_ALLOCATION_CREATE_MAPPED_BIT
-                | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+        Buffer stagingBuffer =
+            createBuffer(bufferSize, vk::BufferUsageFlagBits2::eTransferSrc,
+                         VMA_MEMORY_USAGE_CPU_TO_GPU,
+                         VMA_ALLOCATION_CREATE_MAPPED_BIT
+                             | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
 
         // Track the staging buffer for later cleanup
         stagingBuffers.push_back(stagingBuffer);
 
         // fmt::print(stderr, "\n\ncalling vmaCopyMemoryToAllocation()...\n\n");
-        vmaCopyMemoryToAllocation(
-            allocator,
-            vectorData.data(),
-            stagingBuffer.allocation,
-            0,
-            bufferSize);
+        vmaCopyMemoryToAllocation(allocator, vectorData.data(),
+                                  stagingBuffer.allocation, 0, bufferSize);
 
         // Map and copy data to the staging buffer
         // void *data;
@@ -108,12 +98,12 @@ struct Allocator {
      * must be submitted, then
      * the staging buffer can be cleared using the freeStagingBuffers function.
     -*/
+
     template <typename T>
     [[nodiscard]]
-    auto createBufferAndUploadData(
-        vk::raii::CommandBuffer &cmd,
-        const std::vector<T>    &vectorData,
-        vk::BufferUsageFlags2    usageFlags) -> Buffer
+    auto createBufferAndUploadData(vk::raii::CommandBuffer &cmd,
+                                   const std::vector<T>    &vectorData,
+                                   vk::BufferUsageFlags2    usageFlags) -> Buffer
     {
         // fmt::print(stderr, "\n\ncalling createStagingBuffer()...\n\n");
         // Create staging buffer and upload data
@@ -124,15 +114,12 @@ struct Allocator {
 
         // fmt::print(stderr, "\n\ncalling createBuffer()...\n\n");
         Buffer buffer = createBuffer(
-            bufferSize,
-            usageFlags | vk::BufferUsageFlagBits2::eTransferDst,
+            bufferSize, usageFlags | vk::BufferUsageFlagBits2::eTransferDst,
             VMA_MEMORY_USAGE_GPU_ONLY);
 
         // fmt::print(stderr, "\n\ncalling cmd.copyBuffer()...\n\n");
-        cmd.copyBuffer(
-            stagingBuffer.buffer,
-            buffer.buffer,
-            vk::BufferCopy{}.setSize(bufferSize));
+        cmd.copyBuffer(stagingBuffer.buffer, buffer.buffer,
+                       vk::BufferCopy{}.setSize(bufferSize));
 
         // fmt::print(stderr, "\n\nexiting...\n\n");
         return buffer;
@@ -146,11 +133,10 @@ struct Allocator {
     /*-- Create an image and upload data using a staging buffer --*/
     template <typename T>
     [[nodiscard]]
-    auto createImageAndUploadData(
-        vk::raii::CommandBuffer &cmd,
-        const std::vector<T>    &vectorData,
-        vk::ImageCreateInfo      imageInfo,
-        vk::ImageLayout          finalLayout) -> Image
+    auto createImageAndUploadData(vk::raii::CommandBuffer &cmd,
+                                  const std::vector<T>    &vectorData,
+                                  vk::ImageCreateInfo      imageInfo,
+                                  vk::ImageLayout          finalLayout) -> Image
     {
         // Create staging buffer and upload data
         Buffer stagingBuffer = createStagingBuffer(vectorData);
@@ -160,20 +146,15 @@ struct Allocator {
         Image image = createImage(imageInfo);
 
         // Transition image layout for copying data
-        cmdTransitionImageLayout(
-            cmd,
-            image.image,
-            vk::ImageLayout::eUndefined,
-            vk::ImageLayout::eTransferDstOptimal
-            // VK_IMAGE_LAYOUT_UNDEFINED,
-            // VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+        cmdTransitionImageLayout(cmd, image.image, vk::ImageLayout::eUndefined,
+                                 vk::ImageLayout::eTransferDstOptimal
+                                 // VK_IMAGE_LAYOUT_UNDEFINED,
+                                 // VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
         );
 
         // Copy buffer data to the image
         cmd.copyBufferToImage(
-            stagingBuffer.buffer,
-            image.image,
-            vk::ImageLayout::eTransferDstOptimal,
+            stagingBuffer.buffer, image.image, vk::ImageLayout::eTransferDstOptimal,
             vk::BufferImageCopy{
                 {},
                 {},
@@ -183,11 +164,8 @@ struct Allocator {
                 imageInfo.extent});
 
         // Transition image layout to final layout
-        cmdTransitionImageLayout(
-            cmd,
-            image.image,
-            vk::ImageLayout::eTransferDstOptimal,
-            finalLayout);
+        cmdTransitionImageLayout(cmd, image.image, vk::ImageLayout::eTransferDstOptimal,
+                                 finalLayout);
 
         return image;
     }

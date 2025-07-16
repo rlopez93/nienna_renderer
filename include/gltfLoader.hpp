@@ -21,16 +21,15 @@ struct Primitive {
     glm::vec3                position;
     glm::vec3                normal;
     glm::vec4                tangent;
-    std::array<glm::vec2, 2> texCoord;
+    std::array<glm::vec2, 2> uv;
     glm::vec4                color{1.0f, 1.0f, 1.0f, 1.0f};
 };
 
 struct Transform {
     glm::mat4 modelMatrix{1.0f};
-    glm::mat4 viewMatrix = glm::lookAt(
-        glm::vec3{0.0f, 0.0f, 3.0f},
-        glm::vec3{0.0f, 0.0f, -1.0f},
-        glm::vec3{0.0f, 1.0f, 0.0f});
+    glm::mat4 viewMatrix =
+        glm::lookAt(glm::vec3{0.0f, 0.0f, 3.0f}, glm::vec3{0.0f, 0.0f, -1.0f},
+                    glm::vec3{0.0f, 1.0f, 0.0f});
     glm::mat4 projectionMatrix = glm::perspectiveRH_ZO(0.66f, 1.5f, 1.0f, 1000.0f);
 };
 
@@ -49,6 +48,5 @@ struct Scene {
 
 auto getGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset;
 
-auto getSceneData(
-    fastgltf::Asset             &asset,
-    const std::filesystem::path &directory) -> Scene;
+auto getSceneData(fastgltf::Asset &asset, const std::filesystem::path &directory)
+    -> Scene;
