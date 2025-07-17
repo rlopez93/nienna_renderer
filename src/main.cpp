@@ -346,7 +346,14 @@ auto main(
 
     auto gltfDirectory = filePath.parent_path();
     auto gltfFilename  = filePath.filename();
-    auto shaderPath    = std::filesystem::path("shaders/shader.vert.spv");
+
+    auto shaderPath = [&] -> std::filesystem::path {
+        if (argc < 3) {
+            return "shaders/shader.vert.spv";
+        } else {
+            return std::string{argv[2]};
+        }
+    };
 
     Renderer  r;
     Allocator allocator{
@@ -618,7 +625,8 @@ auto main(
 
         // update uniform buffers
 
-        // for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
+        // for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes))
+        // {
         const auto &mesh      = scene.meshes[0];
         const auto  meshIndex = 0u;
         auto        transform = Transform{
