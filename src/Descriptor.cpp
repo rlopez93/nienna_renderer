@@ -2,21 +2,39 @@
 
 auto Descriptor::createDescriptorSetLayout(
     vk::raii::Device &device,
-    uint64_t          maxFramesInFlight) -> vk::raii::DescriptorSetLayout
+    uint64_t          maxFramesInFlight,
+    bool              hasTexture) -> vk::raii::DescriptorSetLayout
 {
-    const auto descriptorSetLayoutBindings = std::array{
-        vk::DescriptorSetLayoutBinding{
-            0,
-            vk::DescriptorType::eUniformBuffer,
-            1,
-            vk::ShaderStageFlagBits::eVertex},
-        vk::DescriptorSetLayoutBinding{
-            1,
-            vk::DescriptorType::eCombinedImageSampler,
-            1,
-            vk::ShaderStageFlagBits::eFragment}};
+    if (hasTexture) {
+        const auto descriptorSetLayoutBindings = std::array{
+            vk::DescriptorSetLayoutBinding{
+                0,
+                vk::DescriptorType::eUniformBuffer,
+                1,
+                vk::ShaderStageFlagBits::eVertex},
+            vk::DescriptorSetLayoutBinding{
+                1,
+                vk::DescriptorType::eCombinedImageSampler,
+                1,
+                vk::ShaderStageFlagBits::eFragment}};
 
-    return {device, vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
+        return {
+            device,
+            vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
+    } else {
+        const auto descriptorSetLayoutBindings =
+            std::array{vk::DescriptorSetLayoutBinding{
+                0,
+                vk::DescriptorType::eUniformBuffer,
+                1,
+                vk::ShaderStageFlagBits::eVertex}
+
+            };
+
+        return {
+            device,
+            vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
+    }
 }
 
 auto Descriptor::createDescriptorPool(

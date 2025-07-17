@@ -96,7 +96,8 @@ auto getCamera(
     glm::vec3 translation = toGLM(_translation);
 
     glm::mat4 viewMatrix = glm::inverse(
-        glm::translate(glm::mat4(1.0f), translation) * glm::mat4_cast(rotation));
+        glm::translate(glm::identity<glm::mat4>(), translation)
+        * glm::mat4_cast(rotation));
 
     glm::mat4 projectionMatrix = camera.camera.visit(
         overloads{
@@ -131,6 +132,8 @@ auto getCamera(
                     cameraOrthographic.zfar);
             }});
 
+    projectionMatrix[1][1] *= -1;
+
     return projectionMatrix * viewMatrix;
 }
 
@@ -147,7 +150,7 @@ auto getMaterial(
         auto  factor      = material.pbrData.baseColorFactor;
         auto &textureInfo = material.pbrData.baseColorTexture.value();
 
-        // assert(textureInfo.texCoordIndex == 0);
+        assert(textureInfo.texCoordIndex == 0);
         auto &texture = asset.textures[textureInfo.textureIndex];
 
         assert(texture.imageIndex.has_value());
@@ -219,16 +222,18 @@ void getAttributes(
     Mesh                &mesh)
 
 {
-    auto &positionAccessor =
-        asset.accessors[primitive.findAttribute("POSITION")->accessorIndex];
-    mesh.primitives.resize(positionAccessor.count);
+    {
+        auto &positionAccessor =
+            asset.accessors[primitive.findAttribute("POSITION")->accessorIndex];
+        mesh.primitives.resize(positionAccessor.count);
 
-    fastgltf::iterateAccessorWithIndex<glm::vec3>(
-        asset,
-        positionAccessor,
-        [&](glm::vec3 position, std::size_t idx) {
-            mesh.primitives[idx].position = position;
-        });
+        fastgltf::iterateAccessorWithIndex<glm::vec3>(
+            asset,
+            positionAccessor,
+            [&](glm::vec3 position, std::size_t idx) {
+                mesh.primitives[idx].position = position;
+            });
+    }
 
     if (primitive.indicesAccessor.has_value()) {
         auto &indexAccessor = asset.accessors[primitive.indicesAccessor.value()];
@@ -282,21 +287,13 @@ void getAttributes(
                 });
         }
 
-        else if (attribute.name == "TANGENT") {
-            fastgltf::iterateAccessorWithIndex<glm::vec4>(
-                asset,
-                accessor,
-                [&](glm::vec4 tangent, std::size_t idx) {
-                    mesh.primitives[idx].tangent = tangent;
-                });
-        }
-
         else if (attribute.name == "TEXCOORD_0") {
             fastgltf::iterateAccessorWithIndex<glm::vec2>(
                 asset,
                 accessor,
                 [&](glm::vec2 uv, std::size_t idx) {
-                    mesh.primitives[idx].uv[0] = uv;
+                    // mesh.primitives[idx].uv[0] = uv;
+                    mesh.primitives[idx].uv = uv;
                 });
         }
 
@@ -305,11 +302,12 @@ void getAttributes(
                 asset,
                 accessor,
                 [&](glm::vec2 uv, std::size_t idx) {
-                    mesh.primitives[idx].uv[1] = uv;
+                    // mesh.primitives[idx].uv[1] = uv;
                 });
         }
 
         else if (attribute.name == "COLOR_0") {
+            fmt::println(stderr, "FOUND COLOR\n");
             fastgltf::iterateAccessorWithIndex<glm::vec4>(
                 asset,
                 accessor,

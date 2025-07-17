@@ -18,11 +18,11 @@ struct Texture {
 };
 
 struct Primitive {
-    glm::vec3                position;
-    glm::vec3                normal;
-    glm::vec4                tangent;
-    std::array<glm::vec2, 2> uv;
-    glm::vec4                color{1.0f, 1.0f, 1.0f, 1.0f};
+    glm::vec3 position;
+    glm::vec3 normal;
+    // std::array<glm::vec2, 2> uv;
+    glm::vec2 uv;
+    glm::vec4 color{1.0f, 1.0f, 1.0f, 1.0f};
 };
 
 struct Mesh {

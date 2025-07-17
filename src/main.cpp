@@ -36,12 +36,13 @@
 #include "gltfLoader.hpp"
 
 auto createPipeline(
-    vk::raii::Device         &device,
-    vk::Format                imageFormat,
-    vk::Format                depthFormat,
-    vk::raii::PipelineLayout &pipelineLayout) -> vk::raii::Pipeline
+    vk::raii::Device            &device,
+    const std::filesystem::path &shaderPath,
+    vk::Format                   imageFormat,
+    vk::Format                   depthFormat,
+    vk::raii::PipelineLayout    &pipelineLayout) -> vk::raii::Pipeline
 {
-    auto       shaderModule = createShaderModule(device);
+    auto       shaderModule = createShaderModule(device, shaderPath);
     // The stages used by this pipeline
     const auto shaderStages = std::array{
         vk::PipelineShaderStageCreateInfo{
@@ -78,15 +79,10 @@ auto createPipeline(
         vk::VertexInputAttributeDescription{
             2,
             0,
-            vk::Format::eR32G32B32A32Sfloat,
-            offsetof(Primitive, tangent)},
-        vk::VertexInputAttributeDescription{
-            3,
-            0,
             vk::Format::eR32G32Sfloat,
             offsetof(Primitive, uv)},
         vk::VertexInputAttributeDescription{
-            5,
+            3,
             0,
             vk::Format::eR32G32B32A32Sfloat,
             offsetof(Primitive, color)},
@@ -349,11 +345,11 @@ auto main(
 
     auto shaderPath = [&] -> std::filesystem::path {
         if (argc < 3) {
-            return "shaders/shader.vert.spv";
+            return "build/_autogen/mesh-refactor.slang.spv";
         } else {
             return std::string{argv[2]};
         }
-    };
+    }();
 
     Renderer  r;
     Allocator allocator{
@@ -367,9 +363,6 @@ auto main(
     auto swapchainImageViews = std::vector<vk::raii::ImageView>{};
     auto maxFramesInFlight   = swapchainImages.size();
 
-    auto imageAvailable = std::vector<vk::raii::Semaphore>{};
-    auto renderFinished = std::vector<vk::raii::Semaphore>{};
-
     for (auto image : swapchainImages) {
         swapchainImageViews.emplace_back(
             r.ctx.device,
@@ -381,6 +374,9 @@ auto main(
                 {},
                 {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
     }
+
+    auto imageAvailable = std::vector<vk::raii::Semaphore>{};
+    auto renderFinished = std::vector<vk::raii::Semaphore>{};
 
     for (auto i : std::views::iota(0u, maxFramesInFlight)) {
         imageAvailable.emplace_back(r.ctx.device, vk::SemaphoreCreateInfo{});
@@ -464,7 +460,6 @@ auto main(
 
     auto sampler = vk::raii::Sampler{r.ctx.device, vk::SamplerCreateInfo{}};
 
-    // TODO create vertex/index buffers
     auto
         [primitiveBuffers,
          indexBuffers,
@@ -481,12 +476,14 @@ auto main(
 
     fmt::println(stderr, "textures.size(): {}", textureImageBuffers.size());
 
-    assert(textureImageBuffers.size() < 2);
+    assert(textureImageBuffers.size() < 2 && textureImageViews.size() < 2);
 
     Descriptor descriptor;
 
-    auto descriptorSetLayout =
-        descriptor.createDescriptorSetLayout(r.ctx.device, maxFramesInFlight);
+    auto descriptorSetLayout = descriptor.createDescriptorSetLayout(
+        r.ctx.device,
+        maxFramesInFlight,
+        !textureImageViews.empty());
 
     auto descriptorPool =
         descriptor.createDescriptorPool(r.ctx.device, maxFramesInFlight);
@@ -497,27 +494,31 @@ auto main(
         descriptorSetLayout,
         maxFramesInFlight);
 
-    for (const auto &textureImageView : textureImageViews) {
-        for (const auto &[sceneBuffer, descriptorSet] :
-             std::views::zip(sceneBuffers, descriptorSets)) {
+    // for (const auto &textureImageView : textureImageViews) {
+    // for (const auto &[sceneBuffer, descriptorSet] :
+    // std::views::zip(sceneBuffers, descriptorSets)) {
+    for (auto i : std::views::iota(0u, maxFramesInFlight)) {
+        auto descriptorBufferInfo =
+            vk::DescriptorBufferInfo{sceneBuffers[i].buffer, 0, sizeof(Transform)};
 
-            auto descriptorBufferInfo =
-                vk::DescriptorBufferInfo{sceneBuffer.buffer, 0, sizeof(Transform)};
+        if (!textureImageViews.empty()) {
             auto descriptorImageInfo = vk::DescriptorImageInfo{
                 sampler,
-                textureImageView,
+                textureImageViews[0],
                 vk::ImageLayout::eShaderReadOnlyOptimal};
+
             auto descriptorWrites = std::array{
                 vk::WriteDescriptorSet{
-                    descriptorSet,
+                    descriptorSets[i],
                     0,
                     0,
                     1,
                     vk::DescriptorType::eUniformBuffer,
                     {},
                     &descriptorBufferInfo},
+
                 vk::WriteDescriptorSet{
-                    descriptorSet,
+                    descriptorSets[i],
                     1,
                     0,
                     1,
@@ -525,7 +526,21 @@ auto main(
                     &descriptorImageInfo}};
             r.ctx.device.updateDescriptorSets(descriptorWrites, {});
         }
+
+        else {
+            auto descriptorWrites = std::array{vk::WriteDescriptorSet{
+                descriptorSets[i],
+                0,
+                0,
+                1,
+                vk::DescriptorType::eUniformBuffer,
+                {},
+                &descriptorBufferInfo}};
+
+            r.ctx.device.updateDescriptorSets(descriptorWrites, {});
+        }
     }
+    // }
 
     auto descriptorSetLayouts =
         std::vector<vk::DescriptorSetLayout>(maxFramesInFlight, descriptorSetLayout);
@@ -536,6 +551,7 @@ auto main(
 
     auto graphicsPipeline = createPipeline(
         r.ctx.device,
+        shaderPath,
         r.ctx.imageFormat,
         r.ctx.depthFormat,
         pipelineLayout);
@@ -632,7 +648,7 @@ auto main(
         auto        transform = Transform{
                    .modelMatrix          = mesh.modelMatrix,
                    .viewProjectionMatrix = scene.viewProjectionMatrix};
-        transform.viewProjectionMatrix[1][1] *= -1;
+        // transform.viewProjectionMatrix[1][1] *= -1;
 
         vmaCopyMemoryToAllocation(
             allocator.allocator,
@@ -793,42 +809,3 @@ auto main(
 
     return 0;
 }
-
-// auto sceneBuffers = std::vector<Buffer>{};
-//
-// for (auto i : std::views::iota(0u, maxFramesInFlight)) {
-//     sceneBuffers.emplace_back(allocator.createBuffer(
-//         sizeof(SceneInfo),
-//         vk::BufferUsageFlagBits2::eUniformBuffer
-//             | vk::BufferUsageFlagBits2::eTransferDst,
-//         VMA_MEMORY_USAGE_AUTO,
-//         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-//             | VMA_ALLOCATION_CREATE_MAPPED_BIT));
-// }
-//
-// for (auto i : std::views::iota(0u, maxFramesInFlight)) {
-//     auto descriptorBufferInfo =
-//         vk::DescriptorBufferInfo{sceneBuffers[i].buffer, 0, sizeof(SceneInfo)};
-//     auto descriptorImageInfo = vk::DescriptorImageInfo{
-//         sampler,
-//         textureImageView,
-//         vk::ImageLayout::eShaderReadOnlyOptimal};
-//     auto descriptorWrites = std::array{
-//         vk::WriteDescriptorSet{
-//             descriptorSets[i],
-//             0,
-//             0,
-//             1,
-//             vk::DescriptorType::eUniformBuffer,
-//             {},
-//             &descriptorBufferInfo},
-//         vk::WriteDescriptorSet{
-//             descriptorSets[i],
-//             1,
-//             0,
-//             1,
-//             vk::DescriptorType::eCombinedImageSampler,
-//             &descriptorImageInfo}};
-//     r.ctx.device.updateDescriptorSets(descriptorWrites, {});
-// }
-//

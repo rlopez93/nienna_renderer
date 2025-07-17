@@ -16,4 +16,6 @@ struct VertexReflectionData {
 
 auto readShaders(const std::string &filename) -> std::vector<char>;
 auto reflectShader(const std::vector<char> &code) -> VertexReflectionData;
-auto createShaderModule(vk::raii::Device &device) -> vk::raii::ShaderModule;
+auto createShaderModule(
+    vk::raii::Device            &device,
+    const std::filesystem::path &path) -> vk::raii::ShaderModule;

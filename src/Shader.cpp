@@ -132,9 +132,11 @@ auto reflectShader(const std::vector<char> &code) -> VertexReflectionData
 
     return data;
 }
-auto createShaderModule(vk::raii::Device &device) -> vk::raii::ShaderModule
+auto createShaderModule(
+    vk::raii::Device            &device,
+    const std::filesystem::path &path) -> vk::raii::ShaderModule
 {
-    auto shaderCode = readShaders("shaders/shader.slang.spv");
+    auto shaderCode = readShaders(path);
 
     auto data = reflectShader(shaderCode);
 

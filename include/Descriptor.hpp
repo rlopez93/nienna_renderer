@@ -5,7 +5,8 @@ struct Descriptor {
 
     auto createDescriptorSetLayout(
         vk::raii::Device &device,
-        uint64_t          maxFramesInFlight) -> vk::raii::DescriptorSetLayout;
+        uint64_t          maxFramesInFlight,
+        bool              hasTexture) -> vk::raii::DescriptorSetLayout;
     auto createDescriptorPool(
         vk::raii::Device &device,
         uint64_t          maxFramesInFlight) -> vk::raii::DescriptorPool;

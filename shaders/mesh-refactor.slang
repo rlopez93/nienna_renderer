@@ -2,8 +2,8 @@ struct Primitive
 {
     float3 position;
     float3 normal;
-    float4 tangent;
-    float2 uv[2];
+    float2 uv;
+    // float2 uv[2];
     float4 color;
 }
 
@@ -11,8 +11,8 @@ struct FragmentPrimitive
 {
     float4 position : SV_Position;
     float3 normal;
-    float4 tangent;
-    float2 uv[2];
+    float2 uv;
+    // float2 uv[2];
     float4 color;
 }
 
@@ -42,7 +42,6 @@ FragmentPrimitive vertexMain(Primitive input)
             )
         );
     output.normal = input.normal;
-    output.tangent = input.tangent;
     output.uv = input.uv;
     output.color = input.color;
 	return output;
@@ -54,8 +53,9 @@ Sampler2D texture;
 FragmentOutput fragmentMain(FragmentPrimitive input) : SV_TARGET
 {
 	FragmentOutput output;
-    output.color = input.color;
-	output.color = texture.Sample(input.uv[0]);
+	// output.color = texture.Sample(input.uv[0]);
+	// output.color = texture.Sample(input.uv);
+	 output.color = mul(texture.Sample(input.uv), float4(0.0, 0.0, 0.0, 0.0) );
 
 	return output;
 }
