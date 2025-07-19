@@ -55,7 +55,8 @@ FragmentOutput fragmentMain(FragmentPrimitive input) : SV_TARGET
 	FragmentOutput output;
 	// output.color = texture.Sample(input.uv[0]);
 	// output.color = texture.Sample(input.uv);
-	 output.color = mul(texture.Sample(input.uv), float4(0.0, 0.0, 0.0, 0.0) );
+	 // output.color = mul(texture.Sample(input.uv), float4(0.0, 0.0, 0.0, 0.0) );
+    output.color = input.color;
 
 	return output;
 }

@@ -33,15 +33,21 @@ struct Mesh {
 };
 
 struct Scene {
-    std::vector<Mesh>    meshes;
-    std::vector<Texture> textures;
-    glm::mat4            viewProjectionMatrix =
-
-        glm::perspectiveRH_ZO(0.66f, 1.5f, 1.0f, 1000.0f)
-        * glm::lookAt(
+    Scene()
+    {
+        auto viewMatrix = glm::lookAt(
             glm::vec3{0.0f, 0.0f, 3.0f},
             glm::vec3{0.0f, 0.0f, -1.0f},
             glm::vec3{0.0f, 1.0f, 0.0f});
+        auto projectionMatrix = glm::perspectiveRH_ZO(0.66f, 1.5f, 1.0f, 1000.0f);
+        projectionMatrix[1][1] *= -1;
+
+        viewProjectionMatrix = projectionMatrix * viewMatrix;
+    }
+
+    std::vector<Mesh>    meshes;
+    std::vector<Texture> textures;
+    glm::mat4            viewProjectionMatrix;
 };
 
 struct Transform {

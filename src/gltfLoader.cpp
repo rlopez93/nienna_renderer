@@ -76,6 +76,11 @@ auto toGLM(const fastgltf::math::fvec3 &V) -> glm::vec3
     return {V.x(), V.y(), V.z()};
 }
 
+auto toGLM(const fastgltf::math::fvec4 &V) -> glm::vec4
+{
+    return {V.x(), V.y(), V.z(), V.w()};
+}
+
 // helper type for the visitor
 template <class... Ts> struct overloads : Ts... {
     using Ts::operator()...;
@@ -140,14 +145,13 @@ auto getCamera(
 auto getMaterial(
     fastgltf::Asset             &asset,
     fastgltf::Primitive         &primitive,
+    Mesh                        &mesh,
     const std::filesystem::path &directory,
     std::vector<Texture>        &textures)
 {
     auto &material = asset.materials[primitive.materialIndex.value()];
-
+    mesh.color     = toGLM(material.pbrData.baseColorFactor);
     if (material.pbrData.baseColorTexture.has_value()) {
-
-        auto  factor      = material.pbrData.baseColorFactor;
         auto &textureInfo = material.pbrData.baseColorTexture.value();
 
         assert(textureInfo.texCoordIndex == 0);
@@ -308,12 +312,21 @@ void getAttributes(
 
         else if (attribute.name == "COLOR_0") {
             fmt::println(stderr, "FOUND COLOR\n");
-            fastgltf::iterateAccessorWithIndex<glm::vec4>(
-                asset,
-                accessor,
-                [&](glm::vec4 color, std::size_t idx) {
-                    mesh.primitives[idx].color = color;
-                });
+            if (accessor.type == fastgltf::AccessorType::Vec3) {
+                fastgltf::iterateAccessorWithIndex<glm::vec3>(
+                    asset,
+                    accessor,
+                    [&](glm::vec3 color, std::size_t idx) {
+                        mesh.primitives[idx].color *= glm::vec4(color, 1.0f);
+                    });
+            } else if (accessor.type == fastgltf::AccessorType::Vec4) {
+                fastgltf::iterateAccessorWithIndex<glm::vec4>(
+                    asset,
+                    accessor,
+                    [&](glm::vec4 color, std::size_t idx) {
+                        mesh.primitives[idx].color = color;
+                    });
+            }
         }
     }
 }
@@ -329,6 +342,7 @@ auto getSceneData(
         0,
         fastgltf::math::fmat4x4{},
         [&](fastgltf::Node &node, fastgltf::math::fmat4x4 matrix) {
+            fmt::println(stderr, "Node: {}", node.name);
             if (node.cameraIndex.has_value()) {
                 scene.viewProjectionMatrix =
                     getCamera(asset.cameras[node.cameraIndex.value()], matrix);
@@ -338,11 +352,19 @@ auto getSceneData(
                 auto &assetMesh  = asset.meshes[node.meshIndex.value()];
                 auto &mesh       = scene.meshes.emplace_back();
                 mesh.modelMatrix = toGLM(matrix);
+
+                fmt::println(stderr, "Mesh: {}", assetMesh.name);
                 for (auto &primitive : assetMesh.primitives) {
+                    fmt::println(stderr, "Primitive");
+
                     getAttributes(asset, primitive, mesh);
 
                     if (primitive.materialIndex.has_value()) {
-                        getMaterial(asset, primitive, directory, scene.textures);
+                        fmt::println(
+                            stderr,
+                            "MaterialIndex: {}",
+                            primitive.materialIndex.value());
+                        getMaterial(asset, primitive, mesh, directory, scene.textures);
                     }
                 }
             }
