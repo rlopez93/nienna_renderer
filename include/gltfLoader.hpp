@@ -26,10 +26,11 @@ struct Primitive {
 };
 
 struct Mesh {
-    std::vector<Primitive> primitives;
-    std::vector<uint16_t>  indices;
-    glm::vec4              color{1.0f, 1.0f, 1.0f, 1.0f};
-    glm::mat4              modelMatrix = glm::identity<glm::mat4>();
+    std::vector<Primitive>  primitives;
+    std::vector<uint16_t>   indices;
+    glm::vec4               color{1.0f, 1.0f, 1.0f, 1.0f};
+    glm::mat4               modelMatrix = glm::identity<glm::mat4>();
+    std::optional<uint32_t> textureIndex;
 };
 
 struct Scene {

@@ -41,7 +41,7 @@ auto Descriptors::createDescriptorPool(
         device,
         vk::DescriptorPoolCreateInfo{
             vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-            static_cast<uint32_t>(maxFramesInFlight),
+            static_cast<uint32_t>(maxFramesInFlight) * textureCount,
             poolSizes}};
 }
 

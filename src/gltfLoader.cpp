@@ -151,17 +151,19 @@ auto getMaterial(
 {
     auto &material = asset.materials[primitive.materialIndex.value()];
     mesh.color     = toGLM(material.pbrData.baseColorFactor);
-    if (material.pbrData.baseColorTexture.has_value()) {
+
+    if (!material.pbrData.baseColorTexture.has_value()) {
+        mesh.textureIndex = {};
+    }
+
+    else {
+        mesh.textureIndex = textures.size();
+
         auto &textureInfo = material.pbrData.baseColorTexture.value();
+        auto &texture     = asset.textures[textureInfo.textureIndex];
+        auto &image       = asset.images[texture.imageIndex.value()];
 
-        assert(textureInfo.texCoordIndex == 0);
-        auto &texture = asset.textures[textureInfo.textureIndex];
-
-        assert(texture.imageIndex.has_value());
-        auto &image = asset.images[texture.imageIndex.value()];
-
-        namespace sources = fastgltf::sources;
-
+        namespace sources  = fastgltf::sources;
         const auto visitor = overloads{
             [](std::monostate) { throw std::logic_error{"std::monostate"}; },
             [&directory, &textures](const sources::URI &imageURI) {
@@ -359,7 +361,11 @@ auto getSceneData(
 
                     getAttributes(asset, primitive, mesh);
 
-                    if (primitive.materialIndex.has_value()) {
+                    if (!primitive.materialIndex.has_value()) {
+                        mesh.textureIndex = {};
+                    }
+
+                    else {
                         fmt::println(
                             stderr,
                             "MaterialIndex: {}",

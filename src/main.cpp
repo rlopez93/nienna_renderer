@@ -502,25 +502,26 @@ auto main(
         auto descriptorImageInfos = std::vector<vk::DescriptorImageInfo>{};
         for (auto k : std::views::iota(0u, textureCount)) {
             descriptorImageInfos.emplace_back(
-                vk::DescriptorImageInfo{
-                    sampler,
-                    textureImageViews[k],
-                    vk::ImageLayout::eShaderReadOnlyOptimal});
-            descriptorWrites.emplace_back(
-                vk::WriteDescriptorSet{
-                    descriptors.descriptorSets[i],
-                    1,
-                    k,
-                    1,
-                    vk::DescriptorType::eCombinedImageSampler,
-                    &descriptorImageInfos.back()});
+                sampler,
+                *textureImageViews[k],
+                vk::ImageLayout::eShaderReadOnlyOptimal);
         }
+
+        descriptorWrites.emplace_back(
+            descriptors.descriptorSets[i],
+            1,
+            0,
+            vk::DescriptorType::eCombinedImageSampler,
+            descriptorImageInfos);
         r.ctx.device.updateDescriptorSets(descriptorWrites, {});
     }
 
     // descriptor set layout per frame
     auto descriptorSetLayouts =
         std::vector(maxFramesInFlight, *descriptors.descriptorSetLayout);
+
+    assert(descriptors.descriptorSets.size() == descriptorSetLayouts.size());
+    fmt::println(stderr, "pass");
 
     // push constant range for texture index
     auto pushConstantRanges =
@@ -623,21 +624,20 @@ auto main(
 
         // update uniform buffers
 
-        // for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes))
-        // {
-        const auto &mesh      = scene.meshes[0];
-        const auto  meshIndex = 0u;
-        auto        transform = Transform{
-                   .modelMatrix          = mesh.modelMatrix,
-                   .viewProjectionMatrix = scene.viewProjectionMatrix};
-        // transform.viewProjectionMatrix[1][1] *= -1;
+        for (const auto &mesh : scene.meshes) {
+            auto transform = Transform{
+                .modelMatrix          = mesh.modelMatrix,
+                .viewProjectionMatrix = scene.viewProjectionMatrix};
+            // transform.viewProjectionMatrix[1][1] *= -1;
 
-        vmaCopyMemoryToAllocation(
-            allocator.allocator,
-            &transform,
-            sceneBuffers[currentFrame].allocation,
-            0,
-            sizeof(Transform));
+            vmaCopyMemoryToAllocation(
+                allocator.allocator,
+                &transform,
+                sceneBuffers[currentFrame].allocation,
+                0,
+                sizeof(Transform));
+            break;
+        }
 
         // color attachment image to render to: vk::RenderingAttachmentInfo
         auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
@@ -692,6 +692,7 @@ auto main(
 
         cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
+        fmt::println(stderr, "bindDescriptorSets2(), frame {}", currentFrame);
         // bind texture resources passed to shader
         cmdBuffer.bindDescriptorSets2(
             vk::BindDescriptorSetsInfo{
@@ -700,31 +701,38 @@ auto main(
                 0,
                 *descriptors.descriptorSets[currentFrame]});
 
-        // bind vertex data
-        cmdBuffer.bindVertexBuffers(0, primitiveBuffers[meshIndex].buffer, {0});
+        for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
+            fmt::println(stderr, "scene.meshes[{}]", meshIndex);
+            // bind vertex data
+            cmdBuffer.bindVertexBuffers(0, primitiveBuffers[meshIndex].buffer, {0});
 
-        // bind index data
-        cmdBuffer.bindIndexBuffer(
-            indexBuffers[meshIndex].buffer,
-            0,
-            vk::IndexType::eUint16);
-
-        uint32_t textureIndex = 0;
-
-        cmdBuffer.pushConstants2(
-            vk::PushConstantsInfo{
-                *pipelineLayout,
-                vk::ShaderStageFlagBits::eAllGraphics,
+            // bind index data
+            cmdBuffer.bindIndexBuffer(
+                indexBuffers[meshIndex].buffer,
                 0,
-                4,
-                &textureIndex});
+                vk::IndexType::eUint16);
 
-        // render draw call
-        cmdBuffer.drawIndexed(scene.meshes[meshIndex].indices.size(), 1, 0, 0, 0);
+            if (mesh.textureIndex.has_value()) {
+
+                cmdBuffer.pushConstants2(
+                    vk::PushConstantsInfo{
+                        *pipelineLayout,
+                        vk::ShaderStageFlagBits::eAllGraphics,
+                        0,
+                        4,
+                        &mesh.textureIndex.value()});
+            }
+
+            else {
+                fmt::println(stderr, "scene.meshes[{}] no has texture", meshIndex);
+                // ???
+            }
+
+            // render draw call
+            cmdBuffer.drawIndexed(scene.meshes[meshIndex].indices.size(), 1, 0, 0, 0);
+        }
 
         cmdBuffer.endRendering();
-        // }
-
         // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
         cmdTransitionImageLayout(
             cmdBuffer,
