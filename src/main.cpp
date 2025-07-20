@@ -37,25 +37,27 @@
 
 auto createPipeline(
     vk::raii::Device            &device,
-    const std::filesystem::path &shaderPath,
+    const std::filesystem::path &vertShaderPath,
+    const std::filesystem::path &fragShaderPath,
     vk::Format                   imageFormat,
     vk::Format                   depthFormat,
     vk::raii::PipelineLayout    &pipelineLayout) -> vk::raii::Pipeline
 {
-    auto       shaderModule = createShaderModule(device, shaderPath);
+    auto       vertShaderModule = createShaderModule(device, vertShaderPath);
+    auto       fragShaderModule = createShaderModule(device, fragShaderPath);
     // The stages used by this pipeline
     const auto shaderStages = std::array{
         vk::PipelineShaderStageCreateInfo{
             {},
             vk::ShaderStageFlagBits::eVertex,
-            shaderModule,
-            "vertexMain",
+            vertShaderModule,
+            "main",
             {}},
         vk::PipelineShaderStageCreateInfo{
             {},
             vk::ShaderStageFlagBits::eFragment,
-            shaderModule,
-            "fragmentMain",
+            fragShaderModule,
+            "main",
             {}},
     };
 
@@ -197,7 +199,6 @@ auto createBuffers(
 
     auto cmd = beginSingleTimeCommands(device, cmdPool);
 
-    assert(scene.meshes.size() == 1);
     for (const auto &mesh : scene.meshes) {
         primitiveBuffers.emplace_back(allocator.createBufferAndUploadData(
             cmd,
@@ -221,6 +222,7 @@ auto createBuffers(
     }
 
     for (const auto &texture : scene.textures) {
+        fmt::println(stderr, "uploading texture '{}'", texture.name.string());
         textureImageBuffers.emplace_back(allocator.createImageAndUploadData(
             cmd,
             texture.data,
@@ -474,25 +476,10 @@ auto main(
                 scene,
                 maxFramesInFlight);
 
-    fmt::println(stderr, "textures.size(): {}", textureImageBuffers.size());
+    uint32_t textureCount = textureImageBuffers.size();
+    fmt::println(stderr, "textures.size(): {}", textureCount);
 
-    assert(textureImageBuffers.size() < 2 && textureImageViews.size() < 2);
-
-    Descriptor descriptor;
-
-    auto descriptorSetLayout = descriptor.createDescriptorSetLayout(
-        r.ctx.device,
-        maxFramesInFlight,
-        !textureImageViews.empty());
-
-    auto descriptorPool =
-        descriptor.createDescriptorPool(r.ctx.device, maxFramesInFlight);
-
-    auto descriptorSets = descriptor.createDescriptorSets(
-        r.ctx.device,
-        descriptorPool,
-        descriptorSetLayout,
-        maxFramesInFlight);
+    Descriptors descriptors{r.ctx.device, textureCount, maxFramesInFlight};
 
     // for (const auto &textureImageView : textureImageViews) {
     // for (const auto &[sceneBuffer, descriptorSet] :
@@ -501,51 +488,41 @@ auto main(
         auto descriptorBufferInfo =
             vk::DescriptorBufferInfo{sceneBuffers[i].buffer, 0, sizeof(Transform)};
 
-        if (!textureImageViews.empty()) {
-            auto descriptorImageInfo = vk::DescriptorImageInfo{
-                sampler,
-                textureImageViews[0],
-                vk::ImageLayout::eShaderReadOnlyOptimal};
-
-            auto descriptorWrites = std::array{
-                vk::WriteDescriptorSet{
-                    descriptorSets[i],
-                    0,
-                    0,
-                    1,
-                    vk::DescriptorType::eUniformBuffer,
-                    {},
-                    &descriptorBufferInfo},
-
-                vk::WriteDescriptorSet{
-                    descriptorSets[i],
-                    1,
-                    0,
-                    1,
-                    vk::DescriptorType::eCombinedImageSampler,
-                    &descriptorImageInfo}};
-            r.ctx.device.updateDescriptorSets(descriptorWrites, {});
-        }
-
-        else {
-            auto descriptorWrites = std::array{vk::WriteDescriptorSet{
-                descriptorSets[i],
+        auto descriptorWrites = std::vector<vk::WriteDescriptorSet>{};
+        descriptorWrites.emplace_back(
+            vk::WriteDescriptorSet{
+                descriptors.descriptorSets[i],
                 0,
                 0,
                 1,
                 vk::DescriptorType::eUniformBuffer,
                 {},
-                &descriptorBufferInfo}};
+                &descriptorBufferInfo});
 
-            r.ctx.device.updateDescriptorSets(descriptorWrites, {});
+        auto descriptorImageInfos = std::vector<vk::DescriptorImageInfo>{};
+        for (auto k : std::views::iota(0u, textureCount)) {
+            descriptorImageInfos.emplace_back(
+                vk::DescriptorImageInfo{
+                    sampler,
+                    textureImageViews[k],
+                    vk::ImageLayout::eShaderReadOnlyOptimal});
+            descriptorWrites.emplace_back(
+                vk::WriteDescriptorSet{
+                    descriptors.descriptorSets[i],
+                    1,
+                    k,
+                    1,
+                    vk::DescriptorType::eCombinedImageSampler,
+                    &descriptorImageInfos.back()});
         }
+        r.ctx.device.updateDescriptorSets(descriptorWrites, {});
     }
-    // }
 
     // descriptor set layout per frame
-    auto descriptorSetLayouts = std::vector(maxFramesInFlight, *descriptorSetLayout);
+    auto descriptorSetLayouts =
+        std::vector(maxFramesInFlight, *descriptors.descriptorSetLayout);
 
-    // push constant for texture index per frame
+    // push constant range for texture index
     auto pushConstantRanges =
         std::array{vk::PushConstantRange{vk::ShaderStageFlagBits::eAllGraphics, 0, 4}};
 
@@ -555,7 +532,8 @@ auto main(
 
     auto graphicsPipeline = createPipeline(
         r.ctx.device,
-        shaderPath,
+        "shaders/mesh-refactor.slang.vert.spv",
+        "shaders/mesh-refactor.slang.frag.spv",
         r.ctx.imageFormat,
         r.ctx.depthFormat,
         pipelineLayout);
@@ -720,7 +698,7 @@ auto main(
                 vk::ShaderStageFlagBits::eAllGraphics,
                 pipelineLayout,
                 0,
-                *descriptorSets[currentFrame]});
+                *descriptors.descriptorSets[currentFrame]});
 
         // bind vertex data
         cmdBuffer.bindVertexBuffers(0, primitiveBuffers[meshIndex].buffer, {0});

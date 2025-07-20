@@ -132,10 +132,12 @@ auto reflectShader(const std::vector<char> &code) -> VertexReflectionData
 
     return data;
 }
+
 auto createShaderModule(
     vk::raii::Device            &device,
     const std::filesystem::path &path) -> vk::raii::ShaderModule
 {
+    fmt::println(stderr, "creating shader module for {}", path.string());
     auto shaderCode = readShaders(path);
 
     auto data = reflectShader(shaderCode);

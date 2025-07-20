@@ -48,22 +48,17 @@ FragmentPrimitive vertexMain(Primitive input)
 }
 
 
-struct Index {
-        uint32_t index;
-}
-
 Sampler2D texture[];
-[[vk::push_constant]] ConstantBuffer<Index> textureIndex;
 
 [shader("fragment")]
-FragmentOutput fragmentMain(FragmentPrimitive input) : SV_TARGET
+FragmentOutput fragmentMain(FragmentPrimitive input, uniform uint32_t textureIndex) : SV_TARGET
 {
 	FragmentOutput output;
 	// output.color = texture.Sample(input.uv[0]);
 	// output.color = texture.Sample(input.uv);
 	 // output.color = mul(texture.Sample(input.uv), float4(0.0, 0.0, 0.0, 0.0) );
     // output.color = input.color;
-    output.color = mul(texture[textureIndex.index].Sample(input.uv), input.color);
+    output.color = texture[textureIndex].Sample(input.uv) * input.color;
 
 	return output;
 }

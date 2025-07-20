@@ -1,53 +1,41 @@
 #include "Descriptor.hpp"
 
-auto Descriptor::createDescriptorSetLayout(
+auto Descriptors::createDescriptorSetLayout(
     vk::raii::Device &device,
-    uint64_t          maxFramesInFlight,
-    bool              hasTexture) -> vk::raii::DescriptorSetLayout
+    uint32_t          textureCount,
+    uint64_t          maxFramesInFlight) -> vk::raii::DescriptorSetLayout
 {
-    if (hasTexture) {
-        const auto descriptorSetLayoutBindings = std::array{
-            vk::DescriptorSetLayoutBinding{
-                0,
-                vk::DescriptorType::eUniformBuffer,
-                1,
-                vk::ShaderStageFlagBits::eVertex},
-            vk::DescriptorSetLayoutBinding{
-                1,
-                vk::DescriptorType::eCombinedImageSampler,
-                1,
-                vk::ShaderStageFlagBits::eFragment}};
+    const auto descriptorSetLayoutBindings = std::array{
+        vk::DescriptorSetLayoutBinding{
+            0,
+            vk::DescriptorType::eUniformBuffer,
+            1,
+            vk::ShaderStageFlagBits::eVertex},
+        vk::DescriptorSetLayoutBinding{
+            1,
+            vk::DescriptorType::eCombinedImageSampler,
+            textureCount,
+            vk::ShaderStageFlagBits::eFragment}};
 
-        return {
-            device,
-            vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
-    } else {
-        const auto descriptorSetLayoutBindings =
-            std::array{vk::DescriptorSetLayoutBinding{
-                0,
-                vk::DescriptorType::eUniformBuffer,
-                1,
-                vk::ShaderStageFlagBits::eVertex}
-
-            };
-
-        return {
-            device,
-            vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
-    }
+    return {device, vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
 }
 
-auto Descriptor::createDescriptorPool(
-    vk::raii::Device &device,
-    uint64_t          maxFramesInFlight) -> vk::raii::DescriptorPool
+auto Descriptors::createDescriptorPool(
+    vk::raii::Device              &device,
+    vk::raii::DescriptorSetLayout &descriptorSetLayout,
+    uint32_t                       textureCount,
+    uint64_t                       maxFramesInFlight) -> vk::raii::DescriptorPool
 {
+    auto descriptorSetLayouts =
+        std::vector<vk::DescriptorSetLayout>(maxFramesInFlight, descriptorSetLayout);
+
     auto poolSizes = std::array{
         vk::DescriptorPoolSize{
             vk::DescriptorType::eUniformBuffer,
             static_cast<uint32_t>(maxFramesInFlight)},
         vk::DescriptorPoolSize{
             vk::DescriptorType::eCombinedImageSampler,
-            static_cast<uint32_t>(maxFramesInFlight)}};
+            static_cast<uint32_t>(maxFramesInFlight) * textureCount}};
 
     return {
         device,
@@ -57,13 +45,13 @@ auto Descriptor::createDescriptorPool(
             poolSizes}};
 }
 
-auto Descriptor::createDescriptorSets(
+auto Descriptors::createDescriptorSets(
     vk::raii::Device              &device,
-    vk::raii::DescriptorPool      &descriptorPool,
     vk::raii::DescriptorSetLayout &descriptorSetLayout,
+    vk::raii::DescriptorPool      &descriptorPool,
+    uint32_t                       textureCount,
     uint64_t maxFramesInFlight) -> std::vector<vk::raii::DescriptorSet>
 {
-
     auto descriptorSetLayouts =
         std::vector<vk::DescriptorSetLayout>(maxFramesInFlight, descriptorSetLayout);
 
