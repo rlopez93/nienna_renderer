@@ -334,7 +334,7 @@ auto main(
 {
     auto filePath = [&] -> std::filesystem::path {
         if (argc < 2) {
-            return "resources/Duck/glTF/Duck.gltf";
+            return "third_party/glTF-Sample-Assets/Models/Duck/glTF/Duck.gltf";
         } else {
             return std::string{argv[1]};
         }
@@ -542,12 +542,16 @@ auto main(
     }
     // }
 
-    auto descriptorSetLayouts =
-        std::vector<vk::DescriptorSetLayout>(maxFramesInFlight, descriptorSetLayout);
+    // descriptor set layout per frame
+    auto descriptorSetLayouts = std::vector(maxFramesInFlight, *descriptorSetLayout);
+
+    // push constant for texture index per frame
+    auto pushConstantRanges =
+        std::array{vk::PushConstantRange{vk::ShaderStageFlagBits::eAllGraphics, 0, 4}};
 
     auto pipelineLayout = vk::raii::PipelineLayout{
         r.ctx.device,
-        vk::PipelineLayoutCreateInfo{{}, descriptorSetLayouts}};
+        vk::PipelineLayoutCreateInfo{{}, descriptorSetLayouts, pushConstantRanges}};
 
     auto graphicsPipeline = createPipeline(
         r.ctx.device,
@@ -727,6 +731,16 @@ auto main(
             0,
             vk::IndexType::eUint16);
 
+        uint32_t textureIndex = 0;
+
+        cmdBuffer.pushConstants2(
+            vk::PushConstantsInfo{
+                *pipelineLayout,
+                vk::ShaderStageFlagBits::eAllGraphics,
+                0,
+                4,
+                &textureIndex});
+
         // render draw call
         cmdBuffer.drawIndexed(scene.meshes[meshIndex].indices.size(), 1, 0, 0, 0);
 
@@ -799,8 +813,10 @@ auto main(
 
         // fmt::print(
         //     stderr,
-        //     "imageIndex: {}, currentFrame: {}, frameRingCurrent: {}, totalFrames:
-        //     {}\n", nextImageIndex, currentFrame, nextImageIndex, totalFrames);
+        //     "imageIndex: {}, currentFrame: {}, frameRingCurrent: {},
+        //     totalFrames:
+        //     {}\n", nextImageIndex, currentFrame, nextImageIndex,
+        //     totalFrames);
         //
         ++totalFrames;
     }

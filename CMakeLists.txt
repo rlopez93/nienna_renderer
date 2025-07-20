@@ -1,6 +1,20 @@
 cmake_minimum_required(VERSION 3.15)
 project(nienna LANGUAGES C CXX)
 
+add_subdirectory(third_party/vk-bootstrap)
+add_subdirectory(third_party/fastgltf)
+
+set(SLANG_ENABLE_GFX FALSE)
+set(SLANG_ENABLE_SLANGD FALSE)
+set(SLANG_ENABLE_SLANGC TRUE)
+set(SLANG_ENABLE_SLANGI FALSE)
+set(SLANG_ENABLE_SLANGRT FALSE)
+set(SLANG_ENABLE_EXAMPLES FALSE)
+set(SLANG_ENABLE_TESTS FALSE)
+set(SLANG_ENABLE_SLANG_RHI FALSE)
+
+add_subdirectory(third_party/slang)
+
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_PREFIX_PATH $ENV{VULKAN_SDK})
 set(CMAKE_BUILD_TYPE Debug)
@@ -34,9 +48,6 @@ target_link_directories(nienna PRIVATE
     ${Vulkan_LIBRARIES}
 )
 
-add_subdirectory(third_party/vk-bootstrap)
-add_subdirectory(third_party/fastgltf)
-
 target_link_libraries(nienna PRIVATE
     SDL3::SDL3
     Vulkan::Vulkan
@@ -45,6 +56,8 @@ target_link_libraries(nienna PRIVATE
     fmt::fmt
     glm::glm
 )
+
+set(Vulkan_SLANGC_EXECUTABLE "Release/bin/slangc")
 
 if(NOT Vulkan_SLANGC_EXECUTABLE)
     get_filename_component(_Vulkan_LIB_DIR ${Vulkan_LIBRARY} DIRECTORY)
@@ -84,6 +97,7 @@ if(Vulkan_SLANGC_EXECUTABLE)
         OUTPUT ${OUTPUT_FILE}
         COMMAND ${_COMMAND}
         MAIN_DEPENDENCY ${SHADER}
+        # DEPENDS slangc
         COMMENT "Compiling Slang shader ${SHADER_NAME} with slangc"
         VERBATIM
         )
