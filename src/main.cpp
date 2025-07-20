@@ -37,27 +37,25 @@
 
 auto createPipeline(
     vk::raii::Device            &device,
-    const std::filesystem::path &vertShaderPath,
-    const std::filesystem::path &fragShaderPath,
+    const std::filesystem::path &shaderPath,
     vk::Format                   imageFormat,
     vk::Format                   depthFormat,
     vk::raii::PipelineLayout    &pipelineLayout) -> vk::raii::Pipeline
 {
-    auto       vertShaderModule = createShaderModule(device, vertShaderPath);
-    auto       fragShaderModule = createShaderModule(device, fragShaderPath);
+    auto       shaderModule = createShaderModule(device, shaderPath);
     // The stages used by this pipeline
     const auto shaderStages = std::array{
         vk::PipelineShaderStageCreateInfo{
             {},
             vk::ShaderStageFlagBits::eVertex,
-            vertShaderModule,
-            "main",
+            shaderModule,
+            "vertexMain",
             {}},
         vk::PipelineShaderStageCreateInfo{
             {},
             vk::ShaderStageFlagBits::eFragment,
-            fragShaderModule,
-            "main",
+            shaderModule,
+            "fragmentMain",
             {}},
     };
 
@@ -211,9 +209,14 @@ auto createBuffers(
             vk::BufferUsageFlagBits2::eIndexBuffer));
     }
 
+    fmt::println(
+        stderr,
+        "Uniform buffer size: {}",
+        sizeof(Transform) * scene.meshes.size());
+
     for (auto i : std::views::iota(0u, maxFramesInFlight)) {
         sceneBuffers.emplace_back(allocator.createBuffer(
-            sizeof(Transform),
+            sizeof(Transform) * scene.meshes.size(),
             vk::BufferUsageFlagBits2::eUniformBuffer
                 | vk::BufferUsageFlagBits2::eTransferDst,
             VMA_MEMORY_USAGE_AUTO,
@@ -263,72 +266,6 @@ auto createBuffers(
         textureImageBuffers,
         std::move(textureImageViews)};
 }
-
-// auto uploadBuffers(
-//     vk::raii::Device                 &device,
-//     vk::raii::CommandPool            &transientCommandPool,
-//     const std::vector<Vertex>        &vertexData,
-//     const std::vector<uint16_t>      &indexData,
-//     const std::vector<unsigned char> &textureData,
-//     const vk::Extent2D                textureExtent,
-//     vk::raii::Queue                  &queue,
-//     Allocator                        &allocator)
-//     -> std::tuple<
-//         Buffer,
-//         Buffer,
-//         Image,
-//         vk::raii::ImageView>
-// {
-//     auto commandBuffer = beginSingleTimeCommands(device, transientCommandPool);
-//
-//     // fmt::print(stderr, "\n\nvertexBuffer = createBufferAndUploadData()\n\n");
-//     auto vertexBuffer = allocator.createBufferAndUploadData(
-//         commandBuffer,
-//         vertexData,
-//         vk::BufferUsageFlagBits2::eVertexBuffer
-//             | vk::BufferUsageFlagBits2::eStorageBuffer);
-//     // fmt::print(stderr, "\n\nindexBuffer = createBufferAndUploadData()\n\n");
-//     auto indexBuffer = allocator.createBufferAndUploadData(
-//         commandBuffer,
-//         indexData,
-//         vk::BufferUsageFlagBits2::eIndexBuffer);
-//     // fmt::print(
-//     // stderr,
-//     // "texture extent: {}x{}\n",
-//     // textureExtent.width,
-//     // textureExtent.height);
-//     // fmt::print(stderr, "\n\ntextureImage = createImageAndUploadData()\n\n");
-//     auto textureImage = allocator.createImageAndUploadData(
-//         commandBuffer,
-//         textureData,
-//         vk::ImageCreateInfo{
-//             {},
-//             vk::ImageType::e2D,
-//             vk::Format::eR8G8B8A8Srgb,
-//             // vk::Format::eR8G8B8A8Unorm,
-//             {static_cast<uint32_t>(textureExtent.width),
-//              static_cast<uint32_t>(textureExtent.height),
-//              1},
-//             1,
-//             1,
-//             vk::SampleCountFlagBits::e1,
-//             vk::ImageTiling::eOptimal,
-//             vk::ImageUsageFlagBits::eSampled},
-//         vk::ImageLayout::eShaderReadOnlyOptimal);
-//     // fmt::print(stderr, "\n\nimageView = createImageView()\n\n");
-//     auto imageView = device.createImageView(
-//         vk::ImageViewCreateInfo{
-//             {},
-//             textureImage.image,
-//             vk::ImageViewType::e2D,
-//             vk::Format::eR8G8B8A8Srgb,
-//             {},
-//             vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0,
-//             1}});
-//     endSingleTimeCommands(device, transientCommandPool, commandBuffer, queue);
-//
-//     return {vertexBuffer, indexBuffer, textureImage, std::move(imageView)};
-// }
 
 auto main(
     int    argc,
@@ -477,27 +414,35 @@ auto main(
                 maxFramesInFlight);
 
     uint32_t textureCount = textureImageBuffers.size();
+    uint32_t meshCount    = scene.meshes.size();
     fmt::println(stderr, "textures.size(): {}", textureCount);
 
-    Descriptors descriptors{r.ctx.device, textureCount, maxFramesInFlight};
+    Descriptors descriptors{r.ctx.device, meshCount, textureCount, maxFramesInFlight};
 
     // for (const auto &textureImageView : textureImageViews) {
     // for (const auto &[sceneBuffer, descriptorSet] :
     // std::views::zip(sceneBuffers, descriptorSets)) {
-    for (auto i : std::views::iota(0u, maxFramesInFlight)) {
-        auto descriptorBufferInfo =
-            vk::DescriptorBufferInfo{sceneBuffers[i].buffer, 0, sizeof(Transform)};
-
+    for (auto frameIndex : std::views::iota(0u, maxFramesInFlight)) {
         auto descriptorWrites = std::vector<vk::WriteDescriptorSet>{};
+
+        auto descriptorBufferInfos = std::vector<vk::DescriptorBufferInfo>{};
+
+        vk::DeviceSize transformBufferSize = sizeof(Transform) * meshCount;
+        for (auto meshIndex : std::views::iota(0u, meshCount)) {
+            descriptorBufferInfos.emplace_back(
+                sceneBuffers[frameIndex].buffer,
+                sizeof(Transform) * meshIndex,
+                sizeof(Transform));
+        }
+
         descriptorWrites.emplace_back(
             vk::WriteDescriptorSet{
-                descriptors.descriptorSets[i],
+                descriptors.descriptorSets[frameIndex],
                 0,
                 0,
-                1,
                 vk::DescriptorType::eUniformBuffer,
                 {},
-                &descriptorBufferInfo});
+                descriptorBufferInfos});
 
         auto descriptorImageInfos = std::vector<vk::DescriptorImageInfo>{};
         for (auto k : std::views::iota(0u, textureCount)) {
@@ -508,7 +453,7 @@ auto main(
         }
 
         descriptorWrites.emplace_back(
-            descriptors.descriptorSets[i],
+            descriptors.descriptorSets[frameIndex],
             1,
             0,
             vk::DescriptorType::eCombinedImageSampler,
@@ -523,9 +468,10 @@ auto main(
     assert(descriptors.descriptorSets.size() == descriptorSetLayouts.size());
     fmt::println(stderr, "pass");
 
-    // push constant range for texture index
-    auto pushConstantRanges =
-        std::array{vk::PushConstantRange{vk::ShaderStageFlagBits::eAllGraphics, 0, 4}};
+    // push constant range for transform index and texture index
+    auto pushConstantRanges = std::array{
+        vk::PushConstantRange{vk::ShaderStageFlagBits::eVertex, 0, 4},
+        vk::PushConstantRange{vk::ShaderStageFlagBits::eFragment, 0, 4}};
 
     auto pipelineLayout = vk::raii::PipelineLayout{
         r.ctx.device,
@@ -533,8 +479,7 @@ auto main(
 
     auto graphicsPipeline = createPipeline(
         r.ctx.device,
-        "shaders/mesh-refactor.slang.vert.spv",
-        "shaders/mesh-refactor.slang.frag.spv",
+        shaderPath,
         r.ctx.imageFormat,
         r.ctx.depthFormat,
         pipelineLayout);
@@ -589,6 +534,14 @@ auto main(
 
         // check swapchain rebuild
         if (swapchainNeedRebuild) {
+            r.recreateSwapchain(
+                r.ctx.graphicsQueue,
+                currentFrame,
+                swapchainImages,
+                swapchainImageViews,
+                imageAvailable,
+                renderFinished);
+            swapchainNeedRebuild = false;
         }
 
         // get current frame data
@@ -611,7 +564,8 @@ auto main(
             std::numeric_limits<uint64_t>::max(),
             imageAvailable[currentFrame]);
 
-        if (result == vk::Result::eErrorOutOfDateKHR) {
+        if (result == vk::Result::eErrorOutOfDateKHR
+            || result == vk::Result::eSuboptimalKHR) {
             swapchainNeedRebuild = true;
         } else if (!(result == vk::Result::eSuccess
                      || result == vk::Result::eSuboptimalKHR)) {
@@ -619,24 +573,23 @@ auto main(
         }
 
         if (swapchainNeedRebuild) {
-            // continue;
+            continue;
         }
 
         // update uniform buffers
 
-        for (const auto &mesh : scene.meshes) {
+        for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
             auto transform = Transform{
                 .modelMatrix          = mesh.modelMatrix,
                 .viewProjectionMatrix = scene.viewProjectionMatrix};
             // transform.viewProjectionMatrix[1][1] *= -1;
 
-            vmaCopyMemoryToAllocation(
+            VK_CHECK(vmaCopyMemoryToAllocation(
                 allocator.allocator,
                 &transform,
                 sceneBuffers[currentFrame].allocation,
-                0,
-                sizeof(Transform));
-            break;
+                sizeof(Transform) * meshIndex,
+                sizeof(Transform)));
         }
 
         // color attachment image to render to: vk::RenderingAttachmentInfo
@@ -692,17 +645,17 @@ auto main(
 
         cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
-        fmt::println(stderr, "bindDescriptorSets2(), frame {}", currentFrame);
+        // fmt::println(stderr, "bindDescriptorSets2(), frame {}", currentFrame);
         // bind texture resources passed to shader
         cmdBuffer.bindDescriptorSets2(
             vk::BindDescriptorSetsInfo{
-                vk::ShaderStageFlagBits::eAllGraphics,
+                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
                 pipelineLayout,
                 0,
                 *descriptors.descriptorSets[currentFrame]});
 
         for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
-            fmt::println(stderr, "scene.meshes[{}]", meshIndex);
+            // fmt::println(stderr, "scene.meshes[{}]", meshIndex);
             // bind vertex data
             cmdBuffer.bindVertexBuffers(0, primitiveBuffers[meshIndex].buffer, {0});
 
@@ -712,19 +665,29 @@ auto main(
                 0,
                 vk::IndexType::eUint16);
 
+            cmdBuffer.pushConstants2(
+                vk::PushConstantsInfo{
+                    *pipelineLayout,
+                    vk::ShaderStageFlagBits::eVertex
+                        | vk::ShaderStageFlagBits::eFragment,
+                    0,
+                    4,
+                    &meshIndex});
+
             if (mesh.textureIndex.has_value()) {
 
                 cmdBuffer.pushConstants2(
                     vk::PushConstantsInfo{
                         *pipelineLayout,
-                        vk::ShaderStageFlagBits::eAllGraphics,
+                        vk::ShaderStageFlagBits::eVertex
+                            | vk::ShaderStageFlagBits::eFragment,
                         0,
                         4,
                         &mesh.textureIndex.value()});
             }
 
             else {
-                fmt::println(stderr, "scene.meshes[{}] no has texture", meshIndex);
+                // fmt::println(stderr, "scene.meshes[{}] no has texture", meshIndex);
                 // ???
             }
 
@@ -782,7 +745,8 @@ auto main(
                 *r.ctx.swapchain,
                 nextImageIndex});
 
-        if (presentResult == vk::Result::eErrorOutOfDateKHR) {
+        if (presentResult == vk::Result::eErrorOutOfDateKHR
+            || result == vk::Result::eSuboptimalKHR) {
             swapchainNeedRebuild = true;
         }
 

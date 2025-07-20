@@ -27,17 +27,17 @@ struct FragmentOutput
 	float4 color : SV_TARGET;
 }
 
-ConstantBuffer<Transform> transform;
+ConstantBuffer<Transform> transform[];
 
 [shader("vertex")]
-FragmentPrimitive vertexMain(Primitive input)
+FragmentPrimitive vertexMain(Primitive input, uniform uint32_t transformIndex)
 {
 	FragmentPrimitive output;
 	output.position =
         mul(
-            transform.viewProjectionMatrix,
+            transform[transformIndex].viewProjectionMatrix,
             mul(
-                transform.modelMatrix,
+                transform[transformIndex].modelMatrix,
                 float4(input.position, 1.0)
             )
         );

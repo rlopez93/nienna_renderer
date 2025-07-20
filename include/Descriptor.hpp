@@ -4,22 +4,24 @@
 struct Descriptors {
     Descriptors(
         vk::raii::Device &device,
+        uint32_t          meshCount,
         uint32_t          textureCount,
         uint64_t          maxFramesInFlight)
         : descriptorSetLayout{createDescriptorSetLayout(
               device,
+              meshCount,
               textureCount,
               maxFramesInFlight)},
           descriptorPool{createDescriptorPool(
               device,
               descriptorSetLayout,
+              meshCount,
               textureCount,
               maxFramesInFlight)},
           descriptorSets{createDescriptorSets(
               device,
               descriptorSetLayout,
               descriptorPool,
-              textureCount,
               maxFramesInFlight)}
     {
     }
@@ -31,12 +33,14 @@ struct Descriptors {
   private:
     static auto createDescriptorSetLayout(
         vk::raii::Device &device,
+        uint32_t          meshCount,
         uint32_t          textureCount,
         uint64_t          maxFramesInFlight) -> vk::raii::DescriptorSetLayout;
 
     static auto createDescriptorPool(
         vk::raii::Device              &device,
         vk::raii::DescriptorSetLayout &descriptorSetLayout,
+        uint32_t                       meshCount,
         uint32_t                       textureCount,
         uint64_t                       maxFramesInFlight) -> vk::raii::DescriptorPool;
 
@@ -44,6 +48,5 @@ struct Descriptors {
         vk::raii::Device              &device,
         vk::raii::DescriptorSetLayout &descriptorSetLayout,
         vk::raii::DescriptorPool      &descriptorPool,
-        uint32_t                       textureCount,
         uint64_t maxFramesInFlight) -> std::vector<vk::raii::DescriptorSet>;
 };

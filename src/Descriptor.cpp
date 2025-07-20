@@ -2,6 +2,7 @@
 
 auto Descriptors::createDescriptorSetLayout(
     vk::raii::Device &device,
+    uint32_t          meshCount,
     uint32_t          textureCount,
     uint64_t          maxFramesInFlight) -> vk::raii::DescriptorSetLayout
 {
@@ -9,7 +10,7 @@ auto Descriptors::createDescriptorSetLayout(
         vk::DescriptorSetLayoutBinding{
             0,
             vk::DescriptorType::eUniformBuffer,
-            1,
+            meshCount,
             vk::ShaderStageFlagBits::eVertex},
         vk::DescriptorSetLayoutBinding{
             1,
@@ -23,6 +24,7 @@ auto Descriptors::createDescriptorSetLayout(
 auto Descriptors::createDescriptorPool(
     vk::raii::Device              &device,
     vk::raii::DescriptorSetLayout &descriptorSetLayout,
+    uint32_t                       meshCount,
     uint32_t                       textureCount,
     uint64_t                       maxFramesInFlight) -> vk::raii::DescriptorPool
 {
@@ -32,7 +34,7 @@ auto Descriptors::createDescriptorPool(
     auto poolSizes = std::array{
         vk::DescriptorPoolSize{
             vk::DescriptorType::eUniformBuffer,
-            static_cast<uint32_t>(maxFramesInFlight)},
+            static_cast<uint32_t>(maxFramesInFlight) * meshCount},
         vk::DescriptorPoolSize{
             vk::DescriptorType::eCombinedImageSampler,
             static_cast<uint32_t>(maxFramesInFlight) * textureCount}};
@@ -41,7 +43,7 @@ auto Descriptors::createDescriptorPool(
         device,
         vk::DescriptorPoolCreateInfo{
             vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-            static_cast<uint32_t>(maxFramesInFlight) * textureCount,
+            static_cast<uint32_t>(maxFramesInFlight) * (textureCount + meshCount),
             poolSizes}};
 }
 
@@ -49,7 +51,6 @@ auto Descriptors::createDescriptorSets(
     vk::raii::Device              &device,
     vk::raii::DescriptorSetLayout &descriptorSetLayout,
     vk::raii::DescriptorPool      &descriptorPool,
-    uint32_t                       textureCount,
     uint64_t maxFramesInFlight) -> std::vector<vk::raii::DescriptorSet>
 {
     auto descriptorSetLayouts =

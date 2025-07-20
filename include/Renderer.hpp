@@ -4,7 +4,10 @@
 
 #include <memory>
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#include <utility>
 #include <vulkan/vulkan_raii.hpp>
+
+#include <VkBootstrap.h>
 
 struct Renderer;
 
@@ -18,6 +21,14 @@ struct RenderContext {
     using WindowPtr = std::unique_ptr<SDL_Window, decltype(SDL_WindowDeleter)>;
 
     RenderContext(
+        vkb::InstanceBuilder             instanceBuilder,
+        vkb::Instance                    vkbInstance,
+        vkb::PhysicalDeviceSelector      physicalDeviceSelector,
+        vkb::PhysicalDevice              vkbPhysicalDevice,
+        vkb::DeviceBuilder               deviceBuilder,
+        vkb::Device                      vkbDevice,
+        vkb::SwapchainBuilder            swapchainBuilder,
+        vkb::Swapchain                   vkbSwapchain,
         vk::raii::Context                context,
         vk::raii::Instance               instance,
         vk::raii::DebugUtilsMessengerEXT debugUtils,
@@ -33,7 +44,16 @@ struct RenderContext {
         vk::Format                       imageFormat,
         vk::Format                       depthFormat,
         vk::Extent2D                     windowExtent)
-        : context{std::move(context)},
+        : instanceBuilder{std::move(instanceBuilder)},
+          vkbInstance{vkbInstance},
+          vkbPhysicalDevice{std::move(vkbPhysicalDevice)},
+          physicalDeviceSelector{std::move(physicalDeviceSelector)},
+          deviceBuilder{std::move(deviceBuilder)},
+          vkbDevice{std::move(vkbDevice)},
+          swapchainBuilder{std::move(swapchainBuilder)},
+          vkbSwapchain{vkbSwapchain},
+
+          context{std::move(context)},
           instance{std::move(instance)},
           debugUtils{std::move(debugUtils)},
           window{std::move(window)},
@@ -59,7 +79,17 @@ struct RenderContext {
   private:
     static auto init() -> RenderContext;
 
+    vkb::InstanceBuilder        instanceBuilder;
+    vkb::Instance               vkbInstance;
+    vkb::PhysicalDeviceSelector physicalDeviceSelector;
+    vkb::PhysicalDevice         vkbPhysicalDevice;
+    vkb::DeviceBuilder          deviceBuilder;
+    vkb::Device                 vkbDevice;
+    vkb::SwapchainBuilder       swapchainBuilder;
+    vkb::Swapchain              vkbSwapchain;
+
   public:
+    auto                             createSwapchain();
     vk::raii::Context                context;
     vk::raii::Instance               instance;
     vk::raii::DebugUtilsMessengerEXT debugUtils;
@@ -84,6 +114,15 @@ struct Renderer {
     {
     }
     RenderContext ctx;
+
+    auto createSwapchain();
+    auto recreateSwapchain(
+        vk::raii::Queue                  &queue,
+        uint32_t                         &currentFrame,
+        std::vector<vk::Image>           &swapchainImages,
+        std::vector<vk::raii::ImageView> &swapchainImageViews,
+        std::vector<vk::raii::Semaphore> &imageAvailableSemaphores,
+        std::vector<vk::raii::Semaphore> &renderFinishedSemaphores) -> void;
 };
 
 auto findDepthFormat(vk::raii::PhysicalDevice &physicalDevice) -> vk::Format;
