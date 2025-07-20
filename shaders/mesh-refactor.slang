@@ -27,17 +27,26 @@ struct FragmentOutput
 	float4 color : SV_TARGET;
 }
 
+struct Index
+{
+        uint32_t transformIndex;
+        int32_t textureIndex;
+}
+
 ConstantBuffer<Transform> transform[];
+Sampler2D texture[];
+[[vk::push_constant]] ConstantBuffer<Index> index;
+
 
 [shader("vertex")]
-FragmentPrimitive vertexMain(Primitive input, uniform uint32_t transformIndex)
+FragmentPrimitive vertexMain(Primitive input)
 {
 	FragmentPrimitive output;
 	output.position =
         mul(
-            transform[transformIndex].viewProjectionMatrix,
+            transform[index.transformIndex].viewProjectionMatrix,
             mul(
-                transform[transformIndex].modelMatrix,
+                transform[index.transformIndex].modelMatrix,
                 float4(input.position, 1.0)
             )
         );
@@ -48,17 +57,16 @@ FragmentPrimitive vertexMain(Primitive input, uniform uint32_t transformIndex)
 }
 
 
-Sampler2D texture[];
 
 [shader("fragment")]
-FragmentOutput fragmentMain(FragmentPrimitive input, uniform uint32_t textureIndex) : SV_TARGET
+FragmentOutput fragmentMain(FragmentPrimitive input) : SV_TARGET
 {
 	FragmentOutput output;
-	// output.color = texture.Sample(input.uv[0]);
-	// output.color = texture.Sample(input.uv);
-	 // output.color = mul(texture.Sample(input.uv), float4(0.0, 0.0, 0.0, 0.0) );
-    // output.color = input.color;
-    output.color = texture[textureIndex].Sample(input.uv) * input.color;
+    if (index.textureIndex < 0) {
+        output.color = input.color;
+    } else {
+        output.color = texture[index.textureIndex].Sample(input.uv) * input.color;
+    }
 
 	return output;
 }

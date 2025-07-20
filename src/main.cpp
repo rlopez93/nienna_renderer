@@ -428,21 +428,23 @@ auto main(
         auto descriptorBufferInfos = std::vector<vk::DescriptorBufferInfo>{};
 
         vk::DeviceSize transformBufferSize = sizeof(Transform) * meshCount;
-        for (auto meshIndex : std::views::iota(0u, meshCount)) {
+        for (auto meshIndex : std::views::iota(0, static_cast<int32_t>(meshCount))) {
             descriptorBufferInfos.emplace_back(
                 sceneBuffers[frameIndex].buffer,
                 sizeof(Transform) * meshIndex,
                 sizeof(Transform));
         }
 
-        descriptorWrites.emplace_back(
-            vk::WriteDescriptorSet{
-                descriptors.descriptorSets[frameIndex],
-                0,
-                0,
-                vk::DescriptorType::eUniformBuffer,
-                {},
-                descriptorBufferInfos});
+        if (!descriptorBufferInfos.empty()) {
+            descriptorWrites.emplace_back(
+                vk::WriteDescriptorSet{
+                    descriptors.descriptorSets[frameIndex],
+                    0,
+                    0,
+                    vk::DescriptorType::eUniformBuffer,
+                    {},
+                    descriptorBufferInfos});
+        }
 
         auto descriptorImageInfos = std::vector<vk::DescriptorImageInfo>{};
         for (auto k : std::views::iota(0u, textureCount)) {
@@ -452,12 +454,15 @@ auto main(
                 vk::ImageLayout::eShaderReadOnlyOptimal);
         }
 
-        descriptorWrites.emplace_back(
-            descriptors.descriptorSets[frameIndex],
-            1,
-            0,
-            vk::DescriptorType::eCombinedImageSampler,
-            descriptorImageInfos);
+        if (!descriptorImageInfos.empty()) {
+            descriptorWrites.emplace_back(
+                descriptors.descriptorSets[frameIndex],
+                1,
+                0,
+                vk::DescriptorType::eCombinedImageSampler,
+                descriptorImageInfos);
+        }
+
         r.ctx.device.updateDescriptorSets(descriptorWrites, {});
     }
 
@@ -469,9 +474,10 @@ auto main(
     fmt::println(stderr, "pass");
 
     // push constant range for transform index and texture index
-    auto pushConstantRanges = std::array{
-        vk::PushConstantRange{vk::ShaderStageFlagBits::eVertex, 0, 4},
-        vk::PushConstantRange{vk::ShaderStageFlagBits::eFragment, 0, 4}};
+    auto pushConstantRanges = std::array{vk::PushConstantRange{
+        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+        0,
+        8}};
 
     auto pipelineLayout = vk::raii::PipelineLayout{
         r.ctx.device,
@@ -665,31 +671,23 @@ auto main(
                 0,
                 vk::IndexType::eUint16);
 
+            struct Index {
+                uint32_t transformIndex;
+                int32_t  textureIndex;
+            } index{
+                .transformIndex = static_cast<uint32_t>(meshIndex),
+                .textureIndex   = static_cast<int32_t>(mesh.textureIndex.value_or(-1))};
+
             cmdBuffer.pushConstants2(
                 vk::PushConstantsInfo{
                     *pipelineLayout,
                     vk::ShaderStageFlagBits::eVertex
                         | vk::ShaderStageFlagBits::eFragment,
                     0,
-                    4,
-                    &meshIndex});
+                    sizeof(Index),
+                    &index
 
-            if (mesh.textureIndex.has_value()) {
-
-                cmdBuffer.pushConstants2(
-                    vk::PushConstantsInfo{
-                        *pipelineLayout,
-                        vk::ShaderStageFlagBits::eVertex
-                            | vk::ShaderStageFlagBits::eFragment,
-                        0,
-                        4,
-                        &mesh.textureIndex.value()});
-            }
-
-            else {
-                // fmt::println(stderr, "scene.meshes[{}] no has texture", meshIndex);
-                // ???
-            }
+                });
 
             // render draw call
             cmdBuffer.drawIndexed(scene.meshes[meshIndex].indices.size(), 1, 0, 0, 0);

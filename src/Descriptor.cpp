@@ -6,17 +6,23 @@ auto Descriptors::createDescriptorSetLayout(
     uint32_t          textureCount,
     uint64_t          maxFramesInFlight) -> vk::raii::DescriptorSetLayout
 {
-    const auto descriptorSetLayoutBindings = std::array{
-        vk::DescriptorSetLayoutBinding{
+    auto descriptorSetLayoutBindings = std::vector<vk::DescriptorSetLayoutBinding>{};
+
+    if (meshCount > 0) {
+        descriptorSetLayoutBindings.emplace_back(
             0,
             vk::DescriptorType::eUniformBuffer,
             meshCount,
-            vk::ShaderStageFlagBits::eVertex},
-        vk::DescriptorSetLayoutBinding{
+            vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment);
+    }
+
+    if (textureCount > 0) {
+        descriptorSetLayoutBindings.emplace_back(
             1,
             vk::DescriptorType::eCombinedImageSampler,
             textureCount,
-            vk::ShaderStageFlagBits::eFragment}};
+            vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment);
+    };
 
     return {device, vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
 }
@@ -31,13 +37,19 @@ auto Descriptors::createDescriptorPool(
     auto descriptorSetLayouts =
         std::vector<vk::DescriptorSetLayout>(maxFramesInFlight, descriptorSetLayout);
 
-    auto poolSizes = std::array{
-        vk::DescriptorPoolSize{
+    auto poolSizes = std::vector<vk::DescriptorPoolSize>{};
+
+    if (meshCount > 0) {
+        poolSizes.emplace_back(
             vk::DescriptorType::eUniformBuffer,
-            static_cast<uint32_t>(maxFramesInFlight) * meshCount},
-        vk::DescriptorPoolSize{
+            static_cast<uint32_t>(maxFramesInFlight) * meshCount);
+    }
+
+    if (textureCount > 0) {
+        poolSizes.emplace_back(
             vk::DescriptorType::eCombinedImageSampler,
-            static_cast<uint32_t>(maxFramesInFlight) * textureCount}};
+            static_cast<uint32_t>(maxFramesInFlight) * textureCount);
+    }
 
     return {
         device,
