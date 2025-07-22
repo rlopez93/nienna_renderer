@@ -344,7 +344,7 @@ auto getSceneData(
         0,
         fastgltf::math::fmat4x4{},
         [&](fastgltf::Node &node, fastgltf::math::fmat4x4 matrix) {
-            fmt::println(stderr, "Node: {}", node.name);
+            fmt::println(stderr, "Node: {}\n", node.name);
             if (node.cameraIndex.has_value()) {
                 scene.viewProjectionMatrix =
                     getCamera(asset.cameras[node.cameraIndex.value()], matrix);
@@ -355,7 +355,7 @@ auto getSceneData(
                 auto &mesh       = scene.meshes.emplace_back();
                 mesh.modelMatrix = toGLM(matrix);
 
-                fmt::println(stderr, "Mesh: {}", assetMesh.name);
+                fmt::println(stderr, "Mesh: {}\n", assetMesh.name);
                 for (auto &primitive : assetMesh.primitives) {
                     fmt::println(stderr, "Primitive");
 

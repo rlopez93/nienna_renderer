@@ -607,7 +607,7 @@ auto main(
             {},
             vk::AttachmentLoadOp::eClear,
             vk::AttachmentStoreOp::eStore,
-            vk::ClearColorValue{std::array{0.0f, 0.0f, 1.0f, 1.0f}}};
+            vk::ClearColorValue{std::array{0.0f, 0.0f, 0.0f, 1.0f}}};
 
         // depth attachment buffer: vk::RenderingAttachmentInfo
         auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
