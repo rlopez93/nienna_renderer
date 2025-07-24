@@ -39,7 +39,7 @@ target_sources(nienna PRIVATE
     include/Descriptor.hpp src/Descriptor.cpp
 )
 
-target_include_directories(nienna PUBLIC
+target_include_directories(nienna PRIVATE
     include
     ${Vulkan_INCLUDE_DIRS}
 )
@@ -114,7 +114,6 @@ target_sources(nienna PRIVATE ${SHADER_H_FILES})
 
 # Add the shader headers directly to the executable target
 target_sources(nienna PRIVATE ${SHADER_HEADERS})
-
 
 # Include the shader and _autogen directory
 target_include_directories(nienna PRIVATE "${CMAKE_BINARY_DIR}")
