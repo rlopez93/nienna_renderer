@@ -585,13 +585,7 @@ auto main(
 
         // check swapchain rebuild
         if (swapchainNeedRebuild) {
-            r.recreateSwapchain(
-                r.ctx.graphicsQueue,
-                currentFrame,
-                swapchainImages,
-                swapchainImageViews,
-                imageAvailableSemaphores,
-                renderFinishedSemaphores);
+            r.recreateSwapchain(r.ctx.graphicsQueue, currentFrame);
             swapchainNeedRebuild = false;
         }
 

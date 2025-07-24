@@ -275,7 +275,7 @@ auto findDepthFormat(vk::raii::PhysicalDevice &physicalDevice) -> vk::Format
     return vk::Format::eUndefined;
 }
 
-auto Renderer::createSwapchain()
+auto Renderer::createSwapchain() -> void
 {
     auto swapchainResult =
         ctx.swapchainBuilder
@@ -317,12 +317,8 @@ auto Renderer::createSwapchain()
 }
 
 auto Renderer::recreateSwapchain(
-    vk::raii::Queue                  &queue,
-    uint32_t                         &currentFrame,
-    std::vector<vk::Image>           &swapchainImages,
-    std::vector<vk::raii::ImageView> &swapchainImageViews,
-    std::vector<vk::raii::Semaphore> &imageAvailableSemaphores,
-    std::vector<vk::raii::Semaphore> &renderFinishedSemaphores) -> void
+    vk::raii::Queue &queue,
+    uint32_t        &currentFrame) -> void
 {
     queue.waitIdle();
 
@@ -332,12 +328,12 @@ auto Renderer::recreateSwapchain(
     createSwapchain();
 
     // get swapchain images
-    swapchainImages = ctx.swapchain.getImages();
-    swapchainImageViews.clear();
-    auto maxFramesInFlight = swapchainImages.size();
+    ctx.swapchainImages = ctx.swapchain.getImages();
+    ctx.swapchainImageViews.clear();
+    auto maxFramesInFlight = ctx.swapchainImages.size();
 
-    for (auto image : swapchainImages) {
-        swapchainImageViews.emplace_back(
+    for (auto image : ctx.swapchainImages) {
+        ctx.swapchainImageViews.emplace_back(
             ctx.device,
             vk::ImageViewCreateInfo{
                 {},
@@ -348,11 +344,15 @@ auto Renderer::recreateSwapchain(
                 {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
     }
 
-    imageAvailableSemaphores.clear();
-    renderFinishedSemaphores.clear();
+    ctx.imageAvailableSemaphores.clear();
+    ctx.renderFinishedSemaphores.clear();
 
     for (auto i : std::views::iota(0u, maxFramesInFlight)) {
-        imageAvailableSemaphores.emplace_back(ctx.device, vk::SemaphoreCreateInfo{});
-        renderFinishedSemaphores.emplace_back(ctx.device, vk::SemaphoreCreateInfo{});
+        ctx.imageAvailableSemaphores.emplace_back(
+            ctx.device,
+            vk::SemaphoreCreateInfo{});
+        ctx.renderFinishedSemaphores.emplace_back(
+            ctx.device,
+            vk::SemaphoreCreateInfo{});
     }
 }
