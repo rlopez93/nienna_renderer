@@ -88,7 +88,10 @@ template <class... Ts> struct overloads : Ts... {
 
 auto getCamera(
     const fastgltf::Camera        &camera,
-    const fastgltf::math::fmat4x4 &matrix) -> glm::mat4
+    const fastgltf::math::fmat4x4 &matrix)
+    -> std::tuple<
+        glm::mat4,
+        glm::mat4>
 {
 
     fastgltf::math::fvec3 _scale;
@@ -139,7 +142,7 @@ auto getCamera(
 
     projectionMatrix[1][1] *= -1;
 
-    return projectionMatrix * viewMatrix;
+    return {viewMatrix, projectionMatrix};
 }
 
 auto getMaterial(
@@ -346,7 +349,7 @@ auto getSceneData(
         [&](fastgltf::Node &node, fastgltf::math::fmat4x4 matrix) {
             fmt::println(stderr, "Node: {}\n", node.name);
             if (node.cameraIndex.has_value()) {
-                scene.viewProjectionMatrix =
+                std::tie(scene.viewMatrix, scene.projectionMatrix) =
                     getCamera(asset.cameras[node.cameraIndex.value()], matrix);
             }
 
