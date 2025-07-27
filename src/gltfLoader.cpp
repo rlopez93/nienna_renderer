@@ -18,6 +18,8 @@
 #include <ranges>
 #include <vector>
 
+#include "Camera.hpp"
+
 auto getGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset
 {
     constexpr auto supportedExtensions = fastgltf::Extensions::KHR_mesh_quantization
@@ -86,6 +88,31 @@ template <class... Ts> struct overloads : Ts... {
     using Ts::operator()...;
 };
 
+auto getCamera2(
+    const fastgltf::Camera        &camera,
+    const fastgltf::math::fmat4x4 &matrix) -> PerspectiveCamera
+{
+    fastgltf::math::fvec3 _scale;
+    fastgltf::math::fquat _rotation;
+    fastgltf::math::fvec3 _translation;
+
+    fastgltf::math::decomposeTransformMatrix(matrix, _scale, _rotation, _translation);
+
+    glm::quat rotation    = toGLM(_rotation);
+    glm::vec3 translation = toGLM(_translation);
+
+    const auto &perspectiveCamera =
+        std::get<fastgltf::Camera::Perspective>(camera.camera);
+
+    return {
+        .translation = toGLM(_translation),
+        .rotation    = toGLM(_rotation),
+        .yfov        = perspectiveCamera.yfov,
+        .aspectRatio = perspectiveCamera.aspectRatio.value_or(1.5f),
+        .znear       = perspectiveCamera.znear,
+        .zfar        = perspectiveCamera.zfar};
+}
+
 auto getCamera(
     const fastgltf::Camera        &camera,
     const fastgltf::math::fmat4x4 &matrix)
@@ -109,24 +136,21 @@ auto getCamera(
 
     glm::mat4 projectionMatrix = camera.camera.visit(
         overloads{
-            [](const fastgltf::Camera::Perspective &cameraProjection) {
-                glm::mat4 projectionMatrix;
+            [](const fastgltf::Camera::Perspective &cameraProjection) -> glm::mat4 {
                 if (cameraProjection.zfar.has_value()) {
                     fmt::println(stderr, "finite perspective projection\n");
-                    projectionMatrix = glm::perspectiveRH_ZO(
+                    return glm::perspectiveRH_ZO(
                         cameraProjection.yfov,
                         cameraProjection.aspectRatio.value_or(1.5f),
                         cameraProjection.znear,
                         cameraProjection.zfar.value());
                 } else {
                     fmt::println(stderr, "infinite perspective projection\n");
-                    projectionMatrix = glm::infinitePerspectiveRH_ZO(
+                    return glm::infinitePerspectiveRH_ZO(
                         cameraProjection.yfov,
                         cameraProjection.aspectRatio.value_or(1.5f),
                         cameraProjection.znear);
                 }
-
-                return projectionMatrix;
             },
             [](const fastgltf::Camera::Orthographic &cameraOrthographic) {
                 fmt::println(stderr, "orthograhic camera\n");
@@ -229,7 +253,6 @@ void getAttributes(
     fastgltf::Asset     &asset,
     fastgltf::Primitive &primitive,
     Mesh                &mesh)
-
 {
     {
         auto &positionAccessor =
