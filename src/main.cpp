@@ -508,7 +508,6 @@ auto main(
     bool           running      = true;
     constexpr auto period       = 1.0s;
 
-    auto      cameraPosition = glm::vec3{0.0, 0.0, 3.0f};
     SDL_Event e;
     while (running) {
         currentTime    = std::chrono::high_resolution_clock::now();
@@ -534,51 +533,15 @@ auto main(
                 frameRingCurrent);
         }
 
-        auto cameraVelocity = glm::vec3(0.0f, 0.0f, 0.0f);
-
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) {
                 running = false;
             }
-
-            const auto speed = 1.0f;
-
-            if (e.type == SDL_EVENT_KEY_DOWN) {
-
-                if (e.key.scancode == SDL_SCANCODE_W) {
-                    cameraVelocity.z -= speed;
-                }
-
-                if (e.key.scancode == SDL_SCANCODE_A) {
-                    cameraVelocity.x -= speed;
-                }
-
-                if (e.key.scancode == SDL_SCANCODE_S) {
-                    cameraVelocity.z += speed;
-                }
-
-                if (e.key.scancode == SDL_SCANCODE_D) {
-                    cameraVelocity.x += speed;
-                }
-
-                if (e.key.scancode == SDL_SCANCODE_Q) {
-                    cameraVelocity.y += speed;
-                }
-
-                if (e.key.scancode == SDL_SCANCODE_E) {
-                    cameraVelocity.y -= speed;
-                }
-            }
+            scene.processInput(e);
+            scene.getCamera().processInput(
+                e,
+                std::chrono::duration<float, std::milli>(deltaTime));
         }
-
-        cameraPosition += cameraVelocity
-                        * std::chrono::duration<float, std::milli>(deltaTime).count();
-
-        // scene.viewMatrix = glm::lookAt(
-        //     cameraPosition,
-        //
-        //     glm::vec3{0.0f, 0.0f, -1.0f},
-        //     glm::vec3{0.0f, 1.0f, 0.0f});
 
         // begin frame
         // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
@@ -632,8 +595,8 @@ auto main(
         for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
             auto transform = Transform{
                 .modelMatrix          = mesh.modelMatrix,
-                .viewProjectionMatrix = scene.cameras.front().getProjectionMatrix()
-                                      * scene.cameras.front().getViewMatrix()};
+                .viewProjectionMatrix = scene.getCamera().getProjectionMatrix()
+                                      * scene.getCamera().getViewMatrix()};
             // transform.viewProjectionMatrix[1][1] *= -1;
 
             VK_CHECK(vmaCopyMemoryToAllocation(

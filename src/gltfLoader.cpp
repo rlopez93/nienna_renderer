@@ -105,8 +105,8 @@ auto getCamera(
         std::get<fastgltf::Camera::Perspective>(camera.camera);
 
     return {
-        .translation = toGLM(_translation),
-        .rotation    = toGLM(_rotation),
+        .translation = translation,
+        .rotation    = rotation,
         .yfov        = perspectiveCamera.yfov,
         .aspectRatio = perspectiveCamera.aspectRatio.value_or(1.5f),
         .znear       = perspectiveCamera.znear,

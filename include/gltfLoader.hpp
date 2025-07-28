@@ -50,12 +50,34 @@ struct Mesh {
 };
 
 struct Scene {
-    Scene() = default;
-
     std::vector<Mesh>              meshes;
     std::vector<Texture>           textures;
     std::vector<Material>          materials;
     std::vector<PerspectiveCamera> cameras;
+    uint32_t                       cameraIndex = 0u;
+
+    auto processInput(SDL_Event &e) -> void
+    {
+        if (e.type == SDL_EVENT_KEY_DOWN && !e.key.repeat) {
+            switch (e.key.scancode) {
+            case SDL_SCANCODE_N:
+                cameraIndex = (cameraIndex + 1) % cameras.size();
+            default:
+                break;
+            }
+        }
+    }
+
+    [[nodiscard]]
+    auto getCamera() const -> const PerspectiveCamera &
+    {
+        return cameras[cameraIndex];
+    }
+    [[nodiscard]]
+    auto getCamera() -> PerspectiveCamera &
+    {
+        return cameras[cameraIndex];
+    }
 };
 
 struct Transform {
