@@ -574,11 +574,11 @@ auto main(
         cameraPosition += cameraVelocity
                         * std::chrono::duration<float, std::milli>(deltaTime).count();
 
-        scene.viewMatrix = glm::lookAt(
-            cameraPosition,
-
-            glm::vec3{0.0f, 0.0f, -1.0f},
-            glm::vec3{0.0f, 1.0f, 0.0f});
+        // scene.viewMatrix = glm::lookAt(
+        //     cameraPosition,
+        //
+        //     glm::vec3{0.0f, 0.0f, -1.0f},
+        //     glm::vec3{0.0f, 1.0f, 0.0f});
 
         // begin frame
         // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
@@ -632,7 +632,8 @@ auto main(
         for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
             auto transform = Transform{
                 .modelMatrix          = mesh.modelMatrix,
-                .viewProjectionMatrix = scene.projectionMatrix * scene.viewMatrix};
+                .viewProjectionMatrix = scene.cameras.front().getProjectionMatrix()
+                                      * scene.cameras.front().getViewMatrix()};
             // transform.viewProjectionMatrix[1][1] *= -1;
 
             VK_CHECK(vmaCopyMemoryToAllocation(

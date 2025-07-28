@@ -11,6 +11,8 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include <vulkan/vulkan.hpp>
 
+#include "Camera.hpp"
+
 struct Texture {
     std::filesystem::path      name;
     std::vector<unsigned char> data;
@@ -25,6 +27,20 @@ struct Primitive {
     glm::vec4 color{1.0f, 1.0f, 1.0f, 1.0f};
 };
 
+struct Material {
+    glm::vec4               baseColorFactor{1.0f, 1.0f, 1.0f, 1.0f};
+    float                   metallicFactor  = 1.0f;
+    float                   roughnessFactor = 1.0f;
+    std::optional<uint32_t> metallicRoughnessTexture;
+    std::optional<uint32_t> normalTexture;
+    std::optional<uint32_t> occlusionTexture;
+    std::optional<uint32_t> emissiveTexture;
+    glm::vec3               emissiveFactor{0.0f, 0.0f, 0.0f};
+    // TODO: alphaMode
+    // TODO: alphaCutoff
+    // TODO: doubleSided
+};
+
 struct Mesh {
     std::vector<Primitive>  primitives;
     std::vector<uint16_t>   indices;
@@ -34,20 +50,12 @@ struct Mesh {
 };
 
 struct Scene {
-    Scene()
-    {
-        viewMatrix = glm::lookAt(
-            glm::vec3{0.0f, 0.0f, 3.0f},
-            glm::vec3{0.0f, 0.0f, -1.0f},
-            glm::vec3{0.0f, 1.0f, 0.0f});
-        projectionMatrix = glm::perspectiveRH_ZO(0.66f, 1.5f, 1.0f, 1000.0f);
-        projectionMatrix[1][1] *= -1;
-    }
+    Scene() = default;
 
-    std::vector<Mesh>    meshes;
-    std::vector<Texture> textures;
-    glm::mat4            viewMatrix;
-    glm::mat4            projectionMatrix;
+    std::vector<Mesh>              meshes;
+    std::vector<Texture>           textures;
+    std::vector<Material>          materials;
+    std::vector<PerspectiveCamera> cameras;
 };
 
 struct Transform {
@@ -58,5 +66,5 @@ struct Transform {
 auto getGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset;
 
 auto getSceneData(
-    fastgltf::Asset             &asset,
+    const fastgltf::Asset       &asset,
     const std::filesystem::path &directory) -> Scene;

@@ -37,6 +37,7 @@ target_sources(nienna PRIVATE
     include/gltfLoader.hpp src/gltfLoader.cpp
     include/Shader.hpp src/Shader.cpp
     include/Descriptor.hpp src/Descriptor.cpp
+    include/Camera.hpp src/Camera.cpp
 )
 
 target_include_directories(nienna PRIVATE

@@ -88,7 +88,7 @@ template <class... Ts> struct overloads : Ts... {
     using Ts::operator()...;
 };
 
-auto getCamera2(
+auto getCamera(
     const fastgltf::Camera        &camera,
     const fastgltf::math::fmat4x4 &matrix) -> PerspectiveCamera
 {
@@ -113,146 +113,89 @@ auto getCamera2(
         .zfar        = perspectiveCamera.zfar};
 }
 
-auto getCamera(
-    const fastgltf::Camera        &camera,
-    const fastgltf::math::fmat4x4 &matrix)
-    -> std::tuple<
-        glm::mat4,
-        glm::mat4>
+auto getTexture(
+    const fastgltf::Asset       &asset,
+    const fastgltf::TextureInfo &textureInfo,
+    Scene                       &scene,
+    const std::filesystem::path &directory)
 {
+    const auto textureIndex = scene.textures.size();
 
-    fastgltf::math::fvec3 _scale;
-    fastgltf::math::fquat _rotation;
-    fastgltf::math::fvec3 _translation;
+    auto &texture = asset.textures[textureInfo.textureIndex];
+    auto &image   = asset.images[texture.imageIndex.value()];
 
-    fastgltf::math::decomposeTransformMatrix(matrix, _scale, _rotation, _translation);
+    namespace sources  = fastgltf::sources;
+    const auto visitor = overloads{
+        [&directory, &scene](const sources::URI &imageURI) {
+            auto path = directory / imageURI.uri.fspath();
+            fmt::println(stderr, "\"{}\"", path.c_str());
+            int  x, y, n;
+            auto stbiData = stbi_load(path.c_str(), &x, &y, &n, 4);
 
-    glm::quat rotation    = toGLM(_rotation);
-    glm::vec3 translation = toGLM(_translation);
+            fmt::println(stderr, "channels in file: {}", n);
+            assert(stbiData);
 
-    glm::mat4 viewMatrix = glm::inverse(
-        glm::translate(glm::identity<glm::mat4>(), translation)
-        * glm::mat4_cast(rotation));
+            scene.textures.push_back(
+                Texture{
+                    .name   = imageURI.uri.fspath().filename(),
+                    .data   = std::vector(stbiData, stbiData + (x * y * 4)),
+                    .extent = vk::Extent2D(x, y)});
 
-    glm::mat4 projectionMatrix = camera.camera.visit(
-        overloads{
-            [](const fastgltf::Camera::Perspective &cameraProjection) -> glm::mat4 {
-                if (cameraProjection.zfar.has_value()) {
-                    fmt::println(stderr, "finite perspective projection\n");
-                    return glm::perspectiveRH_ZO(
-                        cameraProjection.yfov,
-                        cameraProjection.aspectRatio.value_or(1.5f),
-                        cameraProjection.znear,
-                        cameraProjection.zfar.value());
-                } else {
-                    fmt::println(stderr, "infinite perspective projection\n");
-                    return glm::infinitePerspectiveRH_ZO(
-                        cameraProjection.yfov,
-                        cameraProjection.aspectRatio.value_or(1.5f),
-                        cameraProjection.znear);
-                }
-            },
-            [](const fastgltf::Camera::Orthographic &cameraOrthographic) {
-                fmt::println(stderr, "orthograhic camera\n");
+            stbi_image_free(stbiData);
+        },
+        [](std::monostate) { throw std::logic_error{"std::monostate"}; },
+        [](const sources::BufferView &view) {
+            throw std::logic_error{"sources::BufferView"};
+        },
+        [](const sources::Array &data) { throw std::logic_error{"sources::Array"}; },
+        [](const sources::Vector &data) { throw std::logic_error{"sources::Vector"}; },
+        [](const sources::CustomBuffer &buf) {
+            throw std::logic_error{"sources::CustomBuffer"};
+        },
+        [](const sources::ByteView &byteView) {
+            throw std::logic_error{"sources::ByteView"};
+        },
+        [](const sources::Fallback &fallback) {
+            throw std::logic_error{"sources::Fallback"};
+        }};
 
-                return glm::orthoRH_ZO(
-                    -cameraOrthographic.xmag,
-                    cameraOrthographic.xmag,
-                    -cameraOrthographic.ymag,
-                    cameraOrthographic.ymag,
-                    cameraOrthographic.znear,
-                    cameraOrthographic.zfar);
-            }});
+    image.data.visit(visitor);
 
-    projectionMatrix[1][1] *= -1;
+    auto sampler = [&texture, &asset] -> std::optional<fastgltf::Sampler> {
+        if (texture.samplerIndex.has_value()) {
+            return asset.samplers[texture.samplerIndex.value()];
+        }
 
-    return {viewMatrix, projectionMatrix};
+        else {
+            return {};
+        }
+    };
+
+    return textureIndex;
 }
 
 auto getMaterial(
-    fastgltf::Asset             &asset,
-    fastgltf::Primitive         &primitive,
+    const fastgltf::Asset       &asset,
+    const fastgltf::Primitive   &primitive,
+    Scene                       &scene,
     Mesh                        &mesh,
-    const std::filesystem::path &directory,
-    std::vector<Texture>        &textures)
+    const std::filesystem::path &directory)
 {
-    auto &material = asset.materials[primitive.materialIndex.value()];
-    mesh.color     = toGLM(material.pbrData.baseColorFactor);
+    const auto &material = asset.materials[primitive.materialIndex.value()];
+    mesh.color           = toGLM(material.pbrData.baseColorFactor);
 
-    if (!material.pbrData.baseColorTexture.has_value()) {
-        mesh.textureIndex = {};
-    }
-
-    else {
-        mesh.textureIndex = textures.size();
-
-        auto &textureInfo = material.pbrData.baseColorTexture.value();
-        auto &texture     = asset.textures[textureInfo.textureIndex];
-        auto &image       = asset.images[texture.imageIndex.value()];
-
-        namespace sources  = fastgltf::sources;
-        const auto visitor = overloads{
-            [](std::monostate) { throw std::logic_error{"std::monostate"}; },
-            [&directory, &textures](const sources::URI &imageURI) {
-                const auto path = directory / imageURI.uri.fspath();
-                fmt::println(stderr, "\"{}\"", path.c_str());
-                int  x, y, n;
-                auto stbiData = stbi_load(path.c_str(), &x, &y, &n, 4);
-
-                fmt::println(stderr, "channels in file: {}", n);
-                assert(stbiData);
-
-                textures.push_back(
-                    Texture{
-                        .name   = imageURI.uri.fspath().filename(),
-                        .data   = std::vector(stbiData, stbiData + (x * y * 4)),
-                        .extent = vk::Extent2D(x, y)});
-
-                stbi_image_free(stbiData);
-            },
-            [](const sources::BufferView &view) {
-                throw std::logic_error{"sources::BufferView"};
-            },
-            [](const sources::Array &data) {
-                throw std::logic_error{"sources::Array"};
-            },
-            [](const sources::Vector &data) {
-                throw std::logic_error{"sources::Vector"};
-            },
-            [](const sources::CustomBuffer &buf) {
-                throw std::logic_error{"sources::CustomBuffer"};
-            },
-            [](const sources::ByteView &byteView) {
-                throw std::logic_error{"sources::byteView"};
-            },
-            [](const sources::Fallback &fallback) {
-                throw std::logic_error{"sources::Fallback"};
-            }};
-
-        image.data.visit(visitor);
-
-        auto sampler = [&texture, &asset] -> std::optional<fastgltf::Sampler> {
-            if (texture.samplerIndex.has_value()) {
-                return asset.samplers[texture.samplerIndex.value()];
-            }
-
-            else {
-                return {};
-            }
-        };
-
-        // assert(texture.samplerIndex.has_value());
-        // fastgltf::Sampler &textureSampler =
-        //     asset.samplers[texture.samplerIndex.value()];
-
-        // TODO make vk::SamplerCreateInfo from
-        // fastgltf::Sampler
+    if (material.pbrData.baseColorTexture.has_value()) {
+        mesh.textureIndex = getTexture(
+            asset,
+            material.pbrData.baseColorTexture.value(),
+            scene,
+            directory);
     }
 }
 void getAttributes(
-    fastgltf::Asset     &asset,
-    fastgltf::Primitive &primitive,
-    Mesh                &mesh)
+    const fastgltf::Asset     &asset,
+    const fastgltf::Primitive &primitive,
+    Mesh                      &mesh)
 {
     {
         auto &positionAccessor =
@@ -360,20 +303,21 @@ void getAttributes(
 }
 
 auto getSceneData(
-    fastgltf::Asset             &asset,
+    const fastgltf::Asset       &asset,
     const std::filesystem::path &directory) -> Scene
 {
-    auto scene = Scene{};
+
+    auto scene = Scene();
 
     fastgltf::iterateSceneNodes(
         asset,
         0,
         fastgltf::math::fmat4x4{},
-        [&](fastgltf::Node &node, fastgltf::math::fmat4x4 matrix) {
+        [&](const fastgltf::Node &node, const fastgltf::math::fmat4x4 &matrix) {
             fmt::println(stderr, "Node: {}\n", node.name);
             if (node.cameraIndex.has_value()) {
-                std::tie(scene.viewMatrix, scene.projectionMatrix) =
-                    getCamera(asset.cameras[node.cameraIndex.value()], matrix);
+                scene.cameras.emplace_back(
+                    getCamera(asset.cameras[node.cameraIndex.value()], matrix));
             }
 
             if (node.meshIndex.has_value()) {
@@ -387,16 +331,12 @@ auto getSceneData(
 
                     getAttributes(asset, primitive, mesh);
 
-                    if (!primitive.materialIndex.has_value()) {
-                        mesh.textureIndex = {};
-                    }
-
-                    else {
+                    if (primitive.materialIndex.has_value()) {
                         fmt::println(
                             stderr,
                             "MaterialIndex: {}",
                             primitive.materialIndex.value());
-                        getMaterial(asset, primitive, mesh, directory, scene.textures);
+                        getMaterial(asset, primitive, scene, mesh, directory);
                     }
                 }
             }
