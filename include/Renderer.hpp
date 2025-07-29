@@ -133,6 +133,8 @@ struct Swapchain {
         swapchain.clear();
 
         create(device, vkbDevice);
+
+        needRecreate = false;
     }
 
     auto acquireNextImage()
