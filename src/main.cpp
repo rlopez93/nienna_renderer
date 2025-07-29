@@ -274,6 +274,77 @@ struct PushConstantBlock {
     glm::vec4               baseColorFactor;
 };
 
+void updateDescriptorSets(
+    vk::raii::Device                       &device,
+    Descriptors                            &descriptors,
+    const std::vector<Buffer>              &sceneBuffers,
+    const uint32_t                         &meshCount,
+    const std::vector<vk::raii::ImageView> &textureImageViews,
+    vk::raii::Sampler                      &sampler)
+{
+    for (auto frameIndex : std::views::iota(0u, sceneBuffers.size())) {
+        auto descriptorWrites = std::vector<vk::WriteDescriptorSet>{};
+
+        auto descriptorBufferInfos = std::vector<vk::DescriptorBufferInfo>{};
+
+        vk::DeviceSize transformBufferSize = sizeof(Transform) * meshCount;
+        for (auto meshIndex : std::views::iota(0, static_cast<int32_t>(meshCount))) {
+            descriptorBufferInfos.emplace_back(
+                sceneBuffers[frameIndex].buffer,
+                sizeof(Transform) * meshIndex,
+                sizeof(Transform));
+        }
+
+        if (!descriptorBufferInfos.empty()) {
+            descriptorWrites.emplace_back(
+                vk::WriteDescriptorSet{
+                    descriptors.descriptorSets[frameIndex],
+                    0,
+                    0,
+                    vk::DescriptorType::eUniformBuffer,
+                    {},
+                    descriptorBufferInfos});
+        }
+
+        auto descriptorImageInfos = std::vector<vk::DescriptorImageInfo>{};
+        for (const auto &view : textureImageViews) {
+            descriptorImageInfos.emplace_back(
+                sampler,
+                *view,
+                vk::ImageLayout::eShaderReadOnlyOptimal);
+        }
+
+        if (!descriptorImageInfos.empty()) {
+            descriptorWrites.emplace_back(
+                descriptors.descriptorSets[frameIndex],
+                1,
+                0,
+                vk::DescriptorType::eCombinedImageSampler,
+                descriptorImageInfos);
+        }
+
+        device.updateDescriptorSets(descriptorWrites, {});
+    }
+}
+
+auto createPipelineLayout(
+    vk::raii::Device       &device,
+    vk::DescriptorSetLayout descriptorSetLayout,
+    uint32_t                maxFramesInFlight)
+{
+    // descriptor set layout per frame
+    auto descriptorSetLayouts = std::vector(maxFramesInFlight, descriptorSetLayout);
+
+    // push constant range for transform index and texture index
+    auto pushConstantRanges = std::array{vk::PushConstantRange{
+        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+        0,
+        sizeof(PushConstantBlock)}};
+
+    return vk::raii::PipelineLayout{
+        device,
+        vk::PipelineLayoutCreateInfo{{}, descriptorSetLayouts, pushConstantRanges}};
+}
 auto main(
     int    argc,
     char **argv) -> int
@@ -400,71 +471,24 @@ auto main(
     uint32_t meshCount    = scene.meshes.size();
     fmt::println(stderr, "textures.size(): {}", textureCount);
 
-    Descriptors descriptors{
+    auto descriptors = Descriptors{
         r.ctx.device,
         meshCount,
         textureCount,
         r.ctx.swapchain.frame.maxFramesInFlight};
 
-    for (auto frameIndex :
-         std::views::iota(0u, r.ctx.swapchain.frame.maxFramesInFlight)) {
-        auto descriptorWrites = std::vector<vk::WriteDescriptorSet>{};
-
-        auto descriptorBufferInfos = std::vector<vk::DescriptorBufferInfo>{};
-
-        vk::DeviceSize transformBufferSize = sizeof(Transform) * meshCount;
-        for (auto meshIndex : std::views::iota(0, static_cast<int32_t>(meshCount))) {
-            descriptorBufferInfos.emplace_back(
-                sceneBuffers[frameIndex].buffer,
-                sizeof(Transform) * meshIndex,
-                sizeof(Transform));
-        }
-
-        if (!descriptorBufferInfos.empty()) {
-            descriptorWrites.emplace_back(
-                vk::WriteDescriptorSet{
-                    descriptors.descriptorSets[frameIndex],
-                    0,
-                    0,
-                    vk::DescriptorType::eUniformBuffer,
-                    {},
-                    descriptorBufferInfos});
-        }
-
-        auto descriptorImageInfos = std::vector<vk::DescriptorImageInfo>{};
-        for (auto k : std::views::iota(0u, textureCount)) {
-            descriptorImageInfos.emplace_back(
-                sampler,
-                *textureImageViews[k],
-                vk::ImageLayout::eShaderReadOnlyOptimal);
-        }
-
-        if (!descriptorImageInfos.empty()) {
-            descriptorWrites.emplace_back(
-                descriptors.descriptorSets[frameIndex],
-                1,
-                0,
-                vk::DescriptorType::eCombinedImageSampler,
-                descriptorImageInfos);
-        }
-
-        r.ctx.device.updateDescriptorSets(descriptorWrites, {});
-    }
-
-    // descriptor set layout per frame
-    auto descriptorSetLayouts = std::vector(
-        r.ctx.swapchain.frame.maxFramesInFlight,
-        *descriptors.descriptorSetLayout);
-
-    // push constant range for transform index and texture index
-    auto pushConstantRanges = std::array{vk::PushConstantRange{
-        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-        0,
-        sizeof(PushConstantBlock)}};
-
-    auto pipelineLayout = vk::raii::PipelineLayout{
+    updateDescriptorSets(
         r.ctx.device,
-        vk::PipelineLayoutCreateInfo{{}, descriptorSetLayouts, pushConstantRanges}};
+        descriptors,
+        sceneBuffers,
+        meshCount,
+        textureImageViews,
+        sampler);
+
+    auto pipelineLayout = createPipelineLayout(
+        r.ctx.device,
+        descriptors.descriptorSetLayout,
+        r.ctx.swapchain.frame.maxFramesInFlight);
 
     auto graphicsPipeline = createPipeline(
         r.ctx.device,
