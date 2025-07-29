@@ -1,4 +1,5 @@
 #pragma once
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan_raii.hpp>
 
 struct Descriptors {
@@ -6,25 +7,7 @@ struct Descriptors {
         vk::raii::Device &device,
         uint32_t          meshCount,
         uint32_t          textureCount,
-        uint64_t          maxFramesInFlight)
-        : descriptorSetLayout{createDescriptorSetLayout(
-              device,
-              meshCount,
-              textureCount,
-              maxFramesInFlight)},
-          descriptorPool{createDescriptorPool(
-              device,
-              descriptorSetLayout,
-              meshCount,
-              textureCount,
-              maxFramesInFlight)},
-          descriptorSets{createDescriptorSets(
-              device,
-              descriptorSetLayout,
-              descriptorPool,
-              maxFramesInFlight)}
-    {
-    }
+        uint64_t          maxFramesInFlight);
 
     vk::raii::DescriptorSetLayout        descriptorSetLayout;
     vk::raii::DescriptorPool             descriptorPool;

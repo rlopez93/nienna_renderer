@@ -38,6 +38,7 @@ target_sources(nienna PRIVATE
     include/Shader.hpp src/Shader.cpp
     include/Descriptor.hpp src/Descriptor.cpp
     include/Camera.hpp src/Camera.cpp
+    include/App.hpp src/App.cpp
 )
 
 target_include_directories(nienna PRIVATE

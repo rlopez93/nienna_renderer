@@ -1,5 +1,28 @@
 #include "Descriptor.hpp"
 
+Descriptors::Descriptors(
+    vk::raii::Device &device,
+    uint32_t          meshCount,
+    uint32_t          textureCount,
+    uint64_t          maxFramesInFlight)
+    : descriptorSetLayout{createDescriptorSetLayout(
+          device,
+          meshCount,
+          textureCount,
+          maxFramesInFlight)},
+      descriptorPool{createDescriptorPool(
+          device,
+          descriptorSetLayout,
+          meshCount,
+          textureCount,
+          maxFramesInFlight)},
+      descriptorSets{createDescriptorSets(
+          device,
+          descriptorSetLayout,
+          descriptorPool,
+          maxFramesInFlight)}
+{
+}
 auto Descriptors::createDescriptorSetLayout(
     vk::raii::Device &device,
     uint32_t          meshCount,

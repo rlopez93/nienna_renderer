@@ -348,3 +348,24 @@ auto getSceneData(
 
     return scene;
 }
+auto Scene::processInput(SDL_Event &e) -> void
+{
+    if (e.type == SDL_EVENT_KEY_DOWN && !e.key.repeat) {
+        switch (e.key.scancode) {
+        case SDL_SCANCODE_N:
+            cameraIndex = (cameraIndex + 1) % cameras.size();
+        default:
+            break;
+        }
+    }
+}
+
+auto Scene::getCamera() const -> const PerspectiveCamera &
+{
+    return cameras[cameraIndex];
+}
+
+auto Scene::getCamera() -> PerspectiveCamera &
+{
+    return cameras[cameraIndex];
+}

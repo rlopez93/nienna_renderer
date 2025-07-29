@@ -148,3 +148,7 @@ void Allocator::freeStagingBuffers()
     }
     stagingBuffers.clear();
 }
+Allocator::~Allocator()
+{
+    vmaDestroyAllocator(allocator);
+}

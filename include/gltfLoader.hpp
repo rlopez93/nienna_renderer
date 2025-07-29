@@ -1,17 +1,29 @@
 #pragma once
 
 #include <fastgltf/core.hpp>
-#include <filesystem>
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/mat4x4.hpp>
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
-#include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_transform.hpp>
 
-#include <glm/ext/matrix_clip_space.hpp>
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
 
 #include "Camera.hpp"
+
+#include <cstdint>
+#include <filesystem>
+#include <optional>
+#include <vector>
+
+struct Transform {
+    glm::mat4 modelMatrix;
+    glm::mat4 viewProjectionMatrix;
+};
 
 struct Texture {
     std::filesystem::path      name;
@@ -56,33 +68,12 @@ struct Scene {
     std::vector<PerspectiveCamera> cameras;
     uint32_t                       cameraIndex = 0u;
 
-    auto processInput(SDL_Event &e) -> void
-    {
-        if (e.type == SDL_EVENT_KEY_DOWN && !e.key.repeat) {
-            switch (e.key.scancode) {
-            case SDL_SCANCODE_N:
-                cameraIndex = (cameraIndex + 1) % cameras.size();
-            default:
-                break;
-            }
-        }
-    }
+    auto processInput(SDL_Event &e) -> void;
 
     [[nodiscard]]
-    auto getCamera() const -> const PerspectiveCamera &
-    {
-        return cameras[cameraIndex];
-    }
+    auto getCamera() const -> const PerspectiveCamera &;
     [[nodiscard]]
-    auto getCamera() -> PerspectiveCamera &
-    {
-        return cameras[cameraIndex];
-    }
-};
-
-struct Transform {
-    glm::mat4 modelMatrix;
-    glm::mat4 viewProjectionMatrix;
+    auto getCamera() -> PerspectiveCamera &;
 };
 
 auto getGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset;
