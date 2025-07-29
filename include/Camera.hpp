@@ -11,7 +11,6 @@
 constexpr auto pi = std::numbers::pi_v<float>;
 
 struct PerspectiveCamera {
-
     [[nodiscard]]
     auto getViewMatrix() const -> glm::mat4;
 
@@ -23,24 +22,21 @@ struct PerspectiveCamera {
         const float      angle,
         const glm::vec3 &axis) -> void;
 
-    auto processInput(
-        SDL_Event &e,
-        const std::chrono::duration<
-            float,
-            std::milli> &seconds) -> void;
+    auto update(const std::chrono::duration<float> &dt) -> void;
 
-    glm::vec3            translation;
+    auto processInput(SDL_Event &e) -> void;
+
+    glm::vec3            translation{0.0f, 0.0f, 1.0f};
     glm::quat            rotation;
-    glm::vec3            axis;
-    float                yfov;
-    float                aspectRatio;
-    float                znear;
-    std::optional<float> zfar;
+    float                yfov        = 0.66f;
+    float                aspectRatio = 1.5f;
+    float                znear       = 1.0f;
+    std::optional<float> zfar        = 1000.0f;
 
-    float movementSpeed = 1.5f;      // meters
+    float movementSpeed = 1.5f;      // meters per second
     float rotationSpeed = pi / 4.0f; // seconds
 
-    enum class Movement { None, Forward, Backward } moveZ;
+    enum class Movement { None, Forward, Backward } moveX, moveY, moveZ;
     enum class Rotation { None, CW, CCW } rotateX, rotateY;
 
     auto getRotationAxis(

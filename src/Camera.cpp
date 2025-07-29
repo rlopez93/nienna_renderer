@@ -1,6 +1,7 @@
 #include "Camera.hpp"
 
 #include <chrono>
+#include <fmt/base.h>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/mat4x4.hpp>
@@ -58,46 +59,71 @@ auto PerspectiveCamera::getRotationAxis(
         break;
     }
 }
-
-auto PerspectiveCamera::processInput(
-    SDL_Event &e,
-    const std::chrono::duration<
-        float,
-        std::milli> &dt) -> void
+auto PerspectiveCamera::update(const std::chrono::duration<float> &dt) -> void
 {
     switch (rotateX) {
     case Rotation::CW:
-        // rotate(rotationSpeed * dt.count() / 1000.f, {1, 0, 0});
+        rotate(rotationSpeed * dt.count(), {1, 0, 0});
         break;
     case Rotation::CCW:
-        // rotate(rotationSpeed * dt.count() / 1000.f, {-1, 0, 0});
+        rotate(rotationSpeed * dt.count(), {-1, 0, 0});
         break;
     case Rotation::None:
         break;
     }
     switch (rotateY) {
     case Rotation::CW:
-        // rotate(rotationSpeed * dt.count() / 1000.f, {0, 1, 0});
+        rotate(rotationSpeed * dt.count(), {0, 1, 0});
         break;
     case Rotation::CCW:
-        // rotate(rotationSpeed * dt.count() / 1000.f, {0, -1, 0});
+        rotate(rotationSpeed * dt.count(), {0, -1, 0});
         break;
     case Rotation::None:
         break;
     }
 
-    switch (moveZ) {
+    switch (moveX) {
     case Movement::Forward:
-        translation.z -= movementSpeed * dt.count() / 1000.f;
+        translation += rotation * glm::vec3(1, 0, 0) * movementSpeed * dt.count();
         break;
     case Movement::Backward:
-        translation.z += movementSpeed * dt.count() / 1000.f;
+        translation -= rotation * glm::vec3(1, 0, 0) * movementSpeed * dt.count();
         break;
     default:
         break;
     }
 
+    switch (moveY) {
+    case Movement::Forward:
+        translation += rotation * glm::vec3(0, 1, 0) * movementSpeed * dt.count();
+        break;
+    case Movement::Backward:
+        translation -= rotation * glm::vec3(0, 1, 0) * movementSpeed * dt.count();
+        break;
+    default:
+        break;
+    }
+
+    switch (moveZ) {
+    case Movement::Forward:
+        translation += rotation * glm::vec3(0, 0, -1) * movementSpeed * dt.count();
+        break;
+    case Movement::Backward:
+        translation -= rotation * glm::vec3(0, 0, -1) * movementSpeed * dt.count();
+        break;
+    default:
+        break;
+    }
+}
+
+auto PerspectiveCamera::processInput(SDL_Event &e) -> void
+{
+
     if (e.type == SDL_EVENT_KEY_DOWN && !e.key.repeat) {
+        fmt::println("I'm down!!");
+        if (e.key.repeat) {
+            fmt::println("I'm repeating!!");
+        }
         switch (e.key.scancode) {
         case SDL_SCANCODE_W:
             moveZ = Movement::Forward;
@@ -106,10 +132,16 @@ auto PerspectiveCamera::processInput(
             moveZ = Movement::Backward;
             break;
         case SDL_SCANCODE_A:
-            rotateY = Rotation::CCW;
+            moveX = Movement::Backward;
             break;
         case SDL_SCANCODE_D:
-            rotateY = Rotation::CW;
+            moveX = Movement::Forward;
+            break;
+        case SDL_SCANCODE_R:
+            moveY = Movement::Forward;
+            break;
+        case SDL_SCANCODE_F:
+            moveY = Movement::Backward;
             break;
         case SDL_SCANCODE_Q:
             rotateX = Rotation::CCW;
@@ -122,7 +154,8 @@ auto PerspectiveCamera::processInput(
         }
     }
 
-    else if (e.type == SDL_EVENT_KEY_UP) {
+    if (e.type == SDL_EVENT_KEY_UP) {
+        fmt::println("I'm up!!");
         switch (e.key.scancode) {
         case SDL_SCANCODE_W:
         case SDL_SCANCODE_S:
@@ -130,7 +163,11 @@ auto PerspectiveCamera::processInput(
             break;
         case SDL_SCANCODE_A:
         case SDL_SCANCODE_D:
-            rotateY = Rotation::None;
+            moveX = Movement::None;
+            break;
+        case SDL_SCANCODE_F:
+        case SDL_SCANCODE_R:
+            moveY = Movement::None;
             break;
         case SDL_SCANCODE_Q:
         case SDL_SCANCODE_E:

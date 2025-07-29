@@ -183,6 +183,7 @@ auto getMaterial(
 {
     const auto &material = asset.materials[primitive.materialIndex.value()];
     mesh.color           = toGLM(material.pbrData.baseColorFactor);
+    fmt::println("{} {} {} {}", mesh.color.r, mesh.color.g, mesh.color.b, mesh.color.a);
 
     if (material.pbrData.baseColorTexture.has_value()) {
         mesh.textureIndex = getTexture(
@@ -288,7 +289,7 @@ void getAttributes(
                     asset,
                     accessor,
                     [&](glm::vec3 color, std::size_t idx) {
-                        mesh.primitives[idx].color *= glm::vec4(color, 1.0f);
+                        mesh.primitives[idx].color = glm::vec4(color, 1.0f);
                     });
             } else if (accessor.type == fastgltf::AccessorType::Vec4) {
                 fastgltf::iterateAccessorWithIndex<glm::vec4>(
@@ -341,6 +342,9 @@ auto getSceneData(
                 }
             }
         });
+
+    // add a final "default" camera
+    scene.cameras.emplace_back();
 
     return scene;
 }

@@ -31,6 +31,7 @@ struct PushConstantBlock
 {
         uint32_t transformIndex;
         int32_t textureIndex;
+        uint32_t padding[2];
         float4 baseColorFactor;
 }
 
@@ -53,7 +54,7 @@ FragmentPrimitive vertexMain(Primitive input)
         );
     output.normal = input.normal;
     output.uv = input.uv;
-    output.color = input.color * pushConstant.baseColorFactor;
+    output.color = input.color;
 	return output;
 }
 
@@ -66,7 +67,7 @@ FragmentOutput fragmentMain(FragmentPrimitive input) : SV_TARGET
     if (pushConstant.textureIndex < 0) {
         output.color = input.color;
     } else {
-        output.color = texture[pushConstant.textureIndex].Sample(input.uv) * input.color;
+        output.color = texture[pushConstant.textureIndex].Sample(input.uv) * pushConstant.baseColorFactor;
     }
 
 	return output;

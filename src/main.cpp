@@ -270,6 +270,7 @@ auto createBuffers(
 struct PushConstantBlock {
     uint32_t  transformIndex;
     int32_t   textureIndex;
+    uint32_t  padding[2];
     glm::vec4 baseColorFactor;
 };
 
@@ -538,10 +539,10 @@ auto main(
                 running = false;
             }
             scene.processInput(e);
-            scene.getCamera().processInput(
-                e,
-                std::chrono::duration<float, std::milli>(deltaTime));
+            scene.getCamera().processInput(e);
         }
+
+        scene.getCamera().update(deltaTime);
 
         // begin frame
         // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
@@ -690,19 +691,9 @@ auto main(
                     *pipelineLayout,
                     vk::ShaderStageFlagBits::eVertex
                         | vk::ShaderStageFlagBits::eFragment,
-                    offsetof(PushConstantBlock, transformIndex),
-                    sizeof(PushConstantBlock::transformIndex)
-                        + sizeof(PushConstantBlock::textureIndex),
+                    0,
+                    sizeof(PushConstantBlock),
                     &pushConstant});
-
-            cmdBuffer.pushConstants2(
-                vk::PushConstantsInfo{
-                    *pipelineLayout,
-                    vk::ShaderStageFlagBits::eVertex
-                        | vk::ShaderStageFlagBits::eFragment,
-                    offsetof(PushConstantBlock, baseColorFactor),
-                    sizeof(mesh.color),
-                    &mesh.color});
 
             // render draw call
             cmdBuffer.drawIndexed(scene.meshes[meshIndex].indices.size(), 1, 0, 0, 0);
