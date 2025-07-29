@@ -268,10 +268,10 @@ auto createBuffers(
 }
 
 struct PushConstantBlock {
-    uint32_t  transformIndex;
-    int32_t   textureIndex;
-    uint32_t  padding[2];
-    glm::vec4 baseColorFactor;
+    uint32_t                transformIndex;
+    int32_t                 textureIndex;
+    std::array<uint32_t, 2> padding{};
+    glm::vec4               baseColorFactor;
 };
 
 auto main(
@@ -304,31 +304,6 @@ auto main(
         r.ctx.device,
         vk::ApiVersion14};
 
-    // get swapchain images
-    auto swapchainImages     = r.ctx.swapchain.getImages();
-    auto swapchainImageViews = std::vector<vk::raii::ImageView>{};
-    auto maxFramesInFlight   = swapchainImages.size();
-
-    for (auto image : swapchainImages) {
-        swapchainImageViews.emplace_back(
-            r.ctx.device,
-            vk::ImageViewCreateInfo{
-                {},
-                image,
-                vk::ImageViewType::e2D,
-                r.ctx.imageFormat,
-                {},
-                {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
-    }
-
-    auto imageAvailableSemaphores = std::vector<vk::raii::Semaphore>{};
-    auto renderFinishedSemaphores = std::vector<vk::raii::Semaphore>{};
-
-    for (auto i : std::views::iota(0u, maxFramesInFlight)) {
-        imageAvailableSemaphores.emplace_back(r.ctx.device, vk::SemaphoreCreateInfo{});
-        renderFinishedSemaphores.emplace_back(r.ctx.device, vk::SemaphoreCreateInfo{});
-    }
-
     auto depthImage = allocator.createImage(
         vk::ImageCreateInfo{
             {},
@@ -358,7 +333,7 @@ auto main(
     // Transition image layout
     auto commandBuffer = beginSingleTimeCommands(r.ctx.device, transientCommandPool);
 
-    for (auto image : swapchainImages) {
+    for (auto image : r.ctx.swapchain.images) {
         cmdTransitionImageLayout(
             commandBuffer,
             image,
@@ -373,19 +348,20 @@ auto main(
         commandBuffer,
         r.ctx.graphicsQueue);
 
-    auto commandPools            = std::vector<vk::raii::CommandPool>{};
-    auto commandBuffers          = std::vector<vk::raii::CommandBuffer>{};
-    auto timelineSemaphoreValues = std::vector<uint64_t>(maxFramesInFlight, 0);
+    auto commandPools   = std::vector<vk::raii::CommandPool>{};
+    auto commandBuffers = std::vector<vk::raii::CommandBuffer>{};
+    auto timelineSemaphoreValues =
+        std::vector<uint64_t>(r.ctx.swapchain.frame.maxFramesInFlight, 0);
     std::ranges::iota(timelineSemaphoreValues, 0);
 
-    uint64_t initialValue = maxFramesInFlight - 1;
+    uint64_t initialValue = r.ctx.swapchain.frame.maxFramesInFlight - 1;
 
     auto timelineSemaphoreCreateInfo =
         vk::SemaphoreTypeCreateInfo{vk::SemaphoreType::eTimeline, initialValue};
     auto frameTimelineSemaphore =
         vk::raii::Semaphore{r.ctx.device, {{}, &timelineSemaphoreCreateInfo}};
 
-    for (auto n : std::views::iota(0u, maxFramesInFlight)) {
+    for (auto n : std::views::iota(0u, r.ctx.swapchain.frame.maxFramesInFlight)) {
         commandPools.emplace_back(
             r.ctx.device,
             vk::CommandPoolCreateInfo{{}, r.ctx.graphicsQueueIndex});
@@ -418,18 +394,20 @@ auto main(
                 allocator,
                 r.ctx.graphicsQueue,
                 scene,
-                maxFramesInFlight);
+                r.ctx.swapchain.frame.maxFramesInFlight);
 
     uint32_t textureCount = textureImageBuffers.size();
     uint32_t meshCount    = scene.meshes.size();
     fmt::println(stderr, "textures.size(): {}", textureCount);
 
-    Descriptors descriptors{r.ctx.device, meshCount, textureCount, maxFramesInFlight};
+    Descriptors descriptors{
+        r.ctx.device,
+        meshCount,
+        textureCount,
+        r.ctx.swapchain.frame.maxFramesInFlight};
 
-    // for (const auto &textureImageView : textureImageViews) {
-    // for (const auto &[sceneBuffer, descriptorSet] :
-    // std::views::zip(sceneBuffers, descriptorSets)) {
-    for (auto frameIndex : std::views::iota(0u, maxFramesInFlight)) {
+    for (auto frameIndex :
+         std::views::iota(0u, r.ctx.swapchain.frame.maxFramesInFlight)) {
         auto descriptorWrites = std::vector<vk::WriteDescriptorSet>{};
 
         auto descriptorBufferInfos = std::vector<vk::DescriptorBufferInfo>{};
@@ -474,8 +452,9 @@ auto main(
     }
 
     // descriptor set layout per frame
-    auto descriptorSetLayouts =
-        std::vector(maxFramesInFlight, *descriptors.descriptorSetLayout);
+    auto descriptorSetLayouts = std::vector(
+        r.ctx.swapchain.frame.maxFramesInFlight,
+        *descriptors.descriptorSetLayout);
 
     // push constant range for transform index and texture index
     auto pushConstantRanges = std::array{vk::PushConstantRange{
@@ -490,15 +469,12 @@ auto main(
     auto graphicsPipeline = createPipeline(
         r.ctx.device,
         shaderPath,
-        r.ctx.imageFormat,
+        r.ctx.swapchain.imageFormat,
         r.ctx.depthFormat,
         pipelineLayout);
 
     uint32_t frameRingCurrent = 0;
-    uint32_t currentFrame     = 0;
     uint32_t totalFrames      = 0;
-
-    bool swapchainNeedRebuild = false;
 
     using namespace std::literals;
 
@@ -526,14 +502,6 @@ auto main(
 
         previousTime = currentTime;
 
-        if (currentFrame != frameRingCurrent) {
-            fmt::println(
-                stderr,
-                "frame:{}, frame ring:{}",
-                currentFrame,
-                frameRingCurrent);
-        }
-
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) {
                 running = false;
@@ -548,15 +516,11 @@ auto main(
         // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
 
         // check swapchain rebuild
-        if (swapchainNeedRebuild) {
-            r.recreateSwapchain(
-                r.ctx.graphicsQueue,
-                currentFrame,
-                swapchainImages,
-                swapchainImageViews,
-                imageAvailableSemaphores,
-                renderFinishedSemaphores);
-            swapchainNeedRebuild = false;
+        if (r.ctx.swapchain.needRecreate) {
+            r.ctx.swapchain.recreate(
+                r.ctx.device,
+                r.ctx.vkbDevice,
+                r.ctx.graphicsQueue);
         }
 
         // get current frame data
@@ -575,19 +539,17 @@ auto main(
         cmdPool.reset();
         cmdBuffer.begin({});
 
-        auto [result, nextImageIndex] = r.ctx.swapchain.acquireNextImage(
-            std::numeric_limits<uint64_t>::max(),
-            imageAvailableSemaphores[currentFrame]);
+        auto result = r.ctx.swapchain.acquireNextImage();
 
         if (result == vk::Result::eErrorOutOfDateKHR
             || result == vk::Result::eSuboptimalKHR) {
-            swapchainNeedRebuild = true;
+            r.ctx.swapchain.needRecreate = true;
         } else if (!(result == vk::Result::eSuccess
                      || result == vk::Result::eSuboptimalKHR)) {
             throw std::exception{};
         }
 
-        if (swapchainNeedRebuild) {
+        if (r.ctx.swapchain.needRecreate) {
             continue;
         }
 
@@ -603,14 +565,14 @@ auto main(
             VK_CHECK(vmaCopyMemoryToAllocation(
                 allocator.allocator,
                 &transform,
-                sceneBuffers[currentFrame].allocation,
+                sceneBuffers[r.ctx.swapchain.frame.currentFrameIndex].allocation,
                 sizeof(Transform) * meshIndex,
                 sizeof(Transform)));
         }
 
         // color attachment image to render to: vk::RenderingAttachmentInfo
         auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
-            swapchainImageViews[nextImageIndex],
+            r.ctx.swapchain.getNextImageView(),
             vk::ImageLayout::eAttachmentOptimal,
             {},
             {},
@@ -642,7 +604,7 @@ auto main(
         // transition swapchain image layout
         cmdTransitionImageLayout(
             cmdBuffer,
-            swapchainImages[nextImageIndex],
+            r.ctx.swapchain.getNextImage(),
             vk::ImageLayout::eUndefined,
             vk::ImageLayout::eColorAttachmentOptimal);
 
@@ -668,7 +630,7 @@ auto main(
                 vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
                 pipelineLayout,
                 0,
-                *descriptors.descriptorSets[currentFrame]});
+                *descriptors.descriptorSets[r.ctx.swapchain.frame.currentFrameIndex]});
 
         for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
             // fmt::println(stderr, "scene.meshes[{}]", meshIndex);
@@ -703,7 +665,7 @@ auto main(
         // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
         cmdTransitionImageLayout(
             cmdBuffer,
-            swapchainImages[nextImageIndex],
+            r.ctx.swapchain.getNextImage(),
             vk::ImageLayout::eColorAttachmentOptimal,
             vk::ImageLayout::ePresentSrcKHR);
         cmdBuffer.end();
@@ -713,17 +675,18 @@ auto main(
         // prepare to submit the current frame for rendering
         // add the swapchain semaphore to wait for the image to be available
 
-        uint64_t signalFrameValue = timelineWaitValue + maxFramesInFlight;
+        uint64_t signalFrameValue =
+            timelineWaitValue + r.ctx.swapchain.frame.maxFramesInFlight;
         timelineSemaphoreValues[frameRingCurrent] = signalFrameValue;
 
         auto waitSemaphoreSubmitInfo = vk::SemaphoreSubmitInfo{
-            imageAvailableSemaphores[currentFrame],
+            r.ctx.swapchain.getImageAvailableSemaphore(),
             {},
             vk::PipelineStageFlagBits2::eColorAttachmentOutput};
 
         auto signalSemaphoreSubmitInfos = std::array{
             vk::SemaphoreSubmitInfo{
-                renderFinishedSemaphores[nextImageIndex],
+                r.ctx.swapchain.getRenderFinishedSemaphore(),
                 {},
                 vk::PipelineStageFlagBits2::eColorAttachmentOutput},
             vk::SemaphoreSubmitInfo{
@@ -743,27 +706,10 @@ auto main(
         // fmt::print(stderr, "\n\nAfter vkQueueSubmit2()\n\n");
 
         // present frame
-        auto presentResult = r.ctx.presentQueue.presentKHR(
-            vk::PresentInfoKHR{
-                *renderFinishedSemaphores[nextImageIndex],
-                *r.ctx.swapchain,
-                nextImageIndex});
+        r.present();
 
-        if (presentResult == vk::Result::eErrorOutOfDateKHR
-            || result == vk::Result::eSuboptimalKHR) {
-            swapchainNeedRebuild = true;
-        }
-
-        else if (!(result == vk::Result::eSuccess
-                   || result == vk::Result::eSuboptimalKHR)) {
-            throw std::exception{};
-        }
-
-        // advance to the next frame in the swapchain
-        currentFrame = (currentFrame + 1) % maxFramesInFlight;
-
-        // move to the next frame
-        frameRingCurrent = (frameRingCurrent + 1) % maxFramesInFlight;
+        frameRingCurrent =
+            (frameRingCurrent + 1) % r.ctx.swapchain.frame.maxFramesInFlight;
 
         // fmt::print(
         //     stderr,

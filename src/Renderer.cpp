@@ -175,8 +175,8 @@ auto RenderContext::init() -> RenderContext
     auto vkbDevice = deviceResult.value();
     auto device    = vk::raii::Device{physicalDevice, vkbDevice.device};
 
-    auto vkbGraphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
-    auto graphicsQueue    = vk::raii::Queue{device, vkbGraphicsQueue};
+    auto graphicsQueue =
+        vk::raii::Queue{device, vkbDevice.get_queue(vkb::QueueType::graphics).value()};
     auto graphicsQueueIndex =
         vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
 
@@ -184,65 +184,27 @@ auto RenderContext::init() -> RenderContext
     auto presentQueue      = vk::raii::Queue{device, vkbPresentQueue};
     auto presentQueueIndex = vkbDevice.get_queue_index(vkb::QueueType::present).value();
 
-    auto swapchainBuilder = vkb::SwapchainBuilder{vkbDevice};
-    auto swapchainResult =
-        swapchainBuilder
-            .set_image_usage_flags(
-                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-            .set_desired_present_mode(VK_PRESENT_MODE_MAILBOX_KHR)
-            .add_fallback_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR)
-            .add_fallback_present_mode(VK_PRESENT_MODE_FIFO_KHR)
-            .set_desired_format(
-                VkSurfaceFormatKHR{
-                    .format     = VK_FORMAT_R8G8B8A8_SRGB,
-                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
-            .add_fallback_format(
-                VkSurfaceFormatKHR{
-                    .format     = VK_FORMAT_B8G8R8A8_UNORM,
-                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
-            .add_fallback_format(
-                VkSurfaceFormatKHR{
-                    .format     = VK_FORMAT_R8G8B8A8_SNORM,
-                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
-            .set_desired_min_image_count(3)
-            .build();
-
-    if (!swapchainResult) {
-        fmt::print(
-            stderr,
-            "vk-bootstrap failed to create swapchain: {}",
-            swapchainResult.error().message());
-        throw std::exception{};
-    }
-
-    auto vkbSwapchain = swapchainResult.value();
-    auto swapchain    = vk::raii::SwapchainKHR(device, vkbSwapchain.swapchain);
-    auto imageFormat  = vk::Format(vkbSwapchain.image_format);
     auto depthFormat  = findDepthFormat(physicalDevice);
     auto windowExtent = physicalDevice.getSurfaceCapabilitiesKHR(surface).currentExtent;
 
-    return RenderContext{
-        std::move(instanceBuilder),
-        vkbInstance,
-        std::move(physicalDeviceSelector),
-        std::move(vkbPhysicalDevice),
-        std::move(deviceBuilder),
-        std::move(vkbDevice),
-        std::move(swapchainBuilder),
-        vkbSwapchain,
+    auto swapchain = Swapchain{device, vkbDevice};
+
+    return {
         std::move(context),
+        vkbInstance,
         std::move(instance),
         std::move(debugUtils),
         std::move(window),
         std::move(surface),
-        std::move(physicalDevice),
+        vkbPhysicalDevice,
+        physicalDevice,
+        vkbDevice,
         std::move(device),
-        std::move(graphicsQueue),
-        std::move(presentQueue),
+        graphicsQueue,
+        presentQueue,
         graphicsQueueIndex,
         presentQueueIndex,
         std::move(swapchain),
-        imageFormat,
         depthFormat,
         windowExtent};
 }
@@ -273,86 +235,4 @@ auto findDepthFormat(vk::raii::PhysicalDevice &physicalDevice) -> vk::Format
     assert(false);
 
     return vk::Format::eUndefined;
-}
-
-auto Renderer::createSwapchain()
-{
-    auto swapchainResult =
-        ctx.swapchainBuilder
-            .set_image_usage_flags(
-                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-            .set_desired_present_mode(VK_PRESENT_MODE_MAILBOX_KHR)
-            .add_fallback_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR)
-            .add_fallback_present_mode(VK_PRESENT_MODE_FIFO_KHR)
-            .set_desired_format(
-                VkSurfaceFormatKHR{
-                    .format     = VK_FORMAT_R8G8B8A8_SRGB,
-                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
-            .add_fallback_format(
-                VkSurfaceFormatKHR{
-                    .format     = VK_FORMAT_B8G8R8A8_UNORM,
-                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
-            .add_fallback_format(
-                VkSurfaceFormatKHR{
-                    .format     = VK_FORMAT_R8G8B8A8_SNORM,
-                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
-            .set_desired_min_image_count(3)
-            .build();
-
-    if (!swapchainResult) {
-        fmt::print(
-            stderr,
-            "vk-bootstrap failed to create swapchain: {}",
-            swapchainResult.error().message());
-        throw std::exception{};
-    }
-
-    ctx.vkbSwapchain = swapchainResult.value();
-    ctx.swapchain =
-        std::move(vk::raii::SwapchainKHR(ctx.device, ctx.vkbSwapchain.swapchain));
-    ctx.imageFormat = vk::Format(ctx.vkbSwapchain.image_format);
-    ctx.depthFormat = findDepthFormat(ctx.physicalDevice);
-    ctx.windowExtent =
-        ctx.physicalDevice.getSurfaceCapabilitiesKHR(ctx.surface).currentExtent;
-}
-
-auto Renderer::recreateSwapchain(
-    vk::raii::Queue                  &queue,
-    uint32_t                         &currentFrame,
-    std::vector<vk::Image>           &swapchainImages,
-    std::vector<vk::raii::ImageView> &swapchainImageViews,
-    std::vector<vk::raii::Semaphore> &imageAvailableSemaphores,
-    std::vector<vk::raii::Semaphore> &renderFinishedSemaphores) -> void
-{
-    queue.waitIdle();
-
-    currentFrame = 0;
-
-    ctx.swapchain.clear();
-    createSwapchain();
-
-    // get swapchain images
-    swapchainImages = ctx.swapchain.getImages();
-    swapchainImageViews.clear();
-    auto maxFramesInFlight = swapchainImages.size();
-
-    for (auto image : swapchainImages) {
-        swapchainImageViews.emplace_back(
-            ctx.device,
-            vk::ImageViewCreateInfo{
-                {},
-                image,
-                vk::ImageViewType::e2D,
-                ctx.imageFormat,
-                {},
-                {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
-    }
-
-    imageAvailableSemaphores.clear();
-    renderFinishedSemaphores.clear();
-
-    for (auto i : std::views::iota(0u, maxFramesInFlight)) {
-        imageAvailableSemaphores.emplace_back(ctx.device, vk::SemaphoreCreateInfo{});
-        renderFinishedSemaphores.emplace_back(ctx.device, vk::SemaphoreCreateInfo{});
-    }
 }
