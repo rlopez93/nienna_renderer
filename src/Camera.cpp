@@ -119,6 +119,30 @@ auto PerspectiveCamera::update(const std::chrono::duration<float> &dt) -> void
 auto PerspectiveCamera::processInput(SDL_Event &e) -> void
 {
 
+    if (e.type == SDL_EVENT_KEY_UP) {
+        fmt::println("I'm up!!");
+        switch (e.key.scancode) {
+        case SDL_SCANCODE_W:
+        case SDL_SCANCODE_S:
+            moveZ = Movement::None;
+            break;
+        case SDL_SCANCODE_A:
+        case SDL_SCANCODE_D:
+            moveX = Movement::None;
+            break;
+        case SDL_SCANCODE_F:
+        case SDL_SCANCODE_R:
+            moveY = Movement::None;
+            break;
+        case SDL_SCANCODE_Q:
+        case SDL_SCANCODE_E:
+            rotateX = Rotation::None;
+            break;
+        default:
+            break;
+        }
+    }
+
     if (e.type == SDL_EVENT_KEY_DOWN && !e.key.repeat) {
         fmt::println("I'm down!!");
         if (e.key.repeat) {
@@ -148,30 +172,6 @@ auto PerspectiveCamera::processInput(SDL_Event &e) -> void
             break;
         case SDL_SCANCODE_E:
             rotateX = Rotation::CW;
-            break;
-        default:
-            break;
-        }
-    }
-
-    if (e.type == SDL_EVENT_KEY_UP) {
-        fmt::println("I'm up!!");
-        switch (e.key.scancode) {
-        case SDL_SCANCODE_W:
-        case SDL_SCANCODE_S:
-            moveZ = Movement::None;
-            break;
-        case SDL_SCANCODE_A:
-        case SDL_SCANCODE_D:
-            moveX = Movement::None;
-            break;
-        case SDL_SCANCODE_F:
-        case SDL_SCANCODE_R:
-            moveY = Movement::None;
-            break;
-        case SDL_SCANCODE_Q:
-        case SDL_SCANCODE_E:
-            rotateX = Rotation::None;
             break;
         default:
             break;
