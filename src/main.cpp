@@ -286,7 +286,6 @@ auto main(
 
         cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
-        // fmt::println(stderr, "bindDescriptorSets2(), frame {}", currentFrame);
         // bind texture resources passed to shader
         cmdBuffer.bindDescriptorSets2(
             vk::BindDescriptorSetsInfo{

@@ -39,18 +39,18 @@ struct RenderContext {
     [[nodiscard]]
     auto getWindowExtent() const -> vk::Extent2D;
 
-    Window         window;
-    Instance       instance;
-    Surface        surface;
-    PhysicalDevice physicalDevice;
-    Device         device;
-    Queue          graphicsQueue;
-    Queue          present;
-    Swapchain      swapchain;
-    Allocator      allocator;
-    vk::Format     depthFormat;
-    Image          depthImage;
-    vk::ImageView  depthImageView;
+    Window              window;
+    Instance            instance;
+    Surface             surface;
+    PhysicalDevice      physicalDevice;
+    Device              device;
+    Queue               graphicsQueue;
+    Queue               present;
+    Swapchain           swapchain;
+    Allocator           allocator;
+    vk::Format          depthFormat;
+    Image               depthImage;
+    vk::raii::ImageView depthImageView;
 };
 
 struct Renderer {

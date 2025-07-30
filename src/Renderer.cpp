@@ -60,8 +60,10 @@ RenderContext::RenderContext()
                   getWindowExtent(),
                   1),
               1,
-              1}
-              .setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment))},
+              1,
+              vk::SampleCountFlagBits::e1,
+              vk::ImageTiling::eOptimal,
+              vk::ImageUsageFlagBits::eDepthStencilAttachment})},
       depthImageView{device.handle.createImageView(
           vk::ImageViewCreateInfo{
               {},
@@ -76,5 +78,4 @@ RenderContext::RenderContext()
                   0,
                   1}})}
 {
-    fmt::println(stderr, "{}x{}", getWindowExtent().width, getWindowExtent().height);
 }
