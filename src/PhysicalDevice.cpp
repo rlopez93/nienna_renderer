@@ -1,6 +1,8 @@
 #include "PhysicalDevice.hpp"
 
+#include <algorithm>
 #include <fmt/base.h>
+#include <iostream>
 
 auto createVkbPhysicalDevice(
     Instance &instance,
@@ -25,6 +27,14 @@ auto createVkbPhysicalDevice(
     auto physicalDeviceResult =
         physicalDeviceSelector.set_surface(*surface.handle)
             .set_required_features(features.get<vk::PhysicalDeviceFeatures2>().features)
+            .set_required_features_11(
+                features.get<vk::PhysicalDeviceVulkan11Features>())
+            .set_required_features_12(
+                features.get<vk::PhysicalDeviceVulkan12Features>())
+            .set_required_features_13(
+                features.get<vk::PhysicalDeviceVulkan13Features>())
+            .set_required_features_14(
+                features.get<vk::PhysicalDeviceVulkan14Features>())
             .require_present()
             .select();
 
@@ -36,31 +46,7 @@ auto createVkbPhysicalDevice(
         throw std::exception{};
     }
 
-    auto vkbPhysicalDevice = physicalDeviceResult.value();
-    // auto deviceExtensions = vk::getDeviceExtensions();
-    //
-    // fmt::print(stderr, "device extensions: {}\n", deviceExtensions.size());
-    //
-    // for (const auto &extension : deviceExtensions) {
-    //     std::vector<const char *> enabledExtensions;
-    //     enabledExtensions.push_back(extension.c_str());
-    //     bool enabled = vkb_phys.enable_extensions_if_present(enabledExtensions);
-    //
-    //     fmt::print(stderr, "<{}> enabled: {}\n", extension, enabled);
-    // }
-
-    vkbPhysicalDevice.enable_extension_features_if_present(
-        features.get<vk::PhysicalDeviceFeatures2>());
-    vkbPhysicalDevice.enable_extension_features_if_present(
-        features.get<vk::PhysicalDeviceVulkan11Features>());
-    vkbPhysicalDevice.enable_extension_features_if_present(
-        features.get<vk::PhysicalDeviceVulkan12Features>());
-    vkbPhysicalDevice.enable_extension_features_if_present(
-        features.get<vk::PhysicalDeviceVulkan13Features>());
-    vkbPhysicalDevice.enable_extension_features_if_present(
-        features.get<vk::PhysicalDeviceVulkan14Features>());
-
-    return vkbPhysicalDevice;
+    return physicalDeviceResult.value();
 }
 
 PhysicalDevice::PhysicalDevice(

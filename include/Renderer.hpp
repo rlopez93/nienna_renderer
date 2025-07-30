@@ -34,56 +34,7 @@
 #include "Utility.hpp"
 
 struct RenderContext {
-    RenderContext()
-        : window{createWindow(
-              windowWidth,
-              windowHeight)},
-          instance{},
-          surface{
-              instance,
-              window},
-          physicalDevice{
-              instance,
-              surface},
-          device{physicalDevice},
-          graphicsQueue{
-              device,
-              QueueType::Graphics},
-          present{
-              device,
-              QueueType::Present},
-          swapchain{device},
-          allocator{
-              instance,
-              physicalDevice,
-              device},
-          depthFormat{findDepthFormat(physicalDevice.handle)},
-          depthImage{allocator.createImage(
-              vk::ImageCreateInfo{
-                  {},
-                  vk::ImageType::e2D,
-                  depthFormat,
-                  vk::Extent3D(
-                      getWindowExtent(),
-                      1),
-                  1,
-                  1}
-                  .setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment))},
-          depthImageView{device.handle.createImageView(
-              vk::ImageViewCreateInfo{
-                  {},
-                  depthImage.image,
-                  vk::ImageViewType::e2D,
-                  depthFormat,
-                  {},
-                  vk::ImageSubresourceRange{
-                      vk::ImageAspectFlagBits::eDepth,
-                      0,
-                      1,
-                      0,
-                      1}})}
-    {
-    }
+    RenderContext();
 
     [[nodiscard]]
     auto getWindowExtent() const -> vk::Extent2D;
