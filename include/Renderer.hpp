@@ -35,10 +35,10 @@
 
 struct RenderContext {
     RenderContext()
-        : instance{},
-          window{createWindow(
+        : window{createWindow(
               windowWidth,
               windowHeight)},
+          instance{},
           surface{
               instance,
               window},
@@ -88,8 +88,8 @@ struct RenderContext {
     [[nodiscard]]
     auto getWindowExtent() const -> vk::Extent2D;
 
-    Instance       instance;
     Window         window;
+    Instance       instance;
     Surface        surface;
     PhysicalDevice physicalDevice;
     Device         device;

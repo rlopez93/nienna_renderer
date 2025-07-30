@@ -14,6 +14,7 @@ auto main(
     int    argc,
     char **argv) -> int
 {
+    VULKAN_HPP_DEFAULT_DISPATCHER.init();
     auto filePath = [&] -> std::filesystem::path {
         if (argc < 2) {
             return "third_party/glTF-Sample-Assets/Models/Duck/glTF/Duck.gltf";

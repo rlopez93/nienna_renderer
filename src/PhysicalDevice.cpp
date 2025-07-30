@@ -49,16 +49,16 @@ auto createVkbPhysicalDevice(
     //     fmt::print(stderr, "<{}> enabled: {}\n", extension, enabled);
     // }
 
-    // vkb_phys.enable_extension_features_if_present(
-    //     features.get<vk::PhysicalDeviceFeatures2>());
+    vkbPhysicalDevice.enable_extension_features_if_present(
+        features.get<vk::PhysicalDeviceFeatures2>());
     vkbPhysicalDevice.enable_extension_features_if_present(
         features.get<vk::PhysicalDeviceVulkan11Features>());
-    // vkb_phys.enable_extension_features_if_present(
-    //     features.get<vk::PhysicalDeviceVulkan12Features>());
-    // vkb_phys.enable_extension_features_if_present(
-    //     features.get<vk::PhysicalDeviceVulkan13Features>());
-    // vkb_phys.enable_extension_features_if_present(
-    //     features.get<vk::PhysicalDeviceVulkan14Features>());
+    vkbPhysicalDevice.enable_extension_features_if_present(
+        features.get<vk::PhysicalDeviceVulkan12Features>());
+    vkbPhysicalDevice.enable_extension_features_if_present(
+        features.get<vk::PhysicalDeviceVulkan13Features>());
+    vkbPhysicalDevice.enable_extension_features_if_present(
+        features.get<vk::PhysicalDeviceVulkan14Features>());
 
     return vkbPhysicalDevice;
 }

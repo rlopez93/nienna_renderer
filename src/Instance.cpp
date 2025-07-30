@@ -1,4 +1,3 @@
-#define VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 #include "Instance.hpp"
 
 #include <SDL3/SDL_vulkan.h>
@@ -60,5 +59,4 @@ Instance::Instance()
           handle,
           vkbInstance.debug_messenger}
 {
-    VULKAN_HPP_DEFAULT_DISPATCHER.init();
 }
