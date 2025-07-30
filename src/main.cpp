@@ -14,7 +14,7 @@ auto main(
     int    argc,
     char **argv) -> int
 {
-    VULKAN_HPP_DEFAULT_DISPATCHER.init();
+    // VULKAN_HPP_DEFAULT_DISPATCHER.init();
     auto filePath = [&] -> std::filesystem::path {
         if (argc < 2) {
             return "third_party/glTF-Sample-Assets/Models/Duck/glTF/Duck.gltf";
@@ -36,6 +36,7 @@ auto main(
 
     Renderer r;
 
+    // TODO: move to Renderer construction
     // create transient command pool for single-time commands
     auto transientCommandPool = vk::raii::CommandPool{
         r.ctx.device.handle,
@@ -178,6 +179,7 @@ auto main(
 
         scene.getCamera().update(deltaTime);
 
+        // TODO: move to a render() function
         // begin frame
         // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
 
@@ -287,12 +289,12 @@ auto main(
         cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
         // bind texture resources passed to shader
-        cmdBuffer.bindDescriptorSets2(
-            vk::BindDescriptorSetsInfo{
-                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-                pipelineLayout,
-                0,
-                *descriptors.descriptorSets[r.ctx.swapchain.frame.currentFrameIndex]});
+        cmdBuffer.bindDescriptorSets(
+            vk::PipelineBindPoint::eGraphics,
+            *pipelineLayout,
+            0,
+            *descriptors.descriptorSets[r.ctx.swapchain.frame.currentFrameIndex],
+            {});
 
         for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
             // fmt::println(stderr, "scene.meshes[{}]", meshIndex);

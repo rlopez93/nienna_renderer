@@ -32,7 +32,7 @@ struct Swapchain {
 
     auto getNextImage() -> vk::Image;
 
-    auto getNextImageView() -> vk::ImageView;
+    auto getNextImageView() -> vk::raii::ImageView &;
 
     auto getImageAvailableSemaphore() -> vk::Semaphore;
 

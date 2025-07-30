@@ -96,7 +96,7 @@ auto Swapchain::getNextImage() -> vk::Image
     return images[nextImageIndex];
 }
 
-auto Swapchain::getNextImageView() -> vk::ImageView
+auto Swapchain::getNextImageView() -> vk::raii::ImageView &
 {
     return imageViews[nextImageIndex];
 }
