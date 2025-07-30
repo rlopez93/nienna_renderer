@@ -1,6 +1,6 @@
 #pragma once
-#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
-#include <vulkan/vulkan_raii.hpp>
+
+#include "vulkan_raii.hpp"
 
 #ifdef NDEBUG
 #define VK_CHECK(vkFnc) vkFnc
@@ -56,3 +56,5 @@ void endSingleTimeCommands(
     vk::raii::CommandPool   &commandPool,
     vk::raii::CommandBuffer &commandBuffer,
     vk::raii::Queue         &queue);
+
+auto findDepthFormat(vk::raii::PhysicalDevice &physicalDevice) -> vk::Format;

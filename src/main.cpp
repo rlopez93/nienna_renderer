@@ -1,5 +1,5 @@
-#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
-#include <vulkan/vulkan_raii.hpp>
+
+#include "vulkan_raii.hpp"
 
 #include "App.hpp"
 #include "Renderer.hpp"
@@ -33,39 +33,16 @@ auto main(
         }
     }();
 
-    Renderer  r;
-    Allocator allocator{
-        r.ctx.instance,
-        r.ctx.physicalDevice,
-        r.ctx.device,
-        vk::ApiVersion14};
-
-    auto depthImage = allocator.createImage(
-        vk::ImageCreateInfo{
-            {},
-            vk::ImageType::e2D,
-            r.ctx.depthFormat,
-            vk::Extent3D(r.ctx.windowExtent, 1),
-            1,
-            1}
-            .setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment));
-
-    auto depthImageView = r.ctx.device.createImageView(
-        vk::ImageViewCreateInfo{
-            {},
-            depthImage.image,
-            vk::ImageViewType::e2D,
-            r.ctx.depthFormat,
-            {},
-            vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}});
+    Renderer r;
 
     // create transient command pool for single-time commands
     auto transientCommandPool = vk::raii::CommandPool{
-        r.ctx.device,
-        {vk::CommandPoolCreateFlagBits::eTransient, r.ctx.graphicsQueueIndex}};
+        r.ctx.device.handle,
+        {vk::CommandPoolCreateFlagBits::eTransient, r.ctx.graphicsQueue.index}};
 
     // Transition image layout
-    auto commandBuffer = beginSingleTimeCommands(r.ctx.device, transientCommandPool);
+    auto commandBuffer =
+        beginSingleTimeCommands(r.ctx.device.handle, transientCommandPool);
 
     for (auto image : r.ctx.swapchain.images) {
         cmdTransitionImageLayout(
@@ -77,10 +54,10 @@ auto main(
     }
 
     endSingleTimeCommands(
-        r.ctx.device,
+        r.ctx.device.handle,
         transientCommandPool,
         commandBuffer,
-        r.ctx.graphicsQueue);
+        r.ctx.graphicsQueue.handle);
 
     auto commandPools   = std::vector<vk::raii::CommandPool>{};
     auto commandBuffers = std::vector<vk::raii::CommandBuffer>{};
@@ -93,17 +70,17 @@ auto main(
     auto timelineSemaphoreCreateInfo =
         vk::SemaphoreTypeCreateInfo{vk::SemaphoreType::eTimeline, initialValue};
     auto frameTimelineSemaphore =
-        vk::raii::Semaphore{r.ctx.device, {{}, &timelineSemaphoreCreateInfo}};
+        vk::raii::Semaphore{r.ctx.device.handle, {{}, &timelineSemaphoreCreateInfo}};
 
     for (auto n : std::views::iota(0u, r.ctx.swapchain.frame.maxFramesInFlight)) {
         commandPools.emplace_back(
-            r.ctx.device,
-            vk::CommandPoolCreateInfo{{}, r.ctx.graphicsQueueIndex});
+            r.ctx.device.handle,
+            vk::CommandPoolCreateInfo{{}, r.ctx.graphicsQueue.index});
 
         commandBuffers.emplace_back(
             std::move(
                 vk::raii::CommandBuffers{
-                    r.ctx.device,
+                    r.ctx.device.handle,
                     vk::CommandBufferAllocateInfo{
                         commandPools.back(),
                         vk::CommandBufferLevel::ePrimary,
@@ -114,7 +91,7 @@ auto main(
     auto asset = getGltfAsset(gltfDirectory / gltfFilename);
     auto scene = getSceneData(asset, gltfDirectory);
 
-    auto sampler = vk::raii::Sampler{r.ctx.device, vk::SamplerCreateInfo{}};
+    auto sampler = vk::raii::Sampler{r.ctx.device.handle, vk::SamplerCreateInfo{}};
 
     auto
         [primitiveBuffers,
@@ -123,10 +100,10 @@ auto main(
          textureImageBuffers,
          textureImageViews] =
             createBuffers(
-                r.ctx.device,
+                r.ctx.device.handle,
                 transientCommandPool,
-                allocator,
-                r.ctx.graphicsQueue,
+                r.ctx.allocator,
+                r.ctx.graphicsQueue.handle,
                 scene,
                 r.ctx.swapchain.frame.maxFramesInFlight);
 
@@ -136,13 +113,13 @@ auto main(
     fmt::println(stderr, "meshes.size(): {}", meshCount);
 
     auto descriptors = Descriptors{
-        r.ctx.device,
+        r.ctx.device.handle,
         meshCount,
         textureCount,
         r.ctx.swapchain.frame.maxFramesInFlight};
 
     updateDescriptorSets(
-        r.ctx.device,
+        r.ctx.device.handle,
         descriptors,
         sceneBuffers,
         meshCount,
@@ -150,12 +127,12 @@ auto main(
         sampler);
 
     auto pipelineLayout = createPipelineLayout(
-        r.ctx.device,
+        r.ctx.device.handle,
         descriptors.descriptorSetLayout,
         r.ctx.swapchain.frame.maxFramesInFlight);
 
     auto graphicsPipeline = createPipeline(
-        r.ctx.device,
+        r.ctx.device.handle,
         shaderPath,
         r.ctx.swapchain.imageFormat,
         r.ctx.depthFormat,
@@ -205,10 +182,7 @@ auto main(
 
         // check swapchain rebuild
         if (r.ctx.swapchain.needRecreate) {
-            r.ctx.swapchain.recreate(
-                r.ctx.device,
-                r.ctx.vkbDevice,
-                r.ctx.graphicsQueue);
+            r.ctx.swapchain.recreate(r.ctx.device, r.ctx.graphicsQueue);
         }
 
         // get current frame data
@@ -218,7 +192,7 @@ auto main(
 
         {
             // wait semaphore frame (n - numFrames)
-            auto result = r.ctx.device.waitSemaphores(
+            auto result = r.ctx.device.handle.waitSemaphores(
                 vk::SemaphoreWaitInfo{{}, *frameTimelineSemaphore, timelineWaitValue},
                 std::numeric_limits<uint64_t>::max());
         }
@@ -251,7 +225,7 @@ auto main(
             // transform.viewProjectionMatrix[1][1] *= -1;
 
             VK_CHECK(vmaCopyMemoryToAllocation(
-                allocator.allocator,
+                r.ctx.allocator.allocator,
                 &transform,
                 sceneBuffers[r.ctx.swapchain.frame.currentFrameIndex].allocation,
                 sizeof(Transform) * meshIndex,
@@ -271,7 +245,7 @@ auto main(
 
         // depth attachment buffer: vk::RenderingAttachmentInfo
         auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
-            depthImageView,
+            r.ctx.depthImageView,
             vk::ImageLayout::eAttachmentOptimal,
             {},
             {},
@@ -283,7 +257,7 @@ auto main(
         // rendering info for dynamic rendering
         auto renderingInfo = vk::RenderingInfo{
             {},
-            vk::Rect2D{{}, r.ctx.windowExtent},
+            vk::Rect2D{{}, r.ctx.getWindowExtent()},
             1,
             {},
             renderingColorAttachmentInfo,
@@ -302,12 +276,12 @@ auto main(
             vk::Viewport(
                 0.0f,
                 0.0f,
-                r.ctx.windowExtent.width,
-                r.ctx.windowExtent.height,
+                r.ctx.getWindowExtent().width,
+                r.ctx.getWindowExtent().height,
                 0.0f,
                 1.0f));
         cmdBuffer.setScissorWithCount(
-            vk::Rect2D{vk::Offset2D(0, 0), r.ctx.windowExtent});
+            vk::Rect2D{vk::Offset2D(0, 0), r.ctx.getWindowExtent()});
 
         cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
@@ -353,7 +327,7 @@ auto main(
 
         submit(
             cmdBuffer,
-            r.ctx.graphicsQueue,
+            r.ctx.graphicsQueue.handle,
             r.ctx.swapchain.getNextImage(),
             r.ctx.swapchain.getImageAvailableSemaphore(),
             r.ctx.swapchain.getRenderFinishedSemaphore(),
@@ -377,7 +351,7 @@ auto main(
         ++totalFrames;
     }
 
-    r.ctx.device.waitIdle();
+    r.ctx.device.handle.waitIdle();
 
     return 0;
 }

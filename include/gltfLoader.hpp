@@ -10,8 +10,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/ext/matrix_transform.hpp>
 
-#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
-#include <vulkan/vulkan.hpp>
+#include "vulkan_raii.hpp"
 
 #include "Camera.hpp"
 

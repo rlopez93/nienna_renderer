@@ -29,16 +29,25 @@ add_executable(nienna)
 
 target_sources(nienna PRIVATE
     src/main.cpp
-    include/Renderer.hpp src/Renderer.cpp
-    include/Allocator.hpp src/Allocator.cpp
-    include/Utility.hpp src/Utility.cpp
-    include/spirv_reflect.h src/spirv_reflect.c
-    include/stb_image.h src/stb_image.cpp
-    include/gltfLoader.hpp src/gltfLoader.cpp
-    include/Shader.hpp src/Shader.cpp
-    include/Descriptor.hpp src/Descriptor.cpp
-    include/Camera.hpp src/Camera.cpp
-    include/App.hpp src/App.cpp
+    src/spirv_reflect.c
+    src/Allocator.cpp
+    src/App.cpp
+    src/Camera.cpp
+    src/Descriptor.cpp
+    src/Device.cpp
+    src/Frame.cpp
+    src/gltfLoader.cpp
+    src/Instance.cpp
+    src/PhysicalDevice.cpp
+    src/Queue.cpp
+    src/Renderer.cpp
+    src/Shader.cpp
+    src/stb_image.cpp
+    src/Surface.cpp
+    src/Swapchain.cpp
+    src/Utility.cpp
+    src/vulkan_raii.cpp
+    src/Window.cpp
 )
 
 target_include_directories(nienna PRIVATE

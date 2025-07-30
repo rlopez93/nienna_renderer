@@ -1,8 +1,10 @@
 #pragma once
-#include <SDL3/SDL_video.h>
 
-#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
-#include <vulkan/vulkan_raii.hpp>
+#include "vulkan_raii.hpp"
+
+#include <SDL3/SDL_init.h>
+#include <SDL3/SDL_video.h>
+#include <SDL3/SDL_vulkan.h>
 
 #include <VkBootstrap.h>
 
@@ -13,120 +15,94 @@
 #include <utility>
 #include <vector>
 
-struct Frame {
-    uint32_t                         currentFrameIndex = 0u;
-    uint32_t                         maxFramesInFlight;
-    std::vector<vk::raii::Semaphore> imageAvailableSemaphores;
-    std::vector<vk::raii::Semaphore> renderFinishedSemaphores;
+#include "Instance.hpp"
 
-    Frame(
-        vk::raii::Device &device,
-        uint32_t          imagesSize);
+#include "Surface.hpp"
 
-    auto recreate(
-        vk::raii::Device &device,
-        uint32_t          imagesSize) -> void;
-};
+#include "PhysicalDevice.hpp"
 
-struct Swapchain {
-    vk::raii::SwapchainKHR           swapchain;
-    uint32_t                         nextImageIndex = 0u;
-    std::vector<vk::Image>           images;
-    std::vector<vk::raii::ImageView> imageViews;
-    vk::Format                       imageFormat;
-    vk::Format                       depthFormat;
-    Frame                            frame;
-    bool                             needRecreate = false;
+#include "Device.hpp"
 
-    Swapchain(
-        vk::raii::Device &device,
-        vkb::Device      &vkbDevice);
+#include "Queue.hpp"
 
-    auto create(
-        vk::raii::Device &device,
-        vkb::Device      &vkbDevice) -> void;
+#include "Allocator.hpp"
 
-    auto recreate(
-        vk::raii::Device &device,
-        vkb::Device      &vkbDevice,
-        vk::raii::Queue  &queue) -> void;
+#include "Frame.hpp"
 
-    auto acquireNextImage() -> vk::Result;
+#include "Swapchain.hpp"
 
-    auto getNextImage() -> vk::Image;
-
-    auto getNextImageView() -> vk::ImageView;
-
-    auto getImageAvailableSemaphore() -> vk::Semaphore;
-
-    auto getRenderFinishedSemaphore() -> vk::Semaphore;
-
-    auto advanceFrame() -> void;
-};
-
-struct Renderer;
+#include "Utility.hpp"
 
 struct RenderContext {
-    friend class Renderer;
+    RenderContext()
+        : instance{},
+          window{createWindow(
+              windowWidth,
+              windowHeight)},
+          surface{
+              instance,
+              window},
+          physicalDevice{
+              instance,
+              surface},
+          device{physicalDevice},
+          graphicsQueue{
+              device,
+              QueueType::Graphics},
+          present{
+              device,
+              QueueType::Present},
+          swapchain{device},
+          allocator{
+              instance,
+              physicalDevice,
+              device},
+          depthFormat{findDepthFormat(physicalDevice.handle)},
+          depthImage{allocator.createImage(
+              vk::ImageCreateInfo{
+                  {},
+                  vk::ImageType::e2D,
+                  depthFormat,
+                  vk::Extent3D(
+                      getWindowExtent(),
+                      1),
+                  1,
+                  1}
+                  .setUsage(vk::ImageUsageFlagBits::eDepthStencilAttachment))},
+          depthImageView{device.handle.createImageView(
+              vk::ImageViewCreateInfo{
+                  {},
+                  depthImage.image,
+                  vk::ImageViewType::e2D,
+                  depthFormat,
+                  {},
+                  vk::ImageSubresourceRange{
+                      vk::ImageAspectFlagBits::eDepth,
+                      0,
+                      1,
+                      0,
+                      1}})}
+    {
+    }
 
-    static constexpr auto SDL_WindowDeleter = [](SDL_Window *window) {
-        SDL_DestroyWindow(window);
-    };
+    [[nodiscard]]
+    auto getWindowExtent() const -> vk::Extent2D;
 
-    using WindowPtr = std::unique_ptr<SDL_Window, decltype(SDL_WindowDeleter)>;
-
-    RenderContext(
-        vk::raii::Context                context,
-        vkb::Instance                    vkbInstance,
-        vk::raii::Instance               instance,
-        vk::raii::DebugUtilsMessengerEXT debugUtils,
-        WindowPtr                        window,
-        vk::raii::SurfaceKHR             surface,
-        vkb::PhysicalDevice              vkbPhysicalDevice,
-        vk::raii::PhysicalDevice         physicalDevice,
-        vkb::Device                      vkbDevice,
-        vk::raii::Device                 device,
-        vk::raii::Queue                  graphicsQueue,
-        vk::raii::Queue                  presentQueue,
-        uint32_t                         graphicsQueueIndex,
-        uint32_t                         presentQueueIndex,
-        Swapchain                        swapchain,
-        vk::Format                       depthFormat,
-        vk::Extent2D                     windowExtent);
-
-    ~RenderContext();
-
-  private:
-    static auto init() -> RenderContext;
-
-  public:
-    vk::raii::Context                context;
-    vkb::Instance                    vkbInstance;
-    vk::raii::Instance               instance;
-    vk::raii::DebugUtilsMessengerEXT debugUtils;
-    WindowPtr                        window;
-    vk::raii::SurfaceKHR             surface;
-    vkb::PhysicalDevice              vkbPhysicalDevice;
-    vk::raii::PhysicalDevice         physicalDevice;
-    vkb::Device                      vkbDevice;
-    vk::raii::Device                 device;
-    vk::raii::Queue                  graphicsQueue;
-    vk::raii::Queue                  presentQueue;
-    uint32_t                         graphicsQueueIndex;
-    uint32_t                         presentQueueIndex;
-    Swapchain                        swapchain;
-    vk::Format                       depthFormat;
-
-    vk::Extent2D windowExtent;
+    Instance       instance;
+    Window         window;
+    Surface        surface;
+    PhysicalDevice physicalDevice;
+    Device         device;
+    Queue          graphicsQueue;
+    Queue          present;
+    Swapchain      swapchain;
+    Allocator      allocator;
+    vk::Format     depthFormat;
+    Image          depthImage;
+    vk::ImageView  depthImageView;
 };
 
 struct Renderer {
-    friend struct RenderContext;
-    Renderer();
-
     RenderContext ctx;
-
-    auto present() -> void;
+    auto          present() -> void;
 };
-
-auto findDepthFormat(vk::raii::PhysicalDevice &physicalDevice) -> vk::Format;

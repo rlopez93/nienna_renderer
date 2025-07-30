@@ -3,21 +3,20 @@
 #include "Utility.hpp"
 
 Allocator::Allocator(
-    vk::raii::Instance       &instance,
-    vk::raii::PhysicalDevice &physicalDevice,
-    vk::raii::Device         &device,
-    uint32_t                  api)
-    : device{device}
+    Instance       &instance,
+    PhysicalDevice &physicalDevice,
+    Device         &device)
+    : device{device.handle}
 {
     // Initialization of VMA allocator.
     // #TODO : VK_EXT_memory_priority ? VMA_ALLOCATOR_CREATE_EXT_MEMORY_PRIORITY_BIT
     VmaAllocatorCreateInfo allocatorCreateInfo{
         .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT
                | VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE4_BIT,
-        .physicalDevice   = *physicalDevice,
-        .device           = *device,
-        .instance         = *instance,
-        .vulkanApiVersion = api};
+        .physicalDevice   = *physicalDevice.handle,
+        .device           = this->device,
+        .instance         = *instance.handle,
+        .vulkanApiVersion = vk::ApiVersion14};
 
     allocatorCreateInfo.flags |=
         VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT; // allow querying for the

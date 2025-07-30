@@ -4,8 +4,13 @@
 #define VMA_USE_STL_CONTAINERS 1
 #include <vma/vk_mem_alloc.h>
 
-#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
-#include <vulkan/vulkan_raii.hpp>
+#include "vulkan_raii.hpp"
+
+#include "Instance.hpp"
+
+#include "PhysicalDevice.hpp"
+
+#include "Device.hpp"
 
 #include "Utility.hpp"
 
@@ -42,10 +47,9 @@ struct ImageResource : Image {
 
 struct Allocator {
     Allocator(
-        vk::raii::Instance       &instance,
-        vk::raii::PhysicalDevice &physicalDevice,
-        vk::raii::Device         &device,
-        uint32_t                  api);
+        Instance       &instance,
+        PhysicalDevice &physicalDevice,
+        Device         &device);
 
     ~Allocator();
 
