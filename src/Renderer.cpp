@@ -1,33 +1,6 @@
 #include "Renderer.hpp"
 
-auto Renderer::present() -> void
-{
-    auto renderFinishedSemaphore = ctx.swapchain.getRenderFinishedSemaphore();
-    auto presentResult           = ctx.present.handle.presentKHR(
-        vk::PresentInfoKHR{
-            renderFinishedSemaphore,
-            *ctx.swapchain.swapchain,
-            ctx.swapchain.nextImageIndex});
-
-    if (presentResult == vk::Result::eErrorOutOfDateKHR
-        || presentResult == vk::Result::eSuboptimalKHR) {
-        ctx.swapchain.needRecreate = true;
-    }
-
-    else if (!(presentResult == vk::Result::eSuccess
-               || presentResult == vk::Result::eSuboptimalKHR)) {
-        throw std::exception{};
-    }
-
-    // advance to the next frame in the swapchain
-    ctx.swapchain.advanceFrame();
-}
-auto RenderContext::getWindowExtent() const -> vk::Extent2D
-{
-    return physicalDevice.handle.getSurfaceCapabilitiesKHR(surface.handle)
-        .currentExtent;
-}
-RenderContext::RenderContext()
+Renderer::Renderer()
     : window{createWindow(
           windowWidth,
           windowHeight)},
@@ -42,7 +15,7 @@ RenderContext::RenderContext()
       graphicsQueue{
           device,
           QueueType::Graphics},
-      present{
+      presentQueue{
           device,
           QueueType::Present},
       swapchain{device},
@@ -78,4 +51,32 @@ RenderContext::RenderContext()
                   0,
                   1}})}
 {
+}
+
+auto Renderer::present() -> void
+{
+    auto renderFinishedSemaphore = swapchain.getRenderFinishedSemaphore();
+    auto presentResult           = presentQueue.handle.presentKHR(
+        vk::PresentInfoKHR{
+            renderFinishedSemaphore,
+            *swapchain.swapchain,
+            swapchain.nextImageIndex});
+
+    if (presentResult == vk::Result::eErrorOutOfDateKHR
+        || presentResult == vk::Result::eSuboptimalKHR) {
+        swapchain.needRecreate = true;
+    }
+
+    else if (!(presentResult == vk::Result::eSuccess
+               || presentResult == vk::Result::eSuboptimalKHR)) {
+        throw std::exception{};
+    }
+
+    // advance to the next frame in the swapchain
+    swapchain.advanceFrame();
+}
+auto Renderer::getWindowExtent() const -> vk::Extent2D
+{
+    return physicalDevice.handle.getSurfaceCapabilitiesKHR(surface.handle)
+        .currentExtent;
 }

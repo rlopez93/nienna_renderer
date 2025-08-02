@@ -33,8 +33,8 @@
 
 #include "Utility.hpp"
 
-struct RenderContext {
-    RenderContext();
+struct Renderer {
+    Renderer();
 
     [[nodiscard]]
     auto getWindowExtent() const -> vk::Extent2D;
@@ -45,15 +45,11 @@ struct RenderContext {
     PhysicalDevice      physicalDevice;
     Device              device;
     Queue               graphicsQueue;
-    Queue               present;
+    Queue               presentQueue;
     Swapchain           swapchain;
     Allocator           allocator;
     vk::Format          depthFormat;
     Image               depthImage;
     vk::raii::ImageView depthImageView;
-};
-
-struct Renderer {
-    RenderContext ctx;
-    auto          present() -> void;
+    auto                present() -> void;
 };

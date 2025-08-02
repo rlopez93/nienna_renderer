@@ -39,14 +39,13 @@ auto main(
     // TODO: move to Renderer construction
     // create transient command pool for single-time commands
     auto transientCommandPool = vk::raii::CommandPool{
-        r.ctx.device.handle,
-        {vk::CommandPoolCreateFlagBits::eTransient, r.ctx.graphicsQueue.index}};
+        r.device.handle,
+        {vk::CommandPoolCreateFlagBits::eTransient, r.graphicsQueue.index}};
 
     // Transition image layout
-    auto commandBuffer =
-        beginSingleTimeCommands(r.ctx.device.handle, transientCommandPool);
+    auto commandBuffer = beginSingleTimeCommands(r.device.handle, transientCommandPool);
 
-    for (auto image : r.ctx.swapchain.images) {
+    for (auto image : r.swapchain.images) {
         cmdTransitionImageLayout(
             commandBuffer,
             image,
@@ -56,33 +55,33 @@ auto main(
     }
 
     endSingleTimeCommands(
-        r.ctx.device.handle,
+        r.device.handle,
         transientCommandPool,
         commandBuffer,
-        r.ctx.graphicsQueue.handle);
+        r.graphicsQueue.handle);
 
     auto commandPools   = std::vector<vk::raii::CommandPool>{};
     auto commandBuffers = std::vector<vk::raii::CommandBuffer>{};
     auto timelineSemaphoreValues =
-        std::vector<uint64_t>(r.ctx.swapchain.frame.maxFramesInFlight, 0);
+        std::vector<uint64_t>(r.swapchain.frame.maxFramesInFlight, 0);
     std::ranges::iota(timelineSemaphoreValues, 0);
 
-    uint64_t initialValue = r.ctx.swapchain.frame.maxFramesInFlight - 1;
+    uint64_t initialValue = r.swapchain.frame.maxFramesInFlight - 1;
 
     auto timelineSemaphoreCreateInfo =
         vk::SemaphoreTypeCreateInfo{vk::SemaphoreType::eTimeline, initialValue};
     auto frameTimelineSemaphore =
-        vk::raii::Semaphore{r.ctx.device.handle, {{}, &timelineSemaphoreCreateInfo}};
+        vk::raii::Semaphore{r.device.handle, {{}, &timelineSemaphoreCreateInfo}};
 
-    for (auto n : std::views::iota(0u, r.ctx.swapchain.frame.maxFramesInFlight)) {
+    for (auto n : std::views::iota(0u, r.swapchain.frame.maxFramesInFlight)) {
         commandPools.emplace_back(
-            r.ctx.device.handle,
-            vk::CommandPoolCreateInfo{{}, r.ctx.graphicsQueue.index});
+            r.device.handle,
+            vk::CommandPoolCreateInfo{{}, r.graphicsQueue.index});
 
         commandBuffers.emplace_back(
             std::move(
                 vk::raii::CommandBuffers{
-                    r.ctx.device.handle,
+                    r.device.handle,
                     vk::CommandBufferAllocateInfo{
                         commandPools.back(),
                         vk::CommandBufferLevel::ePrimary,
@@ -93,7 +92,7 @@ auto main(
     auto asset = getGltfAsset(gltfDirectory / gltfFilename);
     auto scene = getSceneData(asset, gltfDirectory);
 
-    auto sampler = vk::raii::Sampler{r.ctx.device.handle, vk::SamplerCreateInfo{}};
+    auto sampler = vk::raii::Sampler{r.device.handle, vk::SamplerCreateInfo{}};
 
     auto
         [primitiveBuffers,
@@ -102,12 +101,12 @@ auto main(
          textureImageBuffers,
          textureImageViews] =
             createBuffers(
-                r.ctx.device.handle,
+                r.device.handle,
                 transientCommandPool,
-                r.ctx.allocator,
-                r.ctx.graphicsQueue.handle,
+                r.allocator,
+                r.graphicsQueue.handle,
                 scene,
-                r.ctx.swapchain.frame.maxFramesInFlight);
+                r.swapchain.frame.maxFramesInFlight);
 
     uint32_t textureCount = textureImageBuffers.size();
     uint32_t meshCount    = scene.meshes.size();
@@ -115,13 +114,13 @@ auto main(
     fmt::println(stderr, "meshes.size(): {}", meshCount);
 
     auto descriptors = Descriptors{
-        r.ctx.device.handle,
+        r.device.handle,
         meshCount,
         textureCount,
-        r.ctx.swapchain.frame.maxFramesInFlight};
+        r.swapchain.frame.maxFramesInFlight};
 
     updateDescriptorSets(
-        r.ctx.device.handle,
+        r.device.handle,
         descriptors,
         sceneBuffers,
         meshCount,
@@ -129,15 +128,15 @@ auto main(
         sampler);
 
     auto pipelineLayout = createPipelineLayout(
-        r.ctx.device.handle,
+        r.device.handle,
         descriptors.descriptorSetLayout,
-        r.ctx.swapchain.frame.maxFramesInFlight);
+        r.swapchain.frame.maxFramesInFlight);
 
     auto graphicsPipeline = createPipeline(
-        r.ctx.device.handle,
+        r.device.handle,
         shaderPath,
-        r.ctx.swapchain.imageFormat,
-        r.ctx.depthFormat,
+        r.swapchain.imageFormat,
+        r.depthFormat,
         pipelineLayout);
 
     uint32_t frameRingCurrent = 0;
@@ -184,8 +183,8 @@ auto main(
         // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
 
         // check swapchain rebuild
-        if (r.ctx.swapchain.needRecreate) {
-            r.ctx.swapchain.recreate(r.ctx.device, r.ctx.graphicsQueue);
+        if (r.swapchain.needRecreate) {
+            r.swapchain.recreate(r.device, r.graphicsQueue);
         }
 
         // get current frame data
@@ -195,7 +194,7 @@ auto main(
 
         {
             // wait semaphore frame (n - numFrames)
-            auto result = r.ctx.device.handle.waitSemaphores(
+            auto result = r.device.handle.waitSemaphores(
                 vk::SemaphoreWaitInfo{{}, *frameTimelineSemaphore, timelineWaitValue},
                 std::numeric_limits<uint64_t>::max());
         }
@@ -204,17 +203,17 @@ auto main(
         cmdPool.reset();
         cmdBuffer.begin({});
 
-        auto result = r.ctx.swapchain.acquireNextImage();
+        auto result = r.swapchain.acquireNextImage();
 
         if (result == vk::Result::eErrorOutOfDateKHR
             || result == vk::Result::eSuboptimalKHR) {
-            r.ctx.swapchain.needRecreate = true;
+            r.swapchain.needRecreate = true;
         } else if (!(result == vk::Result::eSuccess
                      || result == vk::Result::eSuboptimalKHR)) {
             throw std::exception{};
         }
 
-        if (r.ctx.swapchain.needRecreate) {
+        if (r.swapchain.needRecreate) {
             continue;
         }
 
@@ -228,16 +227,16 @@ auto main(
             // transform.viewProjectionMatrix[1][1] *= -1;
 
             VK_CHECK(vmaCopyMemoryToAllocation(
-                r.ctx.allocator.allocator,
+                r.allocator.allocator,
                 &transform,
-                sceneBuffers[r.ctx.swapchain.frame.currentFrameIndex].allocation,
+                sceneBuffers[r.swapchain.frame.currentFrameIndex].allocation,
                 sizeof(Transform) * meshIndex,
                 sizeof(Transform)));
         }
 
         // color attachment image to render to: vk::RenderingAttachmentInfo
         auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
-            r.ctx.swapchain.getNextImageView(),
+            r.swapchain.getNextImageView(),
             vk::ImageLayout::eAttachmentOptimal,
             {},
             {},
@@ -248,7 +247,7 @@ auto main(
 
         // depth attachment buffer: vk::RenderingAttachmentInfo
         auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
-            r.ctx.depthImageView,
+            r.depthImageView,
             vk::ImageLayout::eAttachmentOptimal,
             {},
             {},
@@ -260,7 +259,7 @@ auto main(
         // rendering info for dynamic rendering
         auto renderingInfo = vk::RenderingInfo{
             {},
-            vk::Rect2D{{}, r.ctx.getWindowExtent()},
+            vk::Rect2D{{}, r.getWindowExtent()},
             1,
             {},
             renderingColorAttachmentInfo,
@@ -269,7 +268,7 @@ auto main(
         // transition swapchain image layout
         cmdTransitionImageLayout(
             cmdBuffer,
-            r.ctx.swapchain.getNextImage(),
+            r.swapchain.getNextImage(),
             vk::ImageLayout::eUndefined,
             vk::ImageLayout::eColorAttachmentOptimal);
 
@@ -279,12 +278,12 @@ auto main(
             vk::Viewport(
                 0.0f,
                 0.0f,
-                r.ctx.getWindowExtent().width,
-                r.ctx.getWindowExtent().height,
+                r.getWindowExtent().width,
+                r.getWindowExtent().height,
                 0.0f,
                 1.0f));
         cmdBuffer.setScissorWithCount(
-            vk::Rect2D{vk::Offset2D(0, 0), r.ctx.getWindowExtent()});
+            vk::Rect2D{vk::Offset2D(0, 0), r.getWindowExtent()});
 
         cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
@@ -293,7 +292,7 @@ auto main(
             vk::PipelineBindPoint::eGraphics,
             *pipelineLayout,
             0,
-            *descriptors.descriptorSets[r.ctx.swapchain.frame.currentFrameIndex],
+            *descriptors.descriptorSets[r.swapchain.frame.currentFrameIndex],
             {});
 
         for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
@@ -329,19 +328,18 @@ auto main(
 
         submit(
             cmdBuffer,
-            r.ctx.graphicsQueue.handle,
-            r.ctx.swapchain.getNextImage(),
-            r.ctx.swapchain.getImageAvailableSemaphore(),
-            r.ctx.swapchain.getRenderFinishedSemaphore(),
+            r.graphicsQueue.handle,
+            r.swapchain.getNextImage(),
+            r.swapchain.getImageAvailableSemaphore(),
+            r.swapchain.getRenderFinishedSemaphore(),
             frameTimelineSemaphore,
             timelineSemaphoreValues[frameRingCurrent],
-            r.ctx.swapchain.frame.maxFramesInFlight);
+            r.swapchain.frame.maxFramesInFlight);
 
         // present frame
         r.present();
 
-        frameRingCurrent =
-            (frameRingCurrent + 1) % r.ctx.swapchain.frame.maxFramesInFlight;
+        frameRingCurrent = (frameRingCurrent + 1) % r.swapchain.frame.maxFramesInFlight;
 
         // fmt::print(
         //     stderr,
@@ -353,7 +351,7 @@ auto main(
         ++totalFrames;
     }
 
-    r.ctx.device.handle.waitIdle();
+    r.device.handle.waitIdle();
 
     return 0;
 }
