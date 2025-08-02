@@ -3,7 +3,7 @@
 #include <fmt/base.h>
 
 Swapchain::Swapchain(Device &device)
-    : swapchain(nullptr),
+    : handle(nullptr),
       frame(
           device,
           0u)
@@ -45,8 +45,8 @@ auto Swapchain::create(Device &device) -> void
         throw std::exception{};
     }
 
-    swapchain = vk::raii::SwapchainKHR{device.handle, swapchainResult->swapchain};
-    images    = swapchain.getImages();
+    handle = vk::raii::SwapchainKHR{device.handle, swapchainResult->swapchain};
+    images = handle.getImages();
     imageViews.clear();
     imageFormat = vk::Format(swapchainResult->image_format);
 
@@ -72,9 +72,9 @@ auto Swapchain::recreate(
 {
     queue.handle.waitIdle();
 
-    frame.currentFrameIndex = 0;
+    frame.index = 0;
 
-    swapchain.clear();
+    handle.clear();
 
     create(device);
 
@@ -84,7 +84,7 @@ auto Swapchain::recreate(
 auto Swapchain::acquireNextImage() -> vk::Result
 {
     vk::Result result;
-    std::tie(result, nextImageIndex) = swapchain.acquireNextImage(
+    std::tie(result, nextImageIndex) = handle.acquireNextImage(
         std::numeric_limits<uint64_t>::max(),
         getImageAvailableSemaphore());
 
@@ -103,7 +103,7 @@ auto Swapchain::getNextImageView() -> vk::raii::ImageView &
 
 auto Swapchain::getImageAvailableSemaphore() -> vk::Semaphore
 {
-    return frame.imageAvailableSemaphores[frame.currentFrameIndex];
+    return frame.imageAvailableSemaphores[frame.index];
 }
 
 auto Swapchain::getRenderFinishedSemaphore() -> vk::Semaphore
@@ -113,5 +113,5 @@ auto Swapchain::getRenderFinishedSemaphore() -> vk::Semaphore
 
 auto Swapchain::advanceFrame() -> void
 {
-    frame.currentFrameIndex = (frame.currentFrameIndex + 1) % frame.maxFramesInFlight;
+    frame.index = (frame.index + 1) % frame.maxFramesInFlight;
 }

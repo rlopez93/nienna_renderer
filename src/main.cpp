@@ -60,8 +60,6 @@ auto main(
         commandBuffer,
         r.graphicsQueue.handle);
 
-    auto commandPools   = std::vector<vk::raii::CommandPool>{};
-    auto commandBuffers = std::vector<vk::raii::CommandBuffer>{};
     auto timelineSemaphoreValues =
         std::vector<uint64_t>(r.swapchain.frame.maxFramesInFlight, 0);
     std::ranges::iota(timelineSemaphoreValues, 0);
@@ -73,6 +71,8 @@ auto main(
     auto frameTimelineSemaphore =
         vk::raii::Semaphore{r.device.handle, {{}, &timelineSemaphoreCreateInfo}};
 
+    auto commandPools   = std::vector<vk::raii::CommandPool>{};
+    auto commandBuffers = std::vector<vk::raii::CommandBuffer>{};
     for (auto n : std::views::iota(0u, r.swapchain.frame.maxFramesInFlight)) {
         commandPools.emplace_back(
             r.device.handle,
@@ -229,7 +229,7 @@ auto main(
             VK_CHECK(vmaCopyMemoryToAllocation(
                 r.allocator.allocator,
                 &transform,
-                sceneBuffers[r.swapchain.frame.currentFrameIndex].allocation,
+                sceneBuffers[r.swapchain.frame.index].allocation,
                 sizeof(Transform) * meshIndex,
                 sizeof(Transform)));
         }
@@ -292,7 +292,7 @@ auto main(
             vk::PipelineBindPoint::eGraphics,
             *pipelineLayout,
             0,
-            *descriptors.descriptorSets[r.swapchain.frame.currentFrameIndex],
+            *descriptors.descriptorSets[r.swapchain.frame.index],
             {});
 
         for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
@@ -326,16 +326,17 @@ auto main(
 
         cmdBuffer.endRendering();
 
-        submit(
-            cmdBuffer,
-            r.graphicsQueue.handle,
-            r.swapchain.getNextImage(),
-            r.swapchain.getImageAvailableSemaphore(),
-            r.swapchain.getRenderFinishedSemaphore(),
-            frameTimelineSemaphore,
-            timelineSemaphoreValues[frameRingCurrent],
-            r.swapchain.frame.maxFramesInFlight);
+        // submit(
+        //     cmdBuffer,
+        //     r.graphicsQueue.handle,
+        //     r.swapchain.getNextImage(),
+        //     r.swapchain.getImageAvailableSemaphore(),
+        //     r.swapchain.getRenderFinishedSemaphore(),
+        //     frameTimelineSemaphore,
+        //     timelineSemaphoreValues[frameRingCurrent],
+        //     r.swapchain.frame.maxFramesInFlight);
 
+        r.submit();
         // present frame
         r.present();
 

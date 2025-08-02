@@ -8,6 +8,13 @@
 #include "Descriptor.hpp"
 #include "gltfLoader.hpp"
 
+struct PushConstantBlock {
+    uint32_t                transformIndex;
+    int32_t                 textureIndex;
+    std::array<uint32_t, 2> padding{};
+    glm::vec4               baseColorFactor;
+};
+
 auto createPipeline(
     vk::raii::Device            &device,
     const std::filesystem::path &shaderPath,
@@ -28,13 +35,6 @@ auto createBuffers(
         std::vector<Buffer>,
         std::vector<Image>,
         std::vector<vk::raii::ImageView>>;
-
-struct PushConstantBlock {
-    uint32_t                transformIndex;
-    int32_t                 textureIndex;
-    std::array<uint32_t, 2> padding{};
-    glm::vec4               baseColorFactor;
-};
 
 auto updateDescriptorSets(
     vk::raii::Device                       &device,

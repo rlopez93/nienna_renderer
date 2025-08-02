@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "Allocator.hpp"
+#include "Command.hpp"
 #include "Device.hpp"
 #include "Frame.hpp"
 #include "Instance.hpp"
@@ -23,13 +24,10 @@
 #include "Queue.hpp"
 #include "Surface.hpp"
 #include "Swapchain.hpp"
+#include "Timeline.hpp"
 #include "Utility.hpp"
 
 struct Renderer {
-    Renderer();
-
-    [[nodiscard]]
-    auto getWindowExtent() const -> vk::Extent2D;
 
     Window              window;
     Instance            instance;
@@ -43,5 +41,14 @@ struct Renderer {
     vk::Format          depthFormat;
     Image               depthImage;
     vk::raii::ImageView depthImageView;
-    auto                present() -> void;
+    Timeline            timeline;
+
+    Renderer();
+
+    auto submit() -> void;
+    auto present() -> void;
+    auto render() -> void;
+
+    [[nodiscard]]
+    auto getWindowExtent() const -> vk::Extent2D;
 };

@@ -13,7 +13,7 @@ auto Frame::recreate(
     Device  &device,
     uint32_t imagesSize) -> void
 {
-    currentFrameIndex = 0u;
+    index = 0u;
     imageAvailableSemaphores.clear();
     renderFinishedSemaphores.clear();
 

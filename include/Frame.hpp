@@ -8,7 +8,7 @@
 #include "Device.hpp"
 
 struct Frame {
-    uint32_t                         currentFrameIndex = 0u;
+    uint32_t                         index = 0u;
     uint32_t                         maxFramesInFlight;
     std::vector<vk::raii::Semaphore> imageAvailableSemaphores;
     std::vector<vk::raii::Semaphore> renderFinishedSemaphores;

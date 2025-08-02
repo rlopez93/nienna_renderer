@@ -33,6 +33,7 @@ target_sources(nienna PRIVATE
     src/Allocator.cpp
     src/App.cpp
     src/Camera.cpp
+    src/Command.cpp
     src/Descriptor.cpp
     src/Device.cpp
     src/Frame.cpp
@@ -45,6 +46,7 @@ target_sources(nienna PRIVATE
     src/stb_image.cpp
     src/Surface.cpp
     src/Swapchain.cpp
+    src/Timeline.cpp
     src/Utility.cpp
     src/vulkan_raii.cpp
     src/Window.cpp
