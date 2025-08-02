@@ -3,6 +3,7 @@
 #include "vulkan_raii.hpp"
 
 #include "Device.hpp"
+
 enum class QueueType { Graphics, Present, Compute };
 
 auto QueueTypeToVkb(QueueType type) -> vkb::QueueType;

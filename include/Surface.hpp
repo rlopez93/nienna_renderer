@@ -3,7 +3,6 @@
 #include "vulkan_raii.hpp"
 
 #include "Instance.hpp"
-
 #include "Window.hpp"
 
 auto createSurface(

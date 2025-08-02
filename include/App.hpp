@@ -7,6 +7,7 @@
 #include "Allocator.hpp"
 #include "Descriptor.hpp"
 #include "gltfLoader.hpp"
+
 auto createPipeline(
     vk::raii::Device            &device,
     const std::filesystem::path &shaderPath,

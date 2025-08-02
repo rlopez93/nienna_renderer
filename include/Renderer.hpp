@@ -15,22 +15,14 @@
 #include <utility>
 #include <vector>
 
-#include "Instance.hpp"
-
-#include "Surface.hpp"
-
-#include "PhysicalDevice.hpp"
-
-#include "Device.hpp"
-
-#include "Queue.hpp"
-
 #include "Allocator.hpp"
-
+#include "Device.hpp"
 #include "Frame.hpp"
-
+#include "Instance.hpp"
+#include "PhysicalDevice.hpp"
+#include "Queue.hpp"
+#include "Surface.hpp"
 #include "Swapchain.hpp"
-
 #include "Utility.hpp"
 
 struct Renderer {

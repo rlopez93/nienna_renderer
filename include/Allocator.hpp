@@ -6,12 +6,9 @@
 
 #include "vulkan_raii.hpp"
 
-#include "Instance.hpp"
-
-#include "PhysicalDevice.hpp"
-
 #include "Device.hpp"
-
+#include "Instance.hpp"
+#include "PhysicalDevice.hpp"
 #include "Utility.hpp"
 
 /*--
