@@ -43,18 +43,3 @@ auto updateDescriptorSets(
     const uint32_t                         &meshCount,
     const std::vector<vk::raii::ImageView> &textureImageViews,
     vk::raii::Sampler                      &sampler) -> void;
-
-auto createPipelineLayout(
-    vk::raii::Device       &device,
-    vk::DescriptorSetLayout descriptorSetLayout,
-    uint32_t                maxFramesInFlight) -> vk::raii::PipelineLayout;
-
-auto submit( // TODO : move to Renderer
-    vk::raii::CommandBuffer &cmdBuffer,
-    vk::raii::Queue         &graphicsQueue,
-    vk::Image                nextImage,
-    vk::Semaphore            imageAvailableSemaphore,
-    vk::Semaphore            renderFinishedSemaphore,
-    vk::Semaphore            frameTimelineSemaphore,
-    uint64_t                &timelineWaitValue,
-    const uint32_t          &maxFramesInFlight) -> void;

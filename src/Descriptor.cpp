@@ -1,4 +1,5 @@
 #include "Descriptor.hpp"
+#include "App.hpp"
 
 Descriptors::Descriptors(
     vk::raii::Device &device,
@@ -20,9 +21,14 @@ Descriptors::Descriptors(
           device,
           descriptorSetLayout,
           descriptorPool,
+          maxFramesInFlight)},
+      pipelineLayout{createPipelineLayout(
+          device,
+          descriptorSetLayout,
           maxFramesInFlight)}
 {
 }
+
 auto Descriptors::createDescriptorSetLayout(
     vk::raii::Device &device,
     uint32_t          meshCount,
@@ -95,4 +101,21 @@ auto Descriptors::createDescriptorSets(
         vk::DescriptorSetAllocateInfo{descriptorPool, descriptorSetLayouts};
 
     return device.allocateDescriptorSets(descriptorSetAllocateInfo);
+}
+
+auto Descriptors::createPipelineLayout(
+    vk::raii::Device       &device,
+    vk::DescriptorSetLayout descriptorSetLayout,
+    uint32_t                maxFramesInFlight) -> vk::raii::PipelineLayout
+{
+    auto descriptorSetLayouts = std::vector(maxFramesInFlight, descriptorSetLayout);
+
+    auto pushConstantRanges = std::array{vk::PushConstantRange{
+        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+        0,
+        sizeof(PushConstantBlock)}};
+
+    return {
+        device,
+        vk::PipelineLayoutCreateInfo{{}, descriptorSetLayouts, pushConstantRanges}};
 }

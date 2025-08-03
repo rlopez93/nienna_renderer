@@ -12,6 +12,7 @@ struct Descriptors {
     vk::raii::DescriptorSetLayout        descriptorSetLayout;
     vk::raii::DescriptorPool             descriptorPool;
     std::vector<vk::raii::DescriptorSet> descriptorSets;
+    vk::raii::PipelineLayout             pipelineLayout;
 
   private:
     static auto createDescriptorSetLayout(
@@ -32,4 +33,9 @@ struct Descriptors {
         vk::raii::DescriptorSetLayout &descriptorSetLayout,
         vk::raii::DescriptorPool      &descriptorPool,
         uint64_t maxFramesInFlight) -> std::vector<vk::raii::DescriptorSet>;
+
+    static auto createPipelineLayout(
+        vk::raii::Device       &device,
+        vk::DescriptorSetLayout descriptorSetLayout,
+        uint32_t                maxFramesInFlight) -> vk::raii::PipelineLayout;
 };

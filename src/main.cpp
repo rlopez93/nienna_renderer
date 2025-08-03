@@ -98,17 +98,12 @@ auto main(
         textureImageViews,
         sampler);
 
-    auto pipelineLayout = createPipelineLayout(
-        r.device.handle,
-        descriptors.descriptorSetLayout,
-        r.swapchain.frame.maxFramesInFlight);
-
     auto graphicsPipeline = createPipeline(
         r.device.handle,
         shaderPath,
         r.swapchain.imageFormat,
         r.depthFormat,
-        pipelineLayout);
+        descriptors.pipelineLayout);
 
     uint32_t totalFrames = 0;
 
