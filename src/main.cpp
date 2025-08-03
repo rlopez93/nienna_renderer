@@ -110,8 +110,7 @@ auto main(
         r.depthFormat,
         pipelineLayout);
 
-    uint32_t frameRingCurrent = 0;
-    uint32_t totalFrames      = 0;
+    uint32_t totalFrames = 0;
 
     using namespace std::literals;
 
@@ -155,15 +154,6 @@ auto main(
         // present frame
         r.present();
 
-        frameRingCurrent = (frameRingCurrent + 1) % r.swapchain.frame.maxFramesInFlight;
-
-        // fmt::print(
-        //     stderr,
-        //     "imageIndex: {}, currentFrame: {}, frameRingCurrent: {},
-        //     totalFrames:
-        //     {}\n", nextImageIndex, currentFrame, nextImageIndex,
-        //     totalFrames);
-        //
         ++totalFrames;
     }
 

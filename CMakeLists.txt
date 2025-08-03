@@ -70,7 +70,7 @@ target_link_libraries(nienna PRIVATE
     glm::glm
 )
 
-set(Vulkan_SLANGC_EXECUTABLE "Release/bin/slangc")
+set(Vulkan_SLANGC_EXECUTABLE "slangc")
 
 if(NOT Vulkan_SLANGC_EXECUTABLE)
     get_filename_component(_Vulkan_LIB_DIR ${Vulkan_LIBRARY} DIRECTORY)
