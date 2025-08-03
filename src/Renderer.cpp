@@ -134,3 +134,148 @@ auto Renderer::getWindowExtent() const -> vk::Extent2D
     return physicalDevice.handle.getSurfaceCapabilitiesKHR(surface.handle)
         .currentExtent;
 }
+auto Renderer::render(Scene &scene) -> void
+{
+
+    // begin frame
+    // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
+
+    // check swapchain rebuild
+    if (swapchain.needRecreate) {
+        swapchain.recreate(device, graphicsQueue);
+    }
+
+    {
+        // wait semaphore frame (n - numFrames)
+        auto result = device.handle.waitSemaphores(
+            vk::SemaphoreWaitInfo{{}, *timeline.semaphore, timeline.value()},
+            std::numeric_limits<uint64_t>::max());
+    }
+
+    // reset current frame's command pool to reuse the command buffer
+    timeline.pool().reset();
+    timeline.buffer().begin({});
+
+    auto result = swapchain.acquireNextImage();
+
+    if (result == vk::Result::eErrorOutOfDateKHR
+        || result == vk::Result::eSuboptimalKHR) {
+        swapchain.needRecreate = true;
+    } else if (!(result == vk::Result::eSuccess
+                 || result == vk::Result::eSuboptimalKHR)) {
+        throw std::exception{};
+    }
+
+    if (swapchain.needRecreate) {
+        return;
+    }
+
+    // update uniform buffers
+
+    for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
+        auto transform = Transform{
+            .modelMatrix          = mesh.modelMatrix,
+            .viewProjectionMatrix = scene.getCamera().getProjectionMatrix()
+                                  * scene.getCamera().getViewMatrix()};
+        // transform.viewProjectionMatrix[1][1] *= -1;
+
+        VK_CHECK(vmaCopyMemoryToAllocation(
+            allocator.allocator,
+            &transform,
+            sceneBuffers[swapchain.frame.index].allocation,
+            sizeof(Transform) * meshIndex,
+            sizeof(Transform)));
+    }
+
+    // color attachment image to render to: vk::RenderingAttachmentInfo
+    auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
+        swapchain.getNextImageView(),
+        vk::ImageLayout::eAttachmentOptimal,
+        {},
+        {},
+        {},
+        vk::AttachmentLoadOp::eClear,
+        vk::AttachmentStoreOp::eStore,
+        vk::ClearColorValue{std::array{0.2f, 0.5f, 1.0f, 1.0f}}};
+
+    // depth attachment buffer: vk::RenderingAttachmentInfo
+    auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
+        depthImageView,
+        vk::ImageLayout::eAttachmentOptimal,
+        {},
+        {},
+        {},
+        vk::AttachmentLoadOp::eClear,
+        vk::AttachmentStoreOp::eStore,
+        vk::ClearDepthStencilValue{1.0f, 0}};
+
+    // rendering info for dynamic rendering
+    auto renderingInfo = vk::RenderingInfo{
+        {},
+        vk::Rect2D{{}, getWindowExtent()},
+        1,
+        {},
+        renderingColorAttachmentInfo,
+        &renderingDepthAttachmentInfo};
+
+    // transition swapchain image layout
+    cmdTransitionImageLayout(
+        timeline.buffer(),
+        swapchain.getNextImage(),
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eColorAttachmentOptimal);
+
+    timeline.buffer().beginRendering(renderingInfo);
+
+    timeline.buffer().setViewportWithCount(
+        vk::Viewport(
+            0.0f,
+            0.0f,
+            getWindowExtent().width,
+            getWindowExtent().height,
+            0.0f,
+            1.0f));
+    timeline.buffer().setScissorWithCount(
+        vk::Rect2D{vk::Offset2D(0, 0), getWindowExtent()});
+
+    timeline.buffer().bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
+
+    // bind texture resources passed to shader
+    timeline.buffer().bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics,
+        *pipelineLayout,
+        0,
+        *descriptors.descriptorSets[swapchain.frame.index],
+        {});
+
+    for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
+        // fmt::println(stderr, "scene.meshes[{}]", meshIndex);
+        // bind vertex data
+        timeline.buffer().bindVertexBuffers(0, primitiveBuffers[meshIndex].buffer, {0});
+
+        // bind index data
+        timeline.buffer().bindIndexBuffer(
+            indexBuffers[meshIndex].buffer,
+            0,
+            vk::IndexType::eUint16);
+
+        auto pushConstant = PushConstantBlock{
+            .transformIndex  = static_cast<uint32_t>(meshIndex),
+            .textureIndex    = static_cast<int32_t>(mesh.textureIndex.value_or(-1)),
+            .baseColorFactor = mesh.color};
+
+        timeline.buffer().pushConstants2(
+            vk::PushConstantsInfo{
+                *pipelineLayout,
+                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+                0,
+                sizeof(PushConstantBlock),
+                &pushConstant});
+
+        // render draw call
+        timeline.buffer()
+            .drawIndexed(scene.meshes[meshIndex].indices.size(), 1, 0, 0, 0);
+    }
+
+    timeline.buffer().endRendering();
+};

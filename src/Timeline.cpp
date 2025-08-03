@@ -43,3 +43,7 @@ auto Timeline::value() & -> uint64_t &
 {
     return values[index];
 }
+auto Timeline::pool() -> vk::raii::CommandPool &
+{
+    return command[index].pool;
+}

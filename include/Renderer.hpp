@@ -26,6 +26,7 @@
 #include "Swapchain.hpp"
 #include "Timeline.hpp"
 #include "Utility.hpp"
+#include "gltfLoader.hpp"
 
 struct Renderer {
 
@@ -47,7 +48,7 @@ struct Renderer {
 
     auto submit() -> void;
     auto present() -> void;
-    auto render() -> void;
+    auto render(Scene &scene) -> void;
 
     [[nodiscard]]
     auto getWindowExtent() const -> vk::Extent2D;

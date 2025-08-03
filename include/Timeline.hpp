@@ -23,6 +23,7 @@ struct Timeline {
         uint32_t maxFramesInFlight) -> vk::raii::Semaphore;
     auto advance(uint32_t maxFramesInFlight) -> void;
     auto buffer() -> vk::raii::CommandBuffer &;
+    auto pool() -> vk::raii::CommandPool &;
 
     [[nodiscard]]
     auto value() const & -> const uint64_t &;
