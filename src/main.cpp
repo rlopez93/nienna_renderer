@@ -179,6 +179,9 @@ auto main(
         previousTime = currentTime;
 
         while (SDL_PollEvent(&e)) {
+
+            ImGui_ImplSDL3_ProcessEvent(&e);
+
             if (e.type == SDL_EVENT_QUIT) {
                 running = false;
             }
@@ -186,11 +189,53 @@ auto main(
             scene.processInput(e);
         }
 
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::ShowDemoWindow();
+
+        ImGui::Render();
+        auto imGuiDrawData = ImGui::GetDrawData();
+
         scene.update(deltaTime);
 
+        r.beginFrame();
+
+        // update uniform buffers
+        for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
+            auto transform = Transform{
+                .modelMatrix          = mesh.modelMatrix,
+                .viewProjectionMatrix = scene.getCamera().getProjectionMatrix()
+                                      * scene.getCamera().getViewMatrix()};
+            // transform.viewProjectionMatrix[1][1] *= -1;
+
+            VK_CHECK(vmaCopyMemoryToAllocation(
+                r.allocator.allocator,
+                &transform,
+                scene.buffers.uniform[r.swapchain.frame.index].allocation,
+                sizeof(Transform) * meshIndex,
+                sizeof(Transform)));
+        }
+
+        // render scene
         r.render(scene, graphicsPipeline, descriptors);
+
+        // render imGui
+        r.beginRender(
+            vk::AttachmentLoadOp::eLoad,
+            vk::AttachmentStoreOp::eStore,
+            vk::AttachmentLoadOp::eLoad,
+            vk::AttachmentStoreOp::eStore);
+
+        ImGui_ImplVulkan_RenderDrawData(imGuiDrawData, *r.timeline.buffer());
+        r.endRender();
+
         r.submit();
         r.present();
+
+        r.endFrame();
+        ImGui::EndFrame();
 
         ++totalFrames;
     }

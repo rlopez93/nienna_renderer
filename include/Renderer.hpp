@@ -47,12 +47,20 @@ struct Renderer {
 
     Renderer();
 
-    auto submit() -> void;
-    auto present() -> void;
+    auto beginFrame() -> void;
+    auto beginRender(
+        vk::AttachmentLoadOp  loadOp,
+        vk::AttachmentStoreOp storeOp,
+        vk::AttachmentLoadOp  depthLoadOp,
+        vk::AttachmentStoreOp depthStoreOp) -> void;
     auto render(
         Scene              &scene,
         vk::raii::Pipeline &pipeline,
         Descriptors        &descriptors) -> void;
+    auto endRender() -> void;
+    auto submit() -> void;
+    auto present() -> void;
+    auto endFrame() -> void;
 
     [[nodiscard]]
     auto getWindowExtent() const -> vk::Extent2D;

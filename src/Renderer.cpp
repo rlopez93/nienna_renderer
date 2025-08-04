@@ -123,10 +123,6 @@ auto Renderer::present() -> void
                || presentResult == vk::Result::eSuboptimalKHR)) {
         throw std::exception{};
     }
-
-    // advance to the next frame in the swapchain
-    swapchain.advance();
-    timeline.advance();
 }
 
 auto Renderer::getWindowExtent() const -> vk::Extent2D
@@ -140,96 +136,11 @@ auto Renderer::render(
     vk::raii::Pipeline &graphicsPipeline,
     Descriptors        &descriptors) -> void
 {
-
-    // begin frame
-    // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
-
-    // check swapchain rebuild
-    if (swapchain.needRecreate) {
-        swapchain.recreate(device, graphicsQueue);
-    }
-
-    {
-        // wait semaphore frame (n - numFrames)
-        auto result = device.handle.waitSemaphores(
-            vk::SemaphoreWaitInfo{{}, *timeline.semaphore, timeline.value()},
-            std::numeric_limits<uint64_t>::max());
-    }
-
-    // reset current frame's command pool to reuse the command buffer
-    timeline.pool().reset();
-    timeline.buffer().begin({});
-
-    auto result = swapchain.acquireNextImage();
-
-    if (result == vk::Result::eErrorOutOfDateKHR
-        || result == vk::Result::eSuboptimalKHR) {
-        swapchain.needRecreate = true;
-    } else if (!(result == vk::Result::eSuccess
-                 || result == vk::Result::eSuboptimalKHR)) {
-        throw std::exception{};
-    }
-
-    if (swapchain.needRecreate) {
-        return;
-    }
-
-    // update uniform buffers
-
-    for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
-        auto transform = Transform{
-            .modelMatrix          = mesh.modelMatrix,
-            .viewProjectionMatrix = scene.getCamera().getProjectionMatrix()
-                                  * scene.getCamera().getViewMatrix()};
-        // transform.viewProjectionMatrix[1][1] *= -1;
-
-        VK_CHECK(vmaCopyMemoryToAllocation(
-            allocator.allocator,
-            &transform,
-            scene.buffers.uniform[swapchain.frame.index].allocation,
-            sizeof(Transform) * meshIndex,
-            sizeof(Transform)));
-    }
-
-    // color attachment image to render to: vk::RenderingAttachmentInfo
-    auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
-        swapchain.getNextImageView(),
-        vk::ImageLayout::eAttachmentOptimal,
-        {},
-        {},
-        {},
+    beginRender(
         vk::AttachmentLoadOp::eClear,
         vk::AttachmentStoreOp::eStore,
-        vk::ClearColorValue{std::array{0.2f, 0.5f, 1.0f, 1.0f}}};
-
-    // depth attachment buffer: vk::RenderingAttachmentInfo
-    auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
-        depthImageView,
-        vk::ImageLayout::eAttachmentOptimal,
-        {},
-        {},
-        {},
         vk::AttachmentLoadOp::eClear,
-        vk::AttachmentStoreOp::eStore,
-        vk::ClearDepthStencilValue{1.0f, 0}};
-
-    // rendering info for dynamic rendering
-    auto renderingInfo = vk::RenderingInfo{
-        {},
-        vk::Rect2D{{}, getWindowExtent()},
-        1,
-        {},
-        renderingColorAttachmentInfo,
-        &renderingDepthAttachmentInfo};
-
-    // transition swapchain image layout
-    cmdTransitionImageLayout(
-        timeline.buffer(),
-        swapchain.getNextImage(),
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eColorAttachmentOptimal);
-
-    timeline.buffer().beginRendering(renderingInfo);
+        vk::AttachmentStoreOp::eDontCare);
 
     timeline.buffer().setViewportWithCount(
         vk::Viewport(
@@ -284,5 +195,101 @@ auto Renderer::render(
             .drawIndexed(scene.meshes[meshIndex].indices.size(), 1, 0, 0, 0);
     }
 
+    endRender();
+}
+
+auto Renderer::beginFrame() -> void
+{
+
+    // begin frame
+    // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
+
+    // check swapchain rebuild
+    if (swapchain.needRecreate) {
+        swapchain.recreate(device, graphicsQueue);
+    }
+
+    {
+        // wait semaphore frame (n - numFrames)
+        auto result = device.handle.waitSemaphores(
+            vk::SemaphoreWaitInfo{{}, *timeline.semaphore, timeline.value()},
+            std::numeric_limits<uint64_t>::max());
+    }
+
+    // reset current frame's command pool to reuse the command buffer
+    timeline.pool().reset();
+    timeline.buffer().begin({});
+
+    auto result = swapchain.acquireNextImage();
+
+    if (result == vk::Result::eErrorOutOfDateKHR
+        || result == vk::Result::eSuboptimalKHR) {
+        swapchain.needRecreate = true;
+    } else if (!(result == vk::Result::eSuccess
+                 || result == vk::Result::eSuboptimalKHR)) {
+        throw std::exception{};
+    }
+
+    if (swapchain.needRecreate) {
+        return;
+    }
+}
+
+auto Renderer::endFrame() -> void
+{
+    // advance to the next frame
+    swapchain.advance();
+    timeline.advance();
+}
+auto Renderer::beginRender(
+    vk::AttachmentLoadOp  loadOp,
+    vk::AttachmentStoreOp storeOp,
+    vk::AttachmentLoadOp  depthLoadOp,
+    vk::AttachmentStoreOp depthStoreOp) -> void
+{
+    // color attachment image to render to: vk::RenderingAttachmentInfo
+    auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
+        swapchain.getNextImageView(),
+        vk::ImageLayout::eAttachmentOptimal,
+        {},
+        {},
+        {},
+        loadOp,
+        storeOp,
+        vk::ClearColorValue{std::array{0.2f, 0.5f, 1.0f, 1.0f}}};
+
+    // depth attachment buffer: vk::RenderingAttachmentInfo
+    auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
+        depthImageView,
+        vk::ImageLayout::eAttachmentOptimal,
+        {},
+        {},
+        {},
+        depthLoadOp,
+        depthStoreOp,
+        vk::ClearDepthStencilValue{1.0f, 0}};
+
+    // rendering info for dynamic rendering
+    auto renderingInfo = vk::RenderingInfo{
+        {},
+        vk::Rect2D{{}, getWindowExtent()},
+        1,
+        {},
+        renderingColorAttachmentInfo,
+        &renderingDepthAttachmentInfo};
+
+    // transition swapchain image layout
+    cmdTransitionImageLayout(
+        timeline.buffer(),
+        swapchain.getNextImage(),
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eColorAttachmentOptimal);
+
+    timeline.buffer().beginRendering(renderingInfo);
+}
+
+auto Renderer::endRender() -> void
+{
+
     timeline.buffer().endRendering();
-};
+}
