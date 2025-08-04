@@ -1,4 +1,5 @@
 #include "Renderer.hpp"
+#include "App.hpp"
 #include <ranges>
 
 Renderer::Renderer()
@@ -96,14 +97,12 @@ auto Renderer::submit() -> void
 
     auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{timeline.buffer()};
 
-    fmt::print(stderr, "\n\nBefore vkQueueSubmit2()\n\n");
     graphicsQueue.handle.submit2(
         vk::SubmitInfo2{
             {},
             waitSemaphoreSubmitInfo,
             commandBufferSubmitInfo,
             signalSemaphoreSubmitInfos});
-    fmt::print(stderr, "\n\nAfter vkQueueSubmit2()\n\n");
 }
 
 auto Renderer::present() -> void
@@ -126,7 +125,8 @@ auto Renderer::present() -> void
     }
 
     // advance to the next frame in the swapchain
-    swapchain.advanceFrame();
+    swapchain.advance();
+    timeline.advance();
 }
 
 auto Renderer::getWindowExtent() const -> vk::Extent2D
@@ -134,7 +134,11 @@ auto Renderer::getWindowExtent() const -> vk::Extent2D
     return physicalDevice.handle.getSurfaceCapabilitiesKHR(surface.handle)
         .currentExtent;
 }
-auto Renderer::render(Scene &scene) -> void
+
+auto Renderer::render(
+    Scene              &scene,
+    vk::raii::Pipeline &graphicsPipeline,
+    Descriptors        &descriptors) -> void
 {
 
     // begin frame
@@ -182,7 +186,7 @@ auto Renderer::render(Scene &scene) -> void
         VK_CHECK(vmaCopyMemoryToAllocation(
             allocator.allocator,
             &transform,
-            sceneBuffers[swapchain.frame.index].allocation,
+            scene.buffers.uniform[swapchain.frame.index].allocation,
             sizeof(Transform) * meshIndex,
             sizeof(Transform)));
     }
@@ -243,7 +247,7 @@ auto Renderer::render(Scene &scene) -> void
     // bind texture resources passed to shader
     timeline.buffer().bindDescriptorSets(
         vk::PipelineBindPoint::eGraphics,
-        *pipelineLayout,
+        *descriptors.pipelineLayout,
         0,
         *descriptors.descriptorSets[swapchain.frame.index],
         {});
@@ -251,11 +255,14 @@ auto Renderer::render(Scene &scene) -> void
     for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
         // fmt::println(stderr, "scene.meshes[{}]", meshIndex);
         // bind vertex data
-        timeline.buffer().bindVertexBuffers(0, primitiveBuffers[meshIndex].buffer, {0});
+        timeline.buffer().bindVertexBuffers(
+            0,
+            scene.buffers.vertex[meshIndex].buffer,
+            {0});
 
         // bind index data
         timeline.buffer().bindIndexBuffer(
-            indexBuffers[meshIndex].buffer,
+            scene.buffers.index[meshIndex].buffer,
             0,
             vk::IndexType::eUint16);
 
@@ -266,7 +273,7 @@ auto Renderer::render(Scene &scene) -> void
 
         timeline.buffer().pushConstants2(
             vk::PushConstantsInfo{
-                *pipelineLayout,
+                *descriptors.pipelineLayout,
                 vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
                 0,
                 sizeof(PushConstantBlock),

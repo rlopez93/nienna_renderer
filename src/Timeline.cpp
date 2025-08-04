@@ -27,9 +27,9 @@ Timeline::Timeline(
 
     std::ranges::iota(values, 0u);
 }
-auto Timeline::advance(uint32_t maxFramesInFlight) -> void
+auto Timeline::advance() -> void
 {
-    index = (index + 1) % maxFramesInFlight;
+    index = (index + 1) % values.size();
 }
 auto Timeline::buffer() -> vk::raii::CommandBuffer &
 {

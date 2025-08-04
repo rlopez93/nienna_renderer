@@ -38,5 +38,5 @@ struct Swapchain {
 
     auto getRenderFinishedSemaphore() -> vk::Semaphore;
 
-    auto advanceFrame() -> void;
+    auto advance() -> void;
 };

@@ -38,12 +38,10 @@ auto main(
 
     // TODO: move to Renderer construction
     // create transient command pool for single-time commands
-    auto transientCommandPool = vk::raii::CommandPool{
-        r.device.handle,
-        {vk::CommandPoolCreateFlagBits::eTransient, r.graphicsQueue.index}};
-
+    auto transient =
+        Command{r.device, r.graphicsQueue, vk::CommandPoolCreateFlagBits::eTransient};
     // Transition image layout
-    auto commandBuffer = beginSingleTimeCommands(r.device.handle, transientCommandPool);
+    auto commandBuffer = beginSingleTimeCommands(r.device.handle, transient.pool);
 
     for (auto image : r.swapchain.images) {
         cmdTransitionImageLayout(
@@ -56,7 +54,7 @@ auto main(
 
     endSingleTimeCommands(
         r.device.handle,
-        transientCommandPool,
+        transient.pool,
         commandBuffer,
         r.graphicsQueue.handle);
 
@@ -65,21 +63,14 @@ auto main(
 
     auto sampler = vk::raii::Sampler{r.device.handle, vk::SamplerCreateInfo{}};
 
-    auto
-        [primitiveBuffers,
-         indexBuffers,
-         sceneBuffers,
-         textureImageBuffers,
-         textureImageViews] =
-            createBuffers(
-                r.device.handle,
-                transientCommandPool,
-                r.allocator,
-                r.graphicsQueue.handle,
-                scene,
-                r.swapchain.frame.maxFramesInFlight);
+    scene.createBuffersOnDevice(
+        r.device,
+        transient,
+        r.allocator,
+        r.graphicsQueue,
+        r.swapchain.frame.maxFramesInFlight);
 
-    uint32_t textureCount = textureImageBuffers.size();
+    uint32_t textureCount = scene.textureBuffers.image.size();
     uint32_t meshCount    = scene.meshes.size();
     fmt::println(stderr, "textures.size(): {}", textureCount);
     fmt::println(stderr, "meshes.size(): {}", meshCount);
@@ -93,9 +84,9 @@ auto main(
     updateDescriptorSets(
         r.device.handle,
         descriptors,
-        sceneBuffers,
+        scene.buffers.uniform,
         meshCount,
-        textureImageViews,
+        scene.textureBuffers.imageView,
         sampler);
 
     auto graphicsPipeline = createPipeline(
@@ -143,10 +134,8 @@ auto main(
 
         scene.getCamera().update(deltaTime);
 
-        r.render(scene);
-
+        r.render(scene, graphicsPipeline, descriptors);
         r.submit();
-        // present frame
         r.present();
 
         ++totalFrames;

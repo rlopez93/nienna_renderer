@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fastgltf/core.hpp>
+#include <ranges>
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/mat4x4.hpp>
@@ -12,7 +13,10 @@
 
 #include "vulkan_raii.hpp"
 
+#include "Allocator.hpp"
 #include "Camera.hpp"
+#include "Command.hpp"
+#include "Queue.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -67,12 +71,30 @@ struct Scene {
     std::vector<PerspectiveCamera> cameras;
     uint32_t                       cameraIndex = 0u;
 
+    struct Buffers {
+        std::vector<Buffer> index;
+        std::vector<Buffer> vertex;
+        std::vector<Buffer> uniform;
+    } buffers;
+
+    struct TextureBuffers {
+        std::vector<Image>               image;
+        std::vector<vk::raii::ImageView> imageView;
+    } textureBuffers;
+
     auto processInput(SDL_Event &e) -> void;
 
     [[nodiscard]]
     auto getCamera() const -> const PerspectiveCamera &;
     [[nodiscard]]
     auto getCamera() -> PerspectiveCamera &;
+
+    auto createBuffersOnDevice(
+        Device    &device,
+        Command   &command,
+        Allocator &allocator,
+        Queue     &queue,
+        uint64_t   maxFramesInFlight) -> void;
 };
 
 auto getGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset;

@@ -21,7 +21,7 @@ struct Timeline {
     auto createTimelineSemaphore(
         Device  &device,
         uint32_t maxFramesInFlight) -> vk::raii::Semaphore;
-    auto advance(uint32_t maxFramesInFlight) -> void;
+    auto advance() -> void;
     auto buffer() -> vk::raii::CommandBuffer &;
     auto pool() -> vk::raii::CommandPool &;
 

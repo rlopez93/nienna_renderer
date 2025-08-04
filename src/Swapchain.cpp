@@ -111,7 +111,7 @@ auto Swapchain::getRenderFinishedSemaphore() -> vk::Semaphore
     return frame.renderFinishedSemaphores[nextImageIndex];
 }
 
-auto Swapchain::advanceFrame() -> void
+auto Swapchain::advance() -> void
 {
     frame.index = (frame.index + 1) % frame.maxFramesInFlight;
 }

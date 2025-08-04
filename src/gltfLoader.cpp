@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "Camera.hpp"
+#include "Utility.hpp"
 
 auto getGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset
 {
@@ -368,4 +369,73 @@ auto Scene::getCamera() const -> const PerspectiveCamera &
 auto Scene::getCamera() -> PerspectiveCamera &
 {
     return cameras[cameraIndex];
+}
+
+auto Scene::createBuffersOnDevice(
+    Device    &device,
+    Command   &command,
+    Allocator &allocator,
+    Queue     &queue,
+    uint64_t   maxFramesInFlight) -> void
+{
+    auto cmd = beginSingleTimeCommands(device.handle, command.pool);
+
+    for (const auto &mesh : meshes) {
+        buffers.vertex.emplace_back(allocator.createBufferAndUploadData(
+            cmd,
+            mesh.primitives,
+            vk::BufferUsageFlagBits2::eVertexBuffer));
+
+        buffers.index.emplace_back(allocator.createBufferAndUploadData(
+            cmd,
+            mesh.indices,
+            vk::BufferUsageFlagBits2::eIndexBuffer));
+    }
+
+    fmt::println(stderr, "Uniform buffer size: {}", sizeof(Transform) * meshes.size());
+
+    for (auto i : std::views::iota(0u, maxFramesInFlight)) {
+        buffers.uniform.emplace_back(allocator.createBuffer(
+            sizeof(Transform) * meshes.size(),
+            vk::BufferUsageFlagBits2::eUniformBuffer
+                | vk::BufferUsageFlagBits2::eTransferDst,
+            VMA_MEMORY_USAGE_AUTO,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                | VMA_ALLOCATION_CREATE_MAPPED_BIT));
+    }
+
+    for (const auto &texture : textures) {
+        fmt::println(stderr, "uploading texture '{}'", texture.name.string());
+        textureBuffers.image.emplace_back(allocator.createImageAndUploadData(
+            cmd,
+            texture.data,
+            vk::ImageCreateInfo{
+                {},
+                vk::ImageType::e2D,
+                vk::Format::eR8G8B8A8Srgb,
+                // vk::Format::eR8G8B8A8Unorm,
+                vk::Extent3D(texture.extent, 1),
+                1,
+                1,
+                vk::SampleCountFlagBits::e1,
+                vk::ImageTiling::eOptimal,
+                vk::ImageUsageFlagBits::eSampled},
+            vk::ImageLayout::eShaderReadOnlyOptimal));
+
+        textureBuffers.imageView.emplace_back(device.handle.createImageView(
+            vk::ImageViewCreateInfo{
+                {},
+                textureBuffers.image.back().image,
+                vk::ImageViewType::e2D,
+                vk::Format::eR8G8B8A8Srgb,
+                {},
+                vk::ImageSubresourceRange{
+                    vk::ImageAspectFlagBits::eColor,
+                    0,
+                    1,
+                    0,
+                    1}}));
+    }
+
+    endSingleTimeCommands(device.handle, command.pool, cmd, queue.handle);
 }

@@ -17,6 +17,7 @@
 
 #include "Allocator.hpp"
 #include "Command.hpp"
+#include "Descriptor.hpp"
 #include "Device.hpp"
 #include "Frame.hpp"
 #include "Instance.hpp"
@@ -48,7 +49,10 @@ struct Renderer {
 
     auto submit() -> void;
     auto present() -> void;
-    auto render(Scene &scene) -> void;
+    auto render(
+        Scene              &scene,
+        vk::raii::Pipeline &pipeline,
+        Descriptors        &descriptors) -> void;
 
     [[nodiscard]]
     auto getWindowExtent() const -> vk::Extent2D;
