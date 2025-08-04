@@ -114,6 +114,8 @@ auto Renderer::present() -> void
             *swapchain.handle,
             swapchain.nextImageIndex});
 
+    // FIXME:
+    // Swapchain recreation logic
     if (presentResult == vk::Result::eErrorOutOfDateKHR
         || presentResult == vk::Result::eSuboptimalKHR) {
         swapchain.needRecreate = true;
@@ -204,6 +206,9 @@ auto Renderer::beginFrame() -> void
     // begin frame
     // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
 
+    // FIXME:
+    // Swapchain recreation logic
+
     // check swapchain rebuild
     if (swapchain.needRecreate) {
         swapchain.recreate(device, graphicsQueue);
@@ -222,6 +227,8 @@ auto Renderer::beginFrame() -> void
 
     auto result = swapchain.acquireNextImage();
 
+    // FIXME:
+    // Swapchain recreation logic
     if (result == vk::Result::eErrorOutOfDateKHR
         || result == vk::Result::eSuboptimalKHR) {
         swapchain.needRecreate = true;

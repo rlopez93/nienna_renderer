@@ -200,6 +200,10 @@ auto main(
 
         scene.update(deltaTime);
 
+        // FIXME:
+        // Does copying uniform data to device go in scene.update()?
+        // Synchronization?
+
         // update uniform buffers
         for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
             auto transform = Transform{
@@ -228,7 +232,8 @@ auto main(
             vk::AttachmentLoadOp::eLoad,
             vk::AttachmentStoreOp::eStore);
 
-        ImGui_ImplVulkan_RenderDrawData(imGuiDrawData, *r.timeline.buffer());
+        // ImGui_ImplVulkan_RenderDrawData(imGuiDrawData, *r.timeline.buffer());
+
         r.endRender();
 
         r.submit();
