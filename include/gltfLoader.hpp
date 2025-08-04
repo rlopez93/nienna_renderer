@@ -83,6 +83,7 @@ struct Scene {
     } textureBuffers;
 
     auto processInput(SDL_Event &e) -> void;
+    auto update(const std::chrono::duration<float> dt) -> void;
 
     [[nodiscard]]
     auto getCamera() const -> const PerspectiveCamera &;

@@ -359,6 +359,8 @@ auto Scene::processInput(SDL_Event &e) -> void
             break;
         }
     }
+
+    getCamera().processInput(e);
 }
 
 auto Scene::getCamera() const -> const PerspectiveCamera &
@@ -438,4 +440,8 @@ auto Scene::createBuffersOnDevice(
     }
 
     endSingleTimeCommands(device.handle, command.pool, cmd, queue.handle);
+}
+auto Scene::update(const std::chrono::duration<float> dt) -> void
+{
+    getCamera().update(dt);
 }

@@ -34,12 +34,14 @@ auto main(
         }
     }();
 
+    // instantiate our renderer
+    // this constructor does A LOT
     Renderer r;
 
-    // TODO: move to Renderer construction
     // create transient command pool for single-time commands
     auto transient =
         Command{r.device, r.graphicsQueue, vk::CommandPoolCreateFlagBits::eTransient};
+
     // Transition image layout
     auto commandBuffer = beginSingleTimeCommands(r.device.handle, transient.pool);
 
@@ -61,6 +63,7 @@ auto main(
     auto asset = getGltfAsset(gltfDirectory / gltfFilename);
     auto scene = getSceneData(asset, gltfDirectory);
 
+    // TODO: get sampler from glTF asset
     auto sampler = vk::raii::Sampler{r.device.handle, vk::SamplerCreateInfo{}};
 
     scene.createBuffersOnDevice(
@@ -128,11 +131,11 @@ auto main(
             if (e.type == SDL_EVENT_QUIT) {
                 running = false;
             }
+
             scene.processInput(e);
-            scene.getCamera().processInput(e);
         }
 
-        scene.getCamera().update(deltaTime);
+        scene.update(deltaTime);
 
         r.render(scene, graphicsPipeline, descriptors);
         r.submit();
