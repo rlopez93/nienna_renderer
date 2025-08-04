@@ -241,6 +241,7 @@ auto Renderer::endFrame() -> void
     swapchain.advance();
     timeline.advance();
 }
+
 auto Renderer::beginRender(
     vk::AttachmentLoadOp  loadOp,
     vk::AttachmentStoreOp storeOp,

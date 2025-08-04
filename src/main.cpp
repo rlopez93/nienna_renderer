@@ -200,8 +200,6 @@ auto main(
 
         scene.update(deltaTime);
 
-        r.beginFrame();
-
         // update uniform buffers
         for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
             auto transform = Transform{
@@ -217,6 +215,8 @@ auto main(
                 sizeof(Transform) * meshIndex,
                 sizeof(Transform)));
         }
+
+        r.beginFrame();
 
         // render scene
         r.render(scene, graphicsPipeline, descriptors);
