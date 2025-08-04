@@ -4,6 +4,7 @@ project(nienna LANGUAGES C CXX)
 add_subdirectory(third_party/vk-bootstrap)
 add_subdirectory(third_party/fastgltf)
 
+
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_PREFIX_PATH $ENV{VULKAN_SDK})
 set(CMAKE_BUILD_TYPE Debug)
@@ -41,8 +42,17 @@ target_sources(nienna PRIVATE
     src/Window.cpp
 )
 
+file(GLOB IMGUI_SOURCES "third_party/imgui/*.cpp")
+
+target_sources(nienna PRIVATE
+${IMGUI_SOURCES}
+third_party/imgui/backends/imgui_impl_vulkan.cpp
+third_party/imgui/backends/imgui_impl_sdl3.cpp)
+
 target_include_directories(nienna PRIVATE
     include
+    third_party/imgui
+    third_party/imgui/backends
     ${Vulkan_INCLUDE_DIRS}
 )
 
