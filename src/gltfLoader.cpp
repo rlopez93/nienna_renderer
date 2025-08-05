@@ -380,16 +380,16 @@ auto Scene::createBuffersOnDevice(
     Queue     &queue,
     uint64_t   maxFramesInFlight) -> void
 {
-    auto cmd = beginSingleTimeCommands(device.handle, command.pool);
+    beginSingleTimeCommands(device.handle, command.pool);
 
     for (const auto &mesh : meshes) {
         buffers.vertex.emplace_back(allocator.createBufferAndUploadData(
-            cmd,
+            command.buffer,
             mesh.primitives,
             vk::BufferUsageFlagBits2::eVertexBuffer));
 
         buffers.index.emplace_back(allocator.createBufferAndUploadData(
-            cmd,
+            command.buffer,
             mesh.indices,
             vk::BufferUsageFlagBits2::eIndexBuffer));
     }
@@ -401,6 +401,7 @@ auto Scene::createBuffersOnDevice(
             sizeof(Transform) * meshes.size(),
             vk::BufferUsageFlagBits2::eUniformBuffer
                 | vk::BufferUsageFlagBits2::eTransferDst,
+            false,
             VMA_MEMORY_USAGE_AUTO,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
                 | VMA_ALLOCATION_CREATE_MAPPED_BIT));
@@ -409,7 +410,7 @@ auto Scene::createBuffersOnDevice(
     for (const auto &texture : textures) {
         fmt::println(stderr, "uploading texture '{}'", texture.name.string());
         textureBuffers.image.emplace_back(allocator.createImageAndUploadData(
-            cmd,
+            command.buffer,
             texture.data,
             vk::ImageCreateInfo{
                 {},
@@ -439,7 +440,7 @@ auto Scene::createBuffersOnDevice(
                     1}}));
     }
 
-    endSingleTimeCommands(device.handle, command.pool, cmd, queue.handle);
+    endSingleTimeCommands(device.handle, command.pool, command.buffer, queue.handle);
 }
 auto Scene::update(const std::chrono::duration<float> dt) -> void
 {

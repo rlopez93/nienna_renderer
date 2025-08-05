@@ -72,24 +72,27 @@ void cmdTransitionImageLayout(
     cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, {}, barrier});
 }
 
+// FIXME: change signature to (Device&, Command&) -> void
+// call command.buffer.begin()
+
 auto beginSingleTimeCommands(
     vk::raii::Device      &device,
-    vk::raii::CommandPool &commandPool) -> vk::raii::CommandBuffer
+    vk::raii::CommandPool &commandPool) -> void // vk::raii::CommandBuffer
 {
-    static int64_t count = 0;
-
-    // fmt::print(stderr, "beginSingleTimeCommands(): {}\n", count);
-    ++count;
-    auto commandBuffers = vk::raii::CommandBuffers{
-        device,
-        vk::CommandBufferAllocateInfo{
-            commandPool,
-            vk::CommandBufferLevel::ePrimary,
-            1}};
-    commandBuffers.front().begin(
-        vk::CommandBufferBeginInfo{vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-
-    return std::move(commandBuffers.front());
+    // static int64_t count = 0;
+    //
+    // // fmt::print(stderr, "beginSingleTimeCommands(): {}\n", count);
+    // ++count;
+    // auto commandBuffers = vk::raii::CommandBuffers{
+    //     device,
+    //     vk::CommandBufferAllocateInfo{
+    //         commandPool,
+    //         vk::CommandBufferLevel::ePrimary,
+    //         1}};
+    // commandBuffers.front().begin(
+    //     vk::CommandBufferBeginInfo{vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+    //
+    // return std::move(commandBuffers.front());
 };
 void endSingleTimeCommands(
     vk::raii::Device        &device,

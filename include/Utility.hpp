@@ -49,7 +49,7 @@ void cmdTransitionImageLayout(
 
 auto beginSingleTimeCommands(
     vk::raii::Device      &device,
-    vk::raii::CommandPool &commandPool) -> vk::raii::CommandBuffer;
+    vk::raii::CommandPool &commandPool) -> void;
 
 void endSingleTimeCommands(
     vk::raii::Device        &device,

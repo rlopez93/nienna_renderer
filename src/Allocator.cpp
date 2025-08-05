@@ -56,8 +56,9 @@ Allocator::Allocator(
 auto Allocator::createBuffer(
     vk::DeviceSize           bufferSize,
     vk::BufferUsageFlags2    usageFlags,
+    bool                     isStagingBuffer,
     VmaMemoryUsage           memoryUsage,
-    VmaAllocationCreateFlags allocationFlags) const -> Buffer
+    VmaAllocationCreateFlags allocationFlags) -> Buffer
 {
 
     const auto bufferUsageFlags2CreateInfo = *vk::BufferUsageFlags2CreateInfo{
@@ -94,6 +95,14 @@ auto Allocator::createBuffer(
 
     buffer.buffer = vk_buffer;
 
+    if (isStagingBuffer) {
+        stagingBuffers.push_back(buffer);
+    }
+
+    else {
+        buffers.push_back(buffer);
+    }
+
     return buffer;
 }
 //*-- Destroy a buffer -*/
@@ -108,7 +117,7 @@ void Allocator::destroyBuffer(Buffer buffer) const
  * See createImageAndUploadData for creating an image and uploading data.
 -*/
 [[nodiscard]]
-auto Allocator::createImage(const vk::ImageCreateInfo &imageInfo) const -> Image
+auto Allocator::createImage(const vk::ImageCreateInfo &imageInfo) -> Image
 {
     const auto imageCreateInfo = *imageInfo;
 
@@ -125,11 +134,14 @@ auto Allocator::createImage(const vk::ImageCreateInfo &imageInfo) const -> Image
         &image.allocation,
         &allocInfo));
     image.image = vk_image;
+
+    images.push_back(image);
+
     return image;
 }
 
 /*-- Destroy image --*/
-void Allocator::destroyImage(Image &image) const
+void Allocator::destroyImage(Image image) const
 {
     vmaDestroyImage(allocator, image.image, image.allocation);
 }
@@ -145,9 +157,29 @@ void Allocator::freeStagingBuffers()
     for (const auto &buffer : stagingBuffers) {
         destroyBuffer(buffer);
     }
+
     stagingBuffers.clear();
 }
 Allocator::~Allocator()
 {
+    freeStagingBuffers();
+    freeBuffers();
+    freeImages();
     vmaDestroyAllocator(allocator);
+}
+void Allocator::freeBuffers()
+{
+    for (const auto &buffer : buffers) {
+        destroyBuffer(buffer);
+    }
+
+    buffers.clear();
+}
+
+void Allocator::freeImages()
+{
+    for (const auto &image : images) {
+        destroyImage(image);
+    }
+    images.clear();
 }

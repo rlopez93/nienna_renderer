@@ -33,8 +33,9 @@ struct Allocator {
     auto createBuffer(
         vk::DeviceSize           deviceSize,
         vk::BufferUsageFlags2    usage,
-        VmaMemoryUsage           memoryUsage = VMA_MEMORY_USAGE_AUTO,
-        VmaAllocationCreateFlags flags       = {}) const -> Buffer;
+        bool                     isStagingBuffer = false,
+        VmaMemoryUsage           memoryUsage     = VMA_MEMORY_USAGE_AUTO,
+        VmaAllocationCreateFlags flags           = {}) -> Buffer;
 
     void destroyBuffer(Buffer buffer) const;
 
@@ -50,9 +51,9 @@ struct Allocator {
         vk::BufferUsageFlags2    usageFlags) -> Buffer;
 
     [[nodiscard]]
-    auto createImage(const vk::ImageCreateInfo &imageInfo) const -> Image;
+    auto createImage(const vk::ImageCreateInfo &imageInfo) -> Image;
 
-    void destroyImage(Image &image) const;
+    void destroyImage(Image image) const;
 
     template <typename T>
     [[nodiscard]]
@@ -63,10 +64,14 @@ struct Allocator {
         vk::ImageLayout          finalLayout) -> Image;
 
     void freeStagingBuffers();
+    void freeBuffers();
+    void freeImages();
 
     vk::Device          device;
     VmaAllocator        allocator;
     std::vector<Buffer> stagingBuffers;
+    std::vector<Buffer> buffers;
+    std::vector<Image>  images;
 };
 
 template <typename T>
@@ -154,12 +159,10 @@ inline auto Allocator::createStagingBuffer(const std::vector<T> &vectorData) -> 
     Buffer stagingBuffer = createBuffer(
         bufferSize,
         vk::BufferUsageFlagBits2::eTransferSrc,
+        true,
         VMA_MEMORY_USAGE_CPU_TO_GPU,
         VMA_ALLOCATION_CREATE_MAPPED_BIT
             | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-
-    // Track the staging buffer for later cleanup
-    stagingBuffers.push_back(stagingBuffer);
 
     // fmt::print(stderr, "\n\ncalling vmaCopyMemoryToAllocation()...\n\n");
     vmaCopyMemoryToAllocation(

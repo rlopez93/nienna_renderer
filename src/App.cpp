@@ -10,7 +10,8 @@ auto createPipeline(
     vk::Format                   depthFormat,
     vk::raii::PipelineLayout    &pipelineLayout) -> vk::raii::Pipeline
 {
-    auto       shaderModule = createShaderModule(device, shaderPath);
+    auto shaderModule = createShaderModule(device, shaderPath);
+
     // The stages used by this pipeline
     const auto shaderStages = std::array{
         vk::PipelineShaderStageCreateInfo{

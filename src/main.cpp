@@ -94,11 +94,11 @@ auto main(
         Command{r.device, r.graphicsQueue, vk::CommandPoolCreateFlagBits::eTransient};
 
     // Transition image layout
-    auto commandBuffer = beginSingleTimeCommands(r.device.handle, transient.pool);
+    beginSingleTimeCommands(r.device.handle, transient.pool);
 
     for (auto image : r.swapchain.images) {
         cmdTransitionImageLayout(
-            commandBuffer,
+            transient.buffer,
             image,
             vk::ImageLayout::eUndefined,
             vk::ImageLayout::ePresentSrcKHR,
@@ -108,7 +108,7 @@ auto main(
     endSingleTimeCommands(
         r.device.handle,
         transient.pool,
-        commandBuffer,
+        transient.buffer,
         r.graphicsQueue.handle);
 
     auto asset = getGltfAsset(gltfDirectory / gltfFilename);
