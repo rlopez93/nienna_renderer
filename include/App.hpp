@@ -22,20 +22,6 @@ auto createPipeline(
     vk::Format                   depthFormat,
     vk::raii::PipelineLayout    &pipelineLayout) -> vk::raii::Pipeline;
 
-auto createBuffers(
-    vk::raii::Device      &device,
-    vk::raii::CommandPool &cmdPool,
-    Allocator             &allocator,
-    vk::raii::Queue       &queue,
-    const Scene           &scene,
-    uint64_t               maxFramesInFlight)
-    -> std::tuple<
-        std::vector<Buffer>,
-        std::vector<Buffer>,
-        std::vector<Buffer>,
-        std::vector<Image>,
-        std::vector<vk::raii::ImageView>>;
-
 auto updateDescriptorSets(
     vk::raii::Device                       &device,
     Descriptors                            &descriptors,

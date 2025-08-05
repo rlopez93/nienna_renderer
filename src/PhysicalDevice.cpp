@@ -4,7 +4,19 @@
 #include <fmt/base.h>
 #include <iostream>
 
-auto createVkbPhysicalDevice(
+PhysicalDevice::PhysicalDevice(
+    Instance &instance,
+    Surface  &surface)
+    : vkbPhysicalDevice{createVkbPhysicalDevice(
+          instance,
+          surface)},
+      handle{
+          instance.handle,
+          vkbPhysicalDevice.physical_device}
+{
+}
+
+auto PhysicalDevice::createVkbPhysicalDevice(
     Instance &instance,
     Surface  &surface) -> vkb::PhysicalDevice
 {
@@ -47,16 +59,4 @@ auto createVkbPhysicalDevice(
     }
 
     return physicalDeviceResult.value();
-}
-
-PhysicalDevice::PhysicalDevice(
-    Instance &instance,
-    Surface  &surface)
-    : vkbPhysicalDevice{createVkbPhysicalDevice(
-          instance,
-          surface)},
-      handle{
-          instance.handle,
-          vkbPhysicalDevice.physical_device}
-{
 }

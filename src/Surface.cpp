@@ -3,7 +3,16 @@
 #include <SDL3/SDL_vulkan.h>
 #include <fmt/base.h>
 
-auto createSurface(
+Surface::Surface(
+    Instance &instance,
+    Window   &window)
+    : handle{createSurface(
+          instance,
+          window)}
+{
+}
+
+auto Surface::createSurface(
     Instance &instance,
     Window   &window) -> vk::raii::SurfaceKHR
 {
@@ -13,13 +22,4 @@ auto createSurface(
         return nullptr;
     }
     return {instance.handle, surface};
-}
-
-Surface::Surface(
-    Instance &instance,
-    Window   &window)
-    : handle{createSurface(
-          instance,
-          window)}
-{
 }

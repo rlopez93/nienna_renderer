@@ -11,35 +11,14 @@
 #include "PhysicalDevice.hpp"
 #include "Utility.hpp"
 
-/*--
- * A buffer is a region of memory used to store data.
- * It is used to store vertex data, index data, uniform data, and other types of data.
- * There is a VkBuffer object that represents the buffer, and a VmaAllocation object
-that represents the memory allocation.
- * The address is used to access the buffer in the shader.
--*/
 struct Buffer {
-    vk::Buffer        buffer{};
-    VmaAllocation     allocation{};
-    vk::DeviceAddress address{};
-};
-
-/*--
- * The image resource is an image with an image view and a layout.
- * and other information like format and extent.
--*/
-struct Image {
-    vk::Image     image{};
+    vk::Buffer    buffer{};
     VmaAllocation allocation{};
 };
 
-/*The image resource is an image with an image view and a
-        layout and other information like format and extent*/
-struct ImageResource : Image {
-    vk::raii::ImageView view;     // Image view
-    vk::Extent2D        extent{}; // Size of the image
-    vk::ImageLayout
-        layout{}; // Layout of the image (color attachment, shader read, ...)
+struct Image {
+    vk::Image     image{};
+    VmaAllocation allocation{};
 };
 
 struct Allocator {
@@ -59,23 +38,9 @@ struct Allocator {
 
     void destroyBuffer(Buffer buffer) const;
 
-    /*--
-     * Create a staging buffer, copy data into it, and track it.
-     * This method accepts data, handles the mapping, copying, and unmapping
-     * automatically.
-    -*/
     template <typename T>
     [[nodiscard]]
     auto createStagingBuffer(const std::vector<T> &vectorData) -> Buffer;
-
-    /*--
-     * Create a buffer (GPU only) with data, this is done using a staging buffer
-     * The staging buffer is a buffer that is used to transfer data from the CPU
-     * to the GPU.
-     * and cannot be freed until the data is transferred. So the command buffer
-     * must be submitted, then
-     * the staging buffer can be cleared using the freeStagingBuffers function.
-    -*/
 
     template <typename T>
     [[nodiscard]]
@@ -89,7 +54,6 @@ struct Allocator {
 
     void destroyImage(Image &image) const;
 
-    /*-- Create an image and upload data using a staging buffer --*/
     template <typename T>
     [[nodiscard]]
     auto createImageAndUploadData(
@@ -104,6 +68,7 @@ struct Allocator {
     VmaAllocator        allocator;
     std::vector<Buffer> stagingBuffers;
 };
+
 template <typename T>
 inline auto Allocator::createImageAndUploadData(
     vk::raii::CommandBuffer &cmd,
@@ -123,10 +88,7 @@ inline auto Allocator::createImageAndUploadData(
         cmd,
         image.image,
         vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eTransferDstOptimal
-        // VK_IMAGE_LAYOUT_UNDEFINED,
-        // VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-    );
+        vk::ImageLayout::eTransferDstOptimal);
 
     // Copy buffer data to the image
     cmd.copyBufferToImage(
@@ -207,10 +169,5 @@ inline auto Allocator::createStagingBuffer(const std::vector<T> &vectorData) -> 
         0,
         bufferSize);
 
-    // Map and copy data to the staging buffer
-    // void *data;
-    // vmaMapMemory(allocator, stagingBuffer.allocation, &data);
-    // memcpy(data, vectorData.data(), (size_t)bufferSize);
-    // vmaUnmapMemory(allocator, stagingBuffer.allocation);
     return stagingBuffer;
 }

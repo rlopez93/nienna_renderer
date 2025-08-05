@@ -6,12 +6,14 @@
 
 #include <VkBootstrap.h>
 
-auto createVkbInstance() -> vkb::Instance;
-
 struct Instance {
+
+    Instance();
+
+    static auto createVkbInstance() -> vkb::Instance;
+
     vk::raii::Context                context;
     vkb::Instance                    vkbInstance;
     vk::raii::Instance               handle;
     vk::raii::DebugUtilsMessengerEXT debugUtils;
-    Instance();
 };

@@ -5,13 +5,15 @@
 #include "Instance.hpp"
 #include "Window.hpp"
 
-auto createSurface(
-    Instance &instance,
-    Window   &window) -> vk::raii::SurfaceKHR;
-
 struct Surface {
+
     Surface(
         Instance &instance,
         Window   &window);
+
+    static auto createSurface(
+        Instance &instance,
+        Window   &window) -> vk::raii::SurfaceKHR;
+
     vk::raii::SurfaceKHR handle;
 };

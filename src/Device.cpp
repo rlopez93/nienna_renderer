@@ -2,7 +2,15 @@
 
 #include <fmt/base.h>
 
-auto createVkbDevice(PhysicalDevice &physicalDevice) -> vkb::Device
+Device::Device(PhysicalDevice &physicalDevice)
+    : vkbDevice{createVkbDevice(physicalDevice)},
+      handle{
+          physicalDevice.handle,
+          vkbDevice.device}
+{
+}
+
+auto Device::createVkbDevice(PhysicalDevice &physicalDevice) -> vkb::Device
 {
     auto deviceBuilder = vkb::DeviceBuilder{physicalDevice.vkbPhysicalDevice};
     auto deviceResult  = deviceBuilder.build();
@@ -15,11 +23,4 @@ auto createVkbDevice(PhysicalDevice &physicalDevice) -> vkb::Device
     }
 
     return deviceResult.value();
-}
-Device::Device(PhysicalDevice &physicalDevice)
-    : vkbDevice{createVkbDevice(physicalDevice)},
-      handle{
-          physicalDevice.handle,
-          vkbDevice.device}
-{
 }

@@ -5,14 +5,16 @@
 #include "Instance.hpp"
 #include "Surface.hpp"
 
-auto createVkbPhysicalDevice(
-    Instance &instance,
-    Surface  &surface) -> vkb::PhysicalDevice;
-
 struct PhysicalDevice {
+
     PhysicalDevice(
         Instance &instance,
         Surface  &surface);
+
+    static auto createVkbPhysicalDevice(
+        Instance &instance,
+        Surface  &surface) -> vkb::PhysicalDevice;
+
     vkb::PhysicalDevice      vkbPhysicalDevice;
     vk::raii::PhysicalDevice handle;
 };

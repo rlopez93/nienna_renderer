@@ -10,16 +10,24 @@
 #include <numbers>
 #include <optional>
 
-constexpr auto pi = std::numbers::pi_v<float>;
-
 struct PerspectiveCamera {
+
+    enum class Movement { None, Forward, Backward } moveX, moveY, moveZ;
+    enum class Rotation { None, CW, CCW } rotateX, rotateY;
+
     [[nodiscard]]
     auto getViewMatrix() const -> glm::mat4;
 
     [[nodiscard]]
     auto getProjectionMatrix() const -> glm::mat4;
 
+    auto getRotationAxis(
+        const Rotation   rotation,
+        glm::vec3       &axis,
+        const glm::vec3 &currentAxis) const -> void;
+
     auto translate(const glm::vec3 &t) -> void;
+
     auto rotate(
         const float      angle,
         const glm::vec3 &axis) -> void;
@@ -35,14 +43,6 @@ struct PerspectiveCamera {
     float                znear       = 1.0f;
     std::optional<float> zfar        = 1000.0f;
 
-    float movementSpeed = 1.5f;      // meters per second
-    float rotationSpeed = pi / 4.0f; // seconds
-
-    enum class Movement { None, Forward, Backward } moveX, moveY, moveZ;
-    enum class Rotation { None, CW, CCW } rotateX, rotateY;
-
-    auto getRotationAxis(
-        const Rotation   rotation,
-        glm::vec3       &axis,
-        const glm::vec3 &currentAxis);
+    float movementSpeed = 1.5f;                             // meters per second
+    float rotationSpeed = std::numbers::pi_v<float> / 4.0f; // seconds
 };

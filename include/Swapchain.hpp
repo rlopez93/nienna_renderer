@@ -9,15 +9,6 @@
 #include "Queue.hpp"
 
 struct Swapchain {
-    vk::raii::SwapchainKHR           handle;
-    uint32_t                         nextImageIndex = 0u;
-    std::vector<vk::Image>           images;
-    std::vector<vk::raii::ImageView> imageViews;
-    vk::Format                       imageFormat;
-    vk::Format                       depthFormat;
-    Frame                            frame;
-    bool                             needRecreate = false;
-
     Swapchain(Device &device);
 
     auto create(Device &device) -> void;
@@ -39,4 +30,13 @@ struct Swapchain {
     auto getRenderFinishedSemaphore() -> vk::Semaphore;
 
     auto advance() -> void;
+
+    vk::raii::SwapchainKHR           handle;
+    uint32_t                         nextImageIndex = 0u;
+    std::vector<vk::Image>           images;
+    std::vector<vk::raii::ImageView> imageViews;
+    vk::Format                       imageFormat;
+    vk::Format                       depthFormat;
+    Frame                            frame;
+    bool                             needRecreate = false;
 };

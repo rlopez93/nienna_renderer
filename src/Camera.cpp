@@ -46,7 +46,7 @@ auto PerspectiveCamera::rotate(
 auto PerspectiveCamera::getRotationAxis(
     const Rotation   rotation,
     glm::vec3       &axis,
-    const glm::vec3 &currentAxis)
+    const glm::vec3 &currentAxis) const -> void
 {
     switch (rotation) {
     case Rotation::CW:

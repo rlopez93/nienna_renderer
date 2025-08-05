@@ -8,11 +8,6 @@
 #include "Device.hpp"
 
 struct Frame {
-    uint32_t                         index = 0u;
-    uint32_t                         maxFramesInFlight;
-    std::vector<vk::raii::Semaphore> imageAvailableSemaphores;
-    std::vector<vk::raii::Semaphore> renderFinishedSemaphores;
-
     Frame(
         Device  &device,
         uint32_t imagesSize);
@@ -20,4 +15,9 @@ struct Frame {
     auto recreate(
         Device  &device,
         uint32_t imagesSize) -> void;
+
+    uint32_t                         index = 0u;
+    uint32_t                         maxFramesInFlight;
+    std::vector<vk::raii::Semaphore> imageAvailableSemaphores;
+    std::vector<vk::raii::Semaphore> renderFinishedSemaphores;
 };

@@ -3,7 +3,19 @@
 #include <SDL3/SDL_vulkan.h>
 #include <fmt/base.h>
 
-auto createVkbInstance() -> vkb::Instance
+Instance::Instance()
+    : context{},
+      vkbInstance{createVkbInstance()},
+      handle{
+          context,
+          vkbInstance.instance},
+      debugUtils{
+          handle,
+          vkbInstance.debug_messenger}
+{
+}
+
+auto Instance::createVkbInstance() -> vkb::Instance
 {
     std::vector<const char *> instanceExtensions{
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
@@ -47,15 +59,4 @@ auto createVkbInstance() -> vkb::Instance
     }
 
     return instanceResult.value();
-}
-Instance::Instance()
-    : context{},
-      vkbInstance{createVkbInstance()},
-      handle{
-          context,
-          vkbInstance.instance},
-      debugUtils{
-          handle,
-          vkbInstance.debug_messenger}
-{
 }

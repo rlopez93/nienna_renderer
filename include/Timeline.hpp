@@ -8,10 +8,6 @@
 #include "Command.hpp"
 
 struct Timeline {
-    uint32_t              index = 0u;
-    std::vector<Command>  command{};
-    std::vector<uint64_t> values;
-    vk::raii::Semaphore   semaphore;
 
     Timeline(
         Device        &device,
@@ -21,11 +17,20 @@ struct Timeline {
     auto createTimelineSemaphore(
         Device  &device,
         uint32_t maxFramesInFlight) -> vk::raii::Semaphore;
+
     auto advance() -> void;
+
     auto buffer() -> vk::raii::CommandBuffer &;
+
     auto pool() -> vk::raii::CommandPool &;
 
     [[nodiscard]]
     auto value() const & -> const uint64_t &;
+
     auto value() & -> uint64_t &;
+
+    uint32_t              index = 0u;
+    std::vector<Command>  command{};
+    std::vector<uint64_t> values;
+    vk::raii::Semaphore   semaphore;
 };

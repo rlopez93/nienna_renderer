@@ -1,15 +1,15 @@
 #include "Queue.hpp"
 
-auto QueueTypeToVkb(QueueType type) -> vkb::QueueType
+auto Queue::QueueTypeToVkb(Type type) -> vkb::QueueType
 {
     switch (type) {
-    case QueueType::Graphics:
+    case Type::Graphics:
         return vkb::QueueType::graphics;
 
-    case QueueType::Present:
+    case Type::Present:
         return vkb::QueueType::present;
 
-    case QueueType::Compute:
+    case Type::Compute:
         return vkb::QueueType::compute;
 
     default:
@@ -17,23 +17,23 @@ auto QueueTypeToVkb(QueueType type) -> vkb::QueueType
     }
 }
 
-auto createQueue(
-    Device   &device,
-    QueueType type) -> vk::raii::Queue
+auto Queue::createQueue(
+    Device &device,
+    Type    type) -> vk::raii::Queue
 {
     return {device.handle, device.vkbDevice.get_queue(QueueTypeToVkb(type)).value()};
 }
 
-auto getIndex(
-    Device   &device,
-    QueueType type) -> uint32_t
+auto Queue::getIndex(
+    Device &device,
+    Type    type) -> uint32_t
 {
     return device.vkbDevice.get_queue_index(QueueTypeToVkb(type)).value();
 }
 
 Queue::Queue(
-    Device   &device,
-    QueueType type)
+    Device &device,
+    Type    type)
     : handle{createQueue(
           device,
           type)},
