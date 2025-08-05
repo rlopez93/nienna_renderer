@@ -16,10 +16,10 @@ Renderer::Renderer()
       device{physicalDevice},
       graphicsQueue{
           device,
-          QueueType::Graphics},
+          Queue::Type::Graphics},
       presentQueue{
           device,
-          QueueType::Present},
+          Queue::Type::Present},
       swapchain{device},
       allocator{
           instance,

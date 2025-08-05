@@ -6,6 +6,8 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/mat4x4.hpp>
 
+// FIXME: Fix more than one input per frame, e.g., Left + Right, or Up + Down
+
 [[nodiscard]]
 auto PerspectiveCamera::getViewMatrix() const -> glm::mat4
 {
