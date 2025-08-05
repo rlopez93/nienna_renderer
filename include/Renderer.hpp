@@ -32,6 +32,7 @@
 struct Renderer {
 
     Renderer();
+    ~Renderer();
 
     auto beginFrame() -> void;
 
@@ -57,17 +58,19 @@ struct Renderer {
     [[nodiscard]]
     auto getWindowExtent() const -> vk::Extent2D;
 
-    Window              window;
-    Instance            instance;
-    Surface             surface;
-    PhysicalDevice      physicalDevice;
-    Device              device;
-    Queue               graphicsQueue;
-    Queue               presentQueue;
-    Swapchain           swapchain;
-    Allocator           allocator;
-    vk::Format          depthFormat;
-    Image               depthImage;
-    vk::raii::ImageView depthImageView;
-    Timeline            timeline;
+    Window                              window;
+    Instance                            instance;
+    Surface                             surface;
+    PhysicalDevice                      physicalDevice;
+    Device                              device;
+    Queue                               graphicsQueue;
+    Queue                               presentQueue;
+    Swapchain                           swapchain;
+    Allocator                           allocator;
+    vk::Format                          depthFormat;
+    Image                               depthImage;
+    vk::raii::ImageView                 depthImageView;
+    Timeline                            timeline;
+    std::vector<vk::DescriptorPoolSize> poolSizes;
+    vk::raii::DescriptorPool            imguiDescriptorPool;
 };

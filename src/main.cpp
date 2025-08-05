@@ -42,59 +42,12 @@ auto main(
     // this constructor does A LOT
     Renderer r;
 
-    // Setup Dear ImGui context
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
-
-    ImGui_ImplSDL3_InitForVulkan(r.window.get());
-
-    auto poolSizes = std::vector<vk::DescriptorPoolSize>{
-        {vk::DescriptorType::eSampler, 1000},
-        {vk::DescriptorType::eCombinedImageSampler, 1000},
-        {vk::DescriptorType::eSampledImage, 1000},
-        {vk::DescriptorType::eStorageImage, 1000},
-        {vk::DescriptorType::eUniformTexelBuffer, 1000},
-        {vk::DescriptorType::eStorageTexelBuffer, 1000},
-        {vk::DescriptorType::eUniformBuffer, 1000},
-        {vk::DescriptorType::eStorageBuffer, 1000},
-        {vk::DescriptorType::eUniformBufferDynamic, 1000},
-        {vk::DescriptorType::eStorageBufferDynamic, 1000},
-        {vk::DescriptorType::eInputAttachment, 1000}};
-
-    auto imguiDescriptorPool = vk::raii::DescriptorPool{
-        r.device.handle,
-        vk::DescriptorPoolCreateInfo{
-            vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-            static_cast<uint32_t>(1000u * poolSizes.size()),
-            poolSizes}};
-
-    ImGui_ImplVulkan_InitInfo init_info = {
-        .ApiVersion          = VK_API_VERSION_1_4,
-        .Instance            = *r.instance.handle,
-        .PhysicalDevice      = *r.physicalDevice.handle,
-        .Device              = *r.device.handle,
-        .QueueFamily         = r.graphicsQueue.index,
-        .Queue               = *r.graphicsQueue.handle,
-        .DescriptorPool      = *imguiDescriptorPool,
-        .MinImageCount       = 3,
-        .ImageCount          = 3,
-        .MSAASamples         = VK_SAMPLE_COUNT_1_BIT,
-        .UseDynamicRendering = true,
-        .PipelineRenderingCreateInfo =
-            vk::PipelineRenderingCreateInfo{{}, r.swapchain.imageFormat}};
-
-    ImGui_ImplVulkan_Init(&init_info);
-
     // create transient command pool for single-time commands
     auto transient =
         Command{r.device, r.graphicsQueue, vk::CommandPoolCreateFlagBits::eTransient};
 
     // Transition image layout
-    beginSingleTimeCommands(r.device.handle, transient.pool);
+    transient.beginSingleTime();
 
     for (auto image : r.swapchain.images) {
         cmdTransitionImageLayout(
@@ -105,11 +58,7 @@ auto main(
             vk::ImageAspectFlagBits::eColor);
     }
 
-    endSingleTimeCommands(
-        r.device.handle,
-        transient.pool,
-        transient.buffer,
-        r.graphicsQueue.handle);
+    transient.endSingleTime(r.device, r.graphicsQueue);
 
     auto asset = getGltfAsset(gltfDirectory / gltfFilename);
     auto scene = getSceneData(asset, gltfDirectory);

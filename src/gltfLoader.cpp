@@ -380,7 +380,7 @@ auto Scene::createBuffersOnDevice(
     Queue     &queue,
     uint64_t   maxFramesInFlight) -> void
 {
-    beginSingleTimeCommands(device.handle, command.pool);
+    command.beginSingleTime();
 
     for (const auto &mesh : meshes) {
         buffers.vertex.emplace_back(allocator.createBufferAndUploadData(
@@ -440,7 +440,7 @@ auto Scene::createBuffersOnDevice(
                     1}}));
     }
 
-    endSingleTimeCommands(device.handle, command.pool, command.buffer, queue.handle);
+    command.endSingleTime(device, queue);
 }
 auto Scene::update(const std::chrono::duration<float> dt) -> void
 {

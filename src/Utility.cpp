@@ -72,48 +72,6 @@ void cmdTransitionImageLayout(
     cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, {}, barrier});
 }
 
-// FIXME: change signature to (Device&, Command&) -> void
-// call command.buffer.begin()
-
-auto beginSingleTimeCommands(
-    vk::raii::Device      &device,
-    vk::raii::CommandPool &commandPool) -> void // vk::raii::CommandBuffer
-{
-    // static int64_t count = 0;
-    //
-    // // fmt::print(stderr, "beginSingleTimeCommands(): {}\n", count);
-    // ++count;
-    // auto commandBuffers = vk::raii::CommandBuffers{
-    //     device,
-    //     vk::CommandBufferAllocateInfo{
-    //         commandPool,
-    //         vk::CommandBufferLevel::ePrimary,
-    //         1}};
-    // commandBuffers.front().begin(
-    //     vk::CommandBufferBeginInfo{vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-    //
-    // return std::move(commandBuffers.front());
-};
-void endSingleTimeCommands(
-    vk::raii::Device        &device,
-    vk::raii::CommandPool   &commandPool,
-    vk::raii::CommandBuffer &commandBuffer,
-    vk::raii::Queue         &queue)
-{
-    // submit command buffer
-    commandBuffer.end();
-
-    // create fence for synchronization
-    auto fenceCreateInfo         = vk::FenceCreateInfo{};
-    auto fence                   = vk::raii::Fence{device, fenceCreateInfo};
-    auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{commandBuffer};
-
-    queue.submit2(vk::SubmitInfo2{{}, {}, commandBufferSubmitInfo}, fence);
-    auto result =
-        device.waitForFences(*fence, true, std::numeric_limits<uint64_t>::max());
-
-    assert(result == vk::Result::eSuccess);
-}
 void cmdBufferMemoryBarrier(
     vk::raii::CommandBuffer &commandBuffer,
     vk::Buffer              &buffer,

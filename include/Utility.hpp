@@ -43,18 +43,6 @@ void cmdTransitionImageLayout(
     VkImage                  image,
     vk::ImageLayout          oldLayout,
     vk::ImageLayout          newLayout,
-    vk::ImageAspectFlags     aspectMask = vk::ImageAspectFlagBits::eColor)
-
-    ;
-
-auto beginSingleTimeCommands(
-    vk::raii::Device      &device,
-    vk::raii::CommandPool &commandPool) -> void;
-
-void endSingleTimeCommands(
-    vk::raii::Device        &device,
-    vk::raii::CommandPool   &commandPool,
-    vk::raii::CommandBuffer &commandBuffer,
-    vk::raii::Queue         &queue);
+    vk::ImageAspectFlags     aspectMask = vk::ImageAspectFlagBits::eColor);
 
 auto findDepthFormat(vk::raii::PhysicalDevice &physicalDevice) -> vk::Format;
