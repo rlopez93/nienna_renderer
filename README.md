@@ -11,9 +11,18 @@ Rendered with Nienna:
 <img width="800" height="600" alt="ToyCar" src="https://github.com/user-attachments/assets/ebfb7c74-b581-4134-becc-0695720395f2" />
 
 Tested on Manjaro KDE Linux 25.0 with:
+
 - GCC 15.2.1 with C++26
 - CMake 4.1.1
 - VulkanSDK 1.4.321.1
 - SDL3 3.2.22-1
 - fmt 11.2.0-1
 - glm 1.0.1-1
+
+Currently depends on the above being installed as system packages, which I plan to move into submodules.
+
+## Build
+
+```bash
+cmake -B build -S .
+cmake --build build
