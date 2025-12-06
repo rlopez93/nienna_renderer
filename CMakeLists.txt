@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 project(nienna LANGUAGES C CXX)
 
-add_subdirectory(third_party/vk-bootstrap)
 add_subdirectory(third_party/fastgltf)
 
 
