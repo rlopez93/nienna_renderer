@@ -2,13 +2,19 @@
 
 #include <SDL3/SDL_vulkan.h>
 #include <fmt/base.h>
+#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan_structs.hpp>
 
 Instance::Instance()
     : context{},
-      vkbInstance{createVkbInstance()},
       handle{
           context,
-          vkbInstance.instance},
+          vk::ApplicationInfo{
+              "Nienna",
+              1,
+              {},
+              {},
+              VK_API_VERSION_1_4}},
       debugUtils{
           handle,
           vkbInstance.debug_messenger}
@@ -18,6 +24,7 @@ Instance::Instance()
 auto Instance::createVkbInstance() -> vkb::Instance
 {
     std::vector<const char *> instanceExtensions{
+        // TODO document what each extension enables
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
         VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
         VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME};

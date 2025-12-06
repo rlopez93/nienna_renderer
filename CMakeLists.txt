@@ -62,7 +62,6 @@ target_link_directories(nienna PRIVATE
 target_link_libraries(nienna PRIVATE
     SDL3::SDL3
     Vulkan::Vulkan
-    vk-bootstrap::vk-bootstrap
     fastgltf::fastgltf
     fmt::fmt
     glm::glm
