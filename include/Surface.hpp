@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vulkan_raii.hpp"
+#include <vulkan/vulkan_raii.hpp>
 
 #include "Instance.hpp"
 #include "Window.hpp"

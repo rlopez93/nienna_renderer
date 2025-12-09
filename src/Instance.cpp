@@ -89,7 +89,7 @@ auto Instance::createDebugUtilsMessenger(const vk::raii::Instance &instance)
     return {instance, debugUtilsMessengerCreateInfoEXT};
 }
 
-auto Instance::createInstance(const vk::raii::Context &context) -> vk::raii::Instance
+auto Instance::createInstance(vk::raii::Context &context) -> vk::raii::Instance
 {
     auto applicationInfo =
         vk::ApplicationInfo{"Nienna", 1, "Nienna", 1, vk::ApiVersion14};

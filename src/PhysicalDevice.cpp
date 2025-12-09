@@ -7,15 +7,20 @@
 PhysicalDevice::PhysicalDevice(
     Instance &instance,
     Surface  &surface)
-    : vkbPhysicalDevice{createVkbPhysicalDevice(
+    : handle{createPhysicalDevice(
           instance,
-          surface)},
-      handle{
-          instance.handle,
-          vkbPhysicalDevice.physical_device}
+          surface)}
 {
 }
 
+// auto createPhysicalDevice(
+//     Instance &instance,
+//     Surface  &surface) -> vk::raii::PhysicalDevice
+// {
+//     return {instance};
+// }
+
+/*
 auto PhysicalDevice::createVkbPhysicalDevice(
     Instance &instance,
     Surface  &surface) -> vkb::PhysicalDevice
@@ -60,3 +65,4 @@ auto PhysicalDevice::createVkbPhysicalDevice(
 
     return physicalDeviceResult.value();
 }
+*/

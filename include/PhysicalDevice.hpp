@@ -11,10 +11,9 @@ struct PhysicalDevice {
         Instance &instance,
         Surface  &surface);
 
-    static auto createVkbPhysicalDevice(
+    static auto createPhysicalDevice(
         Instance &instance,
-        Surface  &surface) -> vkb::PhysicalDevice;
+        Surface  &surface) -> vk::raii::PhysicalDevice;
 
-    vkb::PhysicalDevice      vkbPhysicalDevice;
     vk::raii::PhysicalDevice handle;
 };
