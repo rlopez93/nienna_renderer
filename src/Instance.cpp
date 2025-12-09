@@ -2,39 +2,114 @@
 
 #include <SDL3/SDL_vulkan.h>
 #include <fmt/base.h>
-#include <vulkan/vulkan_core.h>
-#include <vulkan/vulkan_structs.hpp>
+#include <iostream>
+#include <sstream>
+#include <vulkan/vulkan_to_string.hpp>
 
 Instance::Instance()
     : context{},
-      handle{
-          context,
-          vk::ApplicationInfo{
-              "Nienna",
-              1,
-              {},
-              {},
-              VK_API_VERSION_1_4}},
-      debugUtils{
-          handle,
-          vkbInstance.debug_messenger}
+      handle{createInstance(context)},
+      debugUtils{createDebugUtilsMessenger(handle)}
 {
 }
 
-auto Instance::createVkbInstance() -> vkb::Instance
+VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageFunc(
+    vk::DebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
+    vk::DebugUtilsMessageTypeFlagsEXT             messageTypes,
+    vk::DebugUtilsMessengerCallbackDataEXT const *pCallbackData,
+    void * /*pUserData*/)
 {
-    std::vector<const char *> instanceExtensions{
-        // TODO document what each extension enables
+    std::ostringstream message;
+
+    message << vk::to_string(messageSeverity) << ": " << vk::to_string(messageTypes)
+            << ":\n";
+    message << std::string("\t") << "messageIDName   = <"
+            << pCallbackData->pMessageIdName << ">\n";
+    message << std::string("\t")
+            << "messageIdNumber = " << pCallbackData->messageIdNumber << "\n";
+    message << std::string("\t") << "message         = <" << pCallbackData->pMessage
+            << ">\n";
+    if (0 < pCallbackData->queueLabelCount) {
+        message << std::string("\t") << "Queue Labels:\n";
+        for (uint32_t i = 0; i < pCallbackData->queueLabelCount; i++) {
+            message << std::string("\t\t") << "labelName = <"
+                    << pCallbackData->pQueueLabels[i].pLabelName << ">\n";
+        }
+    }
+    if (0 < pCallbackData->cmdBufLabelCount) {
+        message << std::string("\t") << "CommandBuffer Labels:\n";
+        for (uint32_t i = 0; i < pCallbackData->cmdBufLabelCount; i++) {
+            message << std::string("\t\t") << "labelName = <"
+                    << pCallbackData->pCmdBufLabels[i].pLabelName << ">\n";
+        }
+    }
+    if (0 < pCallbackData->objectCount) {
+        message << std::string("\t") << "Objects:\n";
+        for (uint32_t i = 0; i < pCallbackData->objectCount; i++) {
+            message << std::string("\t\t") << "Object " << i << "\n";
+            message << std::string("\t\t\t") << "objectType   = "
+                    << vk::to_string(pCallbackData->pObjects[i].objectType) << "\n";
+            message << std::string("\t\t\t")
+                    << "objectHandle = " << pCallbackData->pObjects[i].objectHandle
+                    << "\n";
+            if (pCallbackData->pObjects[i].pObjectName) {
+                message << std::string("\t\t\t") << "objectName   = <"
+                        << pCallbackData->pObjects[i].pObjectName << ">\n";
+            }
+        }
+    }
+
+#ifdef _WIN32
+    MessageBox(NULL, message.str().c_str(), "Alert", MB_OK);
+#else
+    std::cout << message.str() << std::endl;
+#endif
+
+    return false;
+}
+
+auto Instance::createDebugUtilsMessenger(const vk::raii::Instance &instance)
+    -> vk::raii::DebugUtilsMessengerEXT
+{
+    vk::DebugUtilsMessageSeverityFlagsEXT severityFlags(
+        vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
+        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
+
+    vk::DebugUtilsMessageTypeFlagsEXT messageTypeFlags(
+        vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral
+        | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance
+        | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation);
+
+    vk::DebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCreateInfoEXT(
+        {},
+        severityFlags,
+        messageTypeFlags,
+        &debugMessageFunc);
+
+    return {instance, debugUtilsMessengerCreateInfoEXT};
+}
+
+auto Instance::createInstance(const vk::raii::Context &context) -> vk::raii::Instance
+{
+    auto applicationInfo =
+        vk::ApplicationInfo{"Nienna", 1, "Nienna", 1, vk::ApiVersion14};
+    // auto instanceLayerProperties = context.enumerateInstanceLayerProperties();
+    auto instanceLayerNames = std::vector{"VK_LAYER_KHRONOS_validation"};
+
+    // TODO: check layer
+
+    auto instanceExtensions = std::vector<const char *>{
+        // TODO: document what each extension enables
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
         VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
         VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME};
 
     {
-        Uint32             sdlExtensionsCount;
-        const char *const *sdlInstanceExtensions =
+        Uint32 sdlExtensionsCount;
+        auto   sdlInstanceExtensions =
             SDL_Vulkan_GetInstanceExtensions(&sdlExtensionsCount);
 
-        if (sdlInstanceExtensions == nullptr) {
+        if (!sdlInstanceExtensions) {
             fmt::print(
                 stderr,
                 "SDL_Vulkan_GetInstanceExtensions Error: {}\n",
@@ -48,22 +123,11 @@ auto Instance::createVkbInstance() -> vkb::Instance
             sdlInstanceExtensions + sdlExtensionsCount);
     }
 
-    // --- Create Vulkan instance using vk-bootstrap
-    vkb::InstanceBuilder instanceBuilder;
-    auto instanceResult = instanceBuilder.set_app_name("Vulkan SDL3 App")
-                              .require_api_version(1, 4)
-                              .use_default_debug_messenger()
-                              .enable_validation_layers(true)
-                              .enable_extensions(instanceExtensions)
-                              .build();
+    auto instanceCreateInfo = vk::InstanceCreateInfo{
+        {},
+        &applicationInfo,
+        instanceLayerNames,
+        instanceExtensions};
 
-    if (!instanceResult) {
-        fmt::print(
-            stderr,
-            "vk-bootstrap instance creation failed: {}\n",
-            instanceResult.error().message());
-        throw std::exception{};
-    }
-
-    return instanceResult.value();
+    return {context, instanceCreateInfo};
 }
