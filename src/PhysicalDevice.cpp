@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <fmt/base.h>
 #include <iostream>
+#include <ranges>
 
 PhysicalDevice::PhysicalDevice(
     Instance &instance,
@@ -13,12 +14,21 @@ PhysicalDevice::PhysicalDevice(
 {
 }
 
-// auto createPhysicalDevice(
-//     Instance &instance,
-//     Surface  &surface) -> vk::raii::PhysicalDevice
-// {
-//     return {instance};
-// }
+auto createPhysicalDevice(
+    Instance &instance,
+    Surface  &surface) -> vk::raii::PhysicalDevice
+{
+    auto physicalDevices = vk::raii::PhysicalDevices{instance.handle};
+
+    if (physicalDevices.empty()) {
+        throw std::runtime_error{"No suitable GPU found."};
+    }
+
+    namespace rng  = std::ranges;
+    namespace view = std::views;
+
+    return {instance};
+}
 
 /*
 auto PhysicalDevice::createVkbPhysicalDevice(
