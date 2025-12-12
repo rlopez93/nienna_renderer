@@ -1,19 +1,18 @@
 #pragma once
 
-#include "vulkan_raii.hpp"
+#include <vulkan/vulkan_raii.hpp>
 
 #include "Instance.hpp"
-#include "Surface.hpp"
 
 struct PhysicalDevice {
 
-    PhysicalDevice(
-        Instance &instance,
-        Surface  &surface);
+    explicit PhysicalDevice(Instance &instance);
 
-    static auto createPhysicalDevice(
-        Instance &instance,
-        Surface  &surface) -> vk::raii::PhysicalDevice;
+    static auto createPhysicalDevice(Instance &instance) -> vk::raii::PhysicalDevice;
+
+    static auto getMissingExtensions(
+        const vk::raii::PhysicalDevice &device,
+        std::vector<std::string>        requiredExtensions) -> std::vector<std::string>;
 
     vk::raii::PhysicalDevice handle;
 };
