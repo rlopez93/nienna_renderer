@@ -2,25 +2,18 @@
 
 #include <fmt/base.h>
 
-Device::Device(PhysicalDevice &physicalDevice)
-    : vkbDevice{createVkbDevice(physicalDevice)},
-      handle{
-          physicalDevice.handle,
-          vkbDevice.device}
+Device::Device(
+    const PhysicalDevice           &physicalDevice,
+    const std::vector<std::string> &requiredExtensions)
+    : handle{createDevice(
+          physicalDevice,
+          requiredExtensions)}
 {
 }
 
-auto Device::createVkbDevice(PhysicalDevice &physicalDevice) -> vkb::Device
+auto Device::createDevice(
+    const PhysicalDevice           &physicalDevice,
+    const std::vector<std::string> &requiredExtensions) -> vk::raii::Device
 {
-    auto deviceBuilder = vkb::DeviceBuilder{physicalDevice.vkbPhysicalDevice};
-    auto deviceResult  = deviceBuilder.build();
-    if (!deviceResult) {
-        fmt::print(
-            stderr,
-            "vk-bootstrap failed to create logical device: {}\n",
-            deviceResult.error().message());
-        throw std::exception{};
-    }
-
-    return deviceResult.value();
+    return nullptr;
 }

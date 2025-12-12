@@ -1,14 +1,17 @@
 #pragma once
 
-#include "vulkan_raii.hpp"
+#include <vulkan/vulkan_raii.hpp>
 
 #include "PhysicalDevice.hpp"
 
 struct Device {
-    Device(PhysicalDevice &physicalDevice);
+    Device(
+        const PhysicalDevice           &physicalDevice,
+        const std::vector<std::string> &requiredExtensions);
 
-    static auto createVkbDevice(PhysicalDevice &physicalDevice) -> vkb::Device;
+    static auto createDevice(
+        const PhysicalDevice           &physicalDevice,
+        const std::vector<std::string> &requiredExtensions) -> vk::raii::Device;
 
-    vkb::Device      vkbDevice;
     vk::raii::Device handle;
 };

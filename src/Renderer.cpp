@@ -25,7 +25,9 @@ Renderer::Renderer()
       physicalDevice{
           instance,
           requiredExtensions},
-      device{physicalDevice},
+      device{
+          physicalDevice,
+          requiredExtensions},
       graphicsQueue{
           device,
           Queue::Type::Graphics},
