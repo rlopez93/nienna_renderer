@@ -1,10 +1,16 @@
 #include "Instance.hpp"
 
 #include <SDL3/SDL_vulkan.h>
-#include <fmt/base.h>
-#include <iostream>
-#include <sstream>
+
 #include <vulkan/vulkan_to_string.hpp>
+
+#include <fmt/base.h>
+
+#include <iostream>
+#include <ranges>
+#include <sstream>
+#include <string>
+#include <vector>
 
 Instance::Instance()
     : context{},
@@ -13,6 +19,7 @@ Instance::Instance()
 {
 }
 
+// taken from Vulkan-Hpp
 VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageFunc(
     vk::DebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
     vk::DebugUtilsMessageTypeFlagsEXT             messageTypes,
@@ -89,45 +96,78 @@ auto Instance::createDebugUtilsMessenger(const vk::raii::Instance &instance)
     return {instance, debugUtilsMessengerCreateInfoEXT};
 }
 
-auto Instance::createInstance(vk::raii::Context &context) -> vk::raii::Instance
+auto Instance::createInstance(const vk::raii::Context &context) -> vk::raii::Instance
 {
-    auto applicationInfo =
-        vk::ApplicationInfo{"Nienna", 1, "Nienna", 1, vk::ApiVersion14};
-    // auto instanceLayerProperties = context.enumerateInstanceLayerProperties();
-    auto instanceLayerNames = std::vector{"VK_LAYER_KHRONOS_validation"};
+    auto instanceLayers = std::vector{"VK_LAYER_KHRONOS_validation"};
 
-    // TODO: check layer
+    // Get available validation layers' names as vector<string>
+    auto availableLayers =
+        context.enumerateInstanceLayerProperties()
+        | std::views::transform(
+            [](const vk::LayerProperties &properties) -> std::string {
+                return properties.layerName;
+            })
+        | std::ranges::to<std::vector>();
 
-    auto instanceExtensions = std::vector<const char *>{
-        // TODO: document what each extension enables
-        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-        VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
-        VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME};
-
-    {
-        Uint32 sdlExtensionsCount;
-        auto   sdlInstanceExtensions =
-            SDL_Vulkan_GetInstanceExtensions(&sdlExtensionsCount);
-
-        if (!sdlInstanceExtensions) {
-            fmt::print(
-                stderr,
-                "SDL_Vulkan_GetInstanceExtensions Error: {}\n",
-                SDL_GetError());
-            throw std::exception{};
-        }
-
-        instanceExtensions.insert(
-            instanceExtensions.end(),
-            sdlInstanceExtensions,
-            sdlInstanceExtensions + sdlExtensionsCount);
+    // Drop validation layer if not present
+    if (!std::ranges::contains(availableLayers, "VK_LAYER_KHRONOS_validation")) {
+        fmt::print(
+            stderr,
+            "Warning: Validation layer not found — continuing without it.\n");
+        instanceLayers.clear();
     }
 
-    auto instanceCreateInfo = vk::InstanceCreateInfo{
+    auto instanceExtensions = std::vector{
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME, // debug messenger
+        VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
+        VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
+        VK_KHR_SURFACE_EXTENSION_NAME // ALWAYS include explicitly
+    };
+
+    // Add SDL platform extensions
+    Uint32 sdlExtensionCount     = 0;
+    auto   sdlInstanceExtensions = SDL_Vulkan_GetInstanceExtensions(&sdlExtensionCount);
+    if (!sdlInstanceExtensions) {
+        fmt::print(
+            stderr,
+            "SDL_Vulkan_GetInstanceExtensions failed: {}\n",
+            SDL_GetError());
+        throw std::runtime_error("SDL Vulkan initialization failed.");
+    }
+
+    instanceExtensions.insert(
+        instanceExtensions.end(),
+        sdlInstanceExtensions,
+        sdlInstanceExtensions + sdlExtensionCount);
+
+    // Validate that all instance extensions are available
+    auto availableExtensions =
+        context.enumerateInstanceExtensionProperties()
+        | std::views::transform(
+            [](const vk::ExtensionProperties &properties) -> std::string {
+                return properties.extensionName;
+            })
+        | std::ranges::to<std::vector>();
+
+    for (auto extension : instanceExtensions) {
+        if (!std::ranges::contains(availableExtensions, extension)) {
+            fmt::print(
+                stderr,
+                "Required Vulkan instance extension missing: {}\n",
+                extension);
+            throw std::runtime_error("Missing required Vulkan instance extension.");
+        }
+    }
+
+    const auto applicationInfo =
+        vk::ApplicationInfo{"Nienna", 1, "Nienna", 1, vk::ApiVersion14};
+
+    const auto instanceCreateInfo = vk::InstanceCreateInfo{
         {},
         &applicationInfo,
-        instanceLayerNames,
+        instanceLayers,
         instanceExtensions};
 
+    // construct vk::raii::Instance
     return {context, instanceCreateInfo};
 }
