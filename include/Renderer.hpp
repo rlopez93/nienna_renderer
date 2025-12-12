@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vulkan_raii.hpp"
+#include <vulkan/vulkan_raii.hpp>
 
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_video.h>
@@ -59,6 +59,7 @@ struct Renderer {
     Window                              window;
     Instance                            instance;
     Surface                             surface;
+    std::vector<std::string>            requiredExtensions;
     PhysicalDevice                      physicalDevice;
     Device                              device;
     Queue                               graphicsQueue;

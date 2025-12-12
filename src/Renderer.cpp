@@ -13,9 +13,18 @@ Renderer::Renderer()
       surface{
           instance,
           window},
+      requiredExtensions{
+          std::string{VK_KHR_SWAPCHAIN_EXTENSION_NAME},
+          std::string{VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME},
+          std::string{VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME},
+          std::string{VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME},
+          std::string{VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME},
+          std::string{VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME},
+          std::string{VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME},
+          std::string{VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME}},
       physicalDevice{
           instance,
-          surface},
+          requiredExtensions},
       device{physicalDevice},
       graphicsQueue{
           device,
