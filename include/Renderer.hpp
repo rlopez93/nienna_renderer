@@ -59,7 +59,7 @@ struct Renderer {
     Window                              window;
     Instance                            instance;
     Surface                             surface;
-    std::vector<std::string>            requiredExtensions;
+    std::vector<const char *>           requiredExtensions;
     PhysicalDevice                      physicalDevice;
     Device                              device;
     Swapchain                           swapchain;

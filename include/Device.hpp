@@ -17,14 +17,14 @@ struct QueueFamilyIndices {
 
 struct Device {
     Device(
-        const PhysicalDevice           &physicalDevice,
-        const Surface                  &surface,
-        const std::vector<std::string> &requiredExtensions);
+        const PhysicalDevice            &physicalDevice,
+        const Surface                   &surface,
+        const std::vector<const char *> &requiredExtensions);
 
     static auto createDevice(
-        const PhysicalDevice           &physicalDevice,
-        const QueueFamilyIndices       &queueFamilyIndices,
-        const std::vector<std::string> &requiredExtensions) -> vk::raii::Device;
+        const PhysicalDevice            &physicalDevice,
+        const QueueFamilyIndices        &queueFamilyIndices,
+        const std::vector<const char *> &requiredExtensions) -> vk::raii::Device;
 
     static auto findQueueFamilies(
         const PhysicalDevice &physicalDevice,

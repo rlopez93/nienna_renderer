@@ -1,18 +1,13 @@
 #include "Device.hpp"
 
 #include <fmt/base.h>
-
-using FeatureChain = vk::StructureChain<
-    vk::PhysicalDeviceFeatures2,
-    vk::PhysicalDeviceVulkan11Features,
-    vk::PhysicalDeviceVulkan12Features,
-    vk::PhysicalDeviceVulkan13Features,
-    vk::PhysicalDeviceVulkan14Features>;
+#include <set>
+#include <vector>
 
 Device::Device(
-    const PhysicalDevice           &physicalDevice,
-    const Surface                  &surface,
-    const std::vector<std::string> &requiredExtensions)
+    const PhysicalDevice            &physicalDevice,
+    const Surface                   &surface,
+    const std::vector<const char *> &requiredExtensions)
     : queueFamilyIndices{findQueueFamilies(
           physicalDevice,
           surface)},
@@ -31,12 +26,59 @@ Device::Device(
 {
 }
 
-auto Device::createDevice(
-    const PhysicalDevice           &physicalDevice,
-    const QueueFamilyIndices       &queueFamilyIndices,
-    const std::vector<std::string> &requiredExtensions) -> vk::raii::Device
+auto createDevice(
+    const PhysicalDevice            &physicalDevice,
+    const QueueFamilyIndices        &queueFamilyIndices,
+    const std::vector<const char *> &requiredExtensions) -> vk::raii::Device
 {
-    return nullptr;
+
+    auto features2 = physicalDevice.handle.getFeatures2<
+        // Core container
+        vk::PhysicalDeviceFeatures2,
+
+        // Core Vulkan versions
+        vk::PhysicalDeviceVulkan11Features,
+        vk::PhysicalDeviceVulkan12Features,
+        vk::PhysicalDeviceVulkan13Features,
+        vk::PhysicalDeviceVulkan14Features,
+
+        // Descriptor model
+        vk::PhysicalDeviceDescriptorBufferFeaturesEXT,
+
+        // Dynamic state
+        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
+        vk::PhysicalDeviceExtendedDynamicState2FeaturesEXT,
+        vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT,
+
+        // Robustness
+        vk::PhysicalDeviceImageRobustnessFeaturesEXT,
+        vk::PhysicalDeviceRobustness2FeaturesEXT,
+        vk::PhysicalDevicePipelineRobustnessFeaturesEXT,
+
+        // Host image copy
+        vk::PhysicalDeviceHostImageCopyFeaturesEXT>();
+
+    const float queuePriority = 1.0f;
+
+    std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
+    std::set<uint32_t>                     uniqueQueueFamilies = {
+        queueFamilyIndices.graphicsIndex,
+        queueFamilyIndices.presentIndex};
+
+    for (uint32_t familyIndex : uniqueQueueFamilies) {
+        queueCreateInfos
+            .emplace_back(vk::DeviceQueueCreateFlags{}, familyIndex, 1, &queuePriority);
+    }
+
+    auto deviceCreateInfo = vk::DeviceCreateInfo{
+        {},
+        queueCreateInfos,
+        {},
+        requiredExtensions,
+        {},
+        &features2};
+
+    return {physicalDevice.handle, deviceCreateInfo};
 }
 
 auto Device::findQueueFamilies(

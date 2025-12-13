@@ -9,8 +9,8 @@
 #include <vector>
 
 PhysicalDevice::PhysicalDevice(
-    const Instance                 &instance,
-    const std::vector<std::string> &requiredExtensions)
+    const Instance                  &instance,
+    const std::vector<const char *> &requiredExtensions)
     : handle{choosePhysicalDevice(
           instance,
           requiredExtensions)}
@@ -21,8 +21,8 @@ PhysicalDevice::PhysicalDevice(
 // Helper: return a list of missing extensions for this device
 // --------------------------------------------------------------
 auto getMissingExtensions(
-    const vk::raii::PhysicalDevice &physicalDevice,
-    const std::vector<std::string> &requiredExtensions) -> std::vector<std::string>
+    const vk::raii::PhysicalDevice  &physicalDevice,
+    const std::vector<const char *> &requiredExtensions) -> std::vector<std::string>
 {
     // Collect device extension names into a vector<string>
     auto deviceExtensions =
@@ -44,8 +44,8 @@ auto getMissingExtensions(
 }
 
 auto choosePhysicalDevice(
-    const Instance                 &instance,
-    const std::vector<std::string> &requiredExtensions) -> vk::raii::PhysicalDevice
+    const Instance                  &instance,
+    const std::vector<const char *> &requiredExtensions) -> vk::raii::PhysicalDevice
 {
     auto physicalDevices = vk::raii::PhysicalDevices{instance.handle};
 
