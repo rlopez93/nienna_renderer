@@ -62,8 +62,6 @@ struct Renderer {
     std::vector<std::string>            requiredExtensions;
     PhysicalDevice                      physicalDevice;
     Device                              device;
-    Queue                               graphicsQueue;
-    Queue                               presentQueue;
     Swapchain                           swapchain;
     Allocator                           allocator;
     vk::Format                          depthFormat;

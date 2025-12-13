@@ -27,13 +27,8 @@ Renderer::Renderer()
           requiredExtensions},
       device{
           physicalDevice,
+          surface,
           requiredExtensions},
-      graphicsQueue{
-          device,
-          Queue::Type::Graphics},
-      presentQueue{
-          device,
-          Queue::Type::Present},
       swapchain{device},
       allocator{
           instance,
