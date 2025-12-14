@@ -29,7 +29,7 @@ struct Timeline {
     auto value() & -> uint64_t &;
 
     uint32_t              index = 0u;
-    std::vector<Command>  command{};
+    std::vector<Command>  command;
     std::vector<uint64_t> values;
     vk::raii::Semaphore   semaphore;
 };

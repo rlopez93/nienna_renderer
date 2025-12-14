@@ -21,7 +21,9 @@ Timeline::Timeline(
 
 {
     for (int n : std::views::iota(0u, maxFramesInFlight)) {
-        command.emplace_back(device);
+        command.emplace_back(
+            device,
+            vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
     }
 
     std::ranges::iota(values, 0u);

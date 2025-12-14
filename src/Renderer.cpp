@@ -26,6 +26,7 @@ Renderer::Renderer()
           VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME,
           VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME,
           VK_EXT_MEMORY_BUDGET_EXTENSION_NAME,
+          VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME
 
       },
       physicalDevice{
@@ -201,11 +202,39 @@ auto Renderer::present() -> void
         throw std::exception{};
     }
 }
-
 auto Renderer::getWindowExtent() const -> vk::Extent2D
 {
-    return physicalDevice.handle.getSurfaceCapabilitiesKHR(surface.handle)
-        .currentExtent;
+    const vk::SurfaceCapabilitiesKHR caps =
+        physicalDevice.handle.getSurfaceCapabilitiesKHR(surface.handle);
+
+    // If the surface dictates the extent, use it.
+    if (caps.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+        return caps.currentExtent;
+    }
+
+    // Otherwise, we must derive it from the window framebuffer size and clamp.
+    int fbWidth  = 0;
+    int fbHeight = 0;
+    SDL_GetWindowSizeInPixels(window.get(), &fbWidth, &fbHeight);
+
+    // If minimized / not ready, return 0 extent; caller must handle it.
+    if (fbWidth <= 0 || fbHeight <= 0) {
+        return vk::Extent2D{0u, 0u};
+    }
+
+    vk::Extent2D extent{
+        static_cast<uint32_t>(fbWidth),
+        static_cast<uint32_t>(fbHeight)};
+
+    extent.width =
+        std::clamp(extent.width, caps.minImageExtent.width, caps.maxImageExtent.width);
+
+    extent.height = std::clamp(
+        extent.height,
+        caps.minImageExtent.height,
+        caps.maxImageExtent.height);
+
+    return extent;
 }
 
 auto Renderer::render(

@@ -190,6 +190,10 @@ auto main(
         ImGui::EndFrame();
 
         ++totalFrames;
+
+        if (totalFrames > 4) {
+            break;
+        }
     }
 
     r.device.handle.waitIdle();

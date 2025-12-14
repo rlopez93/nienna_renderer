@@ -50,15 +50,7 @@ auto Device::createDevice(
         // Dynamic state
         vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
         vk::PhysicalDeviceExtendedDynamicState2FeaturesEXT,
-        vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT,
-
-        // Robustness
-        vk::PhysicalDeviceImageRobustnessFeaturesEXT,
-        vk::PhysicalDeviceRobustness2FeaturesEXT,
-        vk::PhysicalDevicePipelineRobustnessFeaturesEXT,
-
-        // Host image copy
-        vk::PhysicalDeviceHostImageCopyFeaturesEXT>();
+        vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT>();
 
     const float queuePriority = 1.0f;
 
@@ -78,7 +70,7 @@ auto Device::createDevice(
         {},
         requiredExtensions,
         {},
-        &features2};
+        &features2.get<vk::PhysicalDeviceFeatures2>()};
 
     return {physicalDevice.handle, deviceCreateInfo};
 }
