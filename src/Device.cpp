@@ -6,9 +6,11 @@
 
 Device::Device(
     const PhysicalDevice            &physicalDevice,
+    const Window                    &window,
     const Surface                   &surface,
     const std::vector<const char *> &requiredExtensions)
-    : queueFamilyIndices{findQueueFamilies(
+    : window{window},
+      queueFamilyIndices{findQueueFamilies(
           physicalDevice,
           surface)},
       handle{createDevice(
@@ -26,7 +28,7 @@ Device::Device(
 {
 }
 
-auto createDevice(
+auto Device::createDevice(
     const PhysicalDevice            &physicalDevice,
     const QueueFamilyIndices        &queueFamilyIndices,
     const std::vector<const char *> &requiredExtensions) -> vk::raii::Device

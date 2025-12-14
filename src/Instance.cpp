@@ -110,7 +110,9 @@ auto Instance::createInstance(const vk::raii::Context &context) -> vk::raii::Ins
         | std::ranges::to<std::vector>();
 
     // Drop validation layer if not present
-    if (!std::ranges::contains(availableLayers, "VK_LAYER_KHRONOS_validation")) {
+    if (!std::ranges::contains(
+            availableLayers,
+            std::string{"VK_LAYER_KHRONOS_validation"})) {
         fmt::print(
             stderr,
             "Warning: Validation layer not found — continuing without it.\n");

@@ -11,12 +11,11 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/ext/matrix_transform.hpp>
 
-#include "vulkan_raii.hpp"
+#include <vulkan/vulkan_raii.hpp>
 
 #include "Allocator.hpp"
 #include "Camera.hpp"
 #include "Command.hpp"
-#include "Queue.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -94,7 +93,6 @@ struct Scene {
         Device    &device,
         Command   &command,
         Allocator &allocator,
-        Queue     &queue,
         uint64_t   maxFramesInFlight) -> void;
 };
 

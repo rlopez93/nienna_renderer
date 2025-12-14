@@ -1,56 +1,184 @@
 #include "Swapchain.hpp"
 
+#include <algorithm>
+#include <array>
 #include <fmt/base.h>
+#include <limits>
+#include <stdexcept>
 
-Swapchain::Swapchain(Device &device)
-    : handle(nullptr),
+Swapchain::Swapchain(
+    Device         &device,
+    PhysicalDevice &physicalDevice,
+    Surface        &surface)
+    : handle{nullptr},
       frame(
           device,
           0u)
 {
-    create(device);
+    create(device, physicalDevice, surface);
 }
 
-auto Swapchain::create(Device &device) -> void
+namespace
 {
-    auto swapchainBuilder = vkb::SwapchainBuilder{device.vkbDevice};
-    auto swapchainResult =
-        swapchainBuilder
-            //.set_old_swapchain(*swapchain)
-            .set_image_usage_flags(
-                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-            .set_desired_present_mode(VK_PRESENT_MODE_MAILBOX_KHR)
-            .add_fallback_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR)
-            .add_fallback_present_mode(VK_PRESENT_MODE_FIFO_KHR)
-            .set_desired_format(
-                VkSurfaceFormatKHR{
-                    .format     = VK_FORMAT_R8G8B8A8_SRGB,
-                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
-            .add_fallback_format(
-                VkSurfaceFormatKHR{
-                    .format     = VK_FORMAT_B8G8R8A8_UNORM,
-                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
-            .add_fallback_format(
-                VkSurfaceFormatKHR{
-                    .format     = VK_FORMAT_R8G8B8A8_SNORM,
-                    .colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR})
-            .set_desired_min_image_count(3)
-            .build();
 
-    if (!swapchainResult) {
-        fmt::print(
-            stderr,
-            "vk-bootstrap failed to create swapchain: {}",
-            swapchainResult.error().message());
-        throw std::exception{};
+// -----------------------------------------------------------------------------
+// Surface format selection
+// -----------------------------------------------------------------------------
+vk::SurfaceFormatKHR
+chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &formats)
+{
+    for (const auto &f : formats) {
+        if (f.format == vk::Format::eR8G8B8A8Srgb
+            && f.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
+            return f;
+        }
     }
 
-    handle = vk::raii::SwapchainKHR{device.handle, swapchainResult->swapchain};
+    for (const auto &f : formats) {
+        if (f.format == vk::Format::eB8G8R8A8Unorm
+            && f.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
+            return f;
+        }
+    }
+
+    for (const auto &f : formats) {
+        if (f.format == vk::Format::eR8G8B8A8Snorm
+            && f.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
+            return f;
+        }
+    }
+
+    return formats.front();
+}
+
+// -----------------------------------------------------------------------------
+// Present mode selection
+// -----------------------------------------------------------------------------
+vk::PresentModeKHR choosePresentMode(const std::vector<vk::PresentModeKHR> &modes)
+{
+    for (auto m : modes) {
+        if (m == vk::PresentModeKHR::eMailbox) {
+            return m;
+        }
+    }
+
+    for (auto m : modes) {
+        if (m == vk::PresentModeKHR::eImmediate) {
+            return m;
+        }
+    }
+
+    return vk::PresentModeKHR::eFifo;
+}
+
+// -----------------------------------------------------------------------------
+// Extent selection
+// -----------------------------------------------------------------------------
+vk::Extent2D chooseExtent(
+    const vk::SurfaceCapabilitiesKHR &caps,
+    const vk::Extent2D               &desired)
+{
+    if (caps.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+        return caps.currentExtent;
+    }
+
+    vk::Extent2D extent = desired;
+    extent.width =
+        std::clamp(extent.width, caps.minImageExtent.width, caps.maxImageExtent.width);
+    extent.height = std::clamp(
+        extent.height,
+        caps.minImageExtent.height,
+        caps.maxImageExtent.height);
+
+    return extent;
+}
+
+// -----------------------------------------------------------------------------
+// Swapchain creation helper
+// -----------------------------------------------------------------------------
+vk::raii::SwapchainKHR createSwapchain(
+    Device          &device,
+    PhysicalDevice  &physicalDevice,
+    Surface         &surface,
+    vk::SwapchainKHR oldSwapchain)
+{
+    const auto capabilities =
+        physicalDevice.handle.getSurfaceCapabilitiesKHR(surface.handle);
+
+    const auto formats = physicalDevice.handle.getSurfaceFormatsKHR(surface.handle);
+
+    const auto presentModes =
+        physicalDevice.handle.getSurfacePresentModesKHR(surface.handle);
+
+    if (formats.empty() || presentModes.empty()) {
+        throw std::runtime_error("Surface reports no formats or present modes");
+    }
+
+    const vk::SurfaceFormatKHR surfaceFormat = chooseSurfaceFormat(formats);
+
+    const vk::PresentModeKHR presentMode = choosePresentMode(presentModes);
+
+    const vk::Extent2D desiredExtent = getFramebufferExtent(device.window.get());
+
+    fmt::print("(desiredExtent: [{}, {}]", desiredExtent.width, desiredExtent.height);
+
+    const vk::Extent2D extent = chooseExtent(capabilities, desiredExtent);
+
+    fmt::print("(extent: [{}, {}]", extent.width, extent.height);
+
+    uint32_t imageCount = 3u;
+    imageCount          = std::max(imageCount, capabilities.minImageCount);
+    if (capabilities.maxImageCount > 0u) {
+        imageCount = std::min(imageCount, capabilities.maxImageCount);
+    }
+
+    const uint32_t graphicsFamily = device.queueFamilyIndices.graphicsIndex;
+    const uint32_t presentFamily  = device.queueFamilyIndices.presentIndex;
+
+    const bool concurrent = graphicsFamily != presentFamily;
+
+    const std::array<uint32_t, 2> queueFamilies{graphicsFamily, presentFamily};
+
+    vk::SwapchainCreateInfoKHR createInfo{
+        {},
+        surface.handle,
+        imageCount,
+        surfaceFormat.format,
+        surfaceFormat.colorSpace,
+        extent,
+        1u,
+        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst,
+        concurrent ? vk::SharingMode::eConcurrent : vk::SharingMode::eExclusive,
+        concurrent ? static_cast<uint32_t>(queueFamilies.size()) : 0u,
+        concurrent ? queueFamilies.data() : nullptr,
+        capabilities.currentTransform,
+        vk::CompositeAlphaFlagBitsKHR::eOpaque,
+        presentMode,
+        VK_TRUE,
+        oldSwapchain};
+
+    return vk::raii::SwapchainKHR(device.handle, createInfo);
+}
+
+} // namespace
+
+// -----------------------------------------------------------------------------
+// Swapchain creation
+// -----------------------------------------------------------------------------
+auto Swapchain::create(
+    Device         &device,
+    PhysicalDevice &physicalDevice,
+    Surface        &surface) -> void
+{
+    handle = createSwapchain(device, physicalDevice, surface, vk::SwapchainKHR{});
+
     images = handle.getImages();
     imageViews.clear();
-    imageFormat = vk::Format(swapchainResult->image_format);
 
-    for (auto image : images) {
+    const auto formats = physicalDevice.handle.getSurfaceFormatsKHR(surface.handle);
+    imageFormat        = chooseSurfaceFormat(formats).format;
+
+    for (vk::Image image : images) {
         imageViews.emplace_back(
             device.handle,
             vk::ImageViewCreateInfo{
@@ -65,29 +193,52 @@ auto Swapchain::create(Device &device) -> void
     frame.recreate(device, images.size());
 }
 
+// -----------------------------------------------------------------------------
+// Swapchain recreation
+// -----------------------------------------------------------------------------
 auto Swapchain::recreate(
-    Device &device,
-    Queue  &queue) -> void
-
+    Device         &device,
+    PhysicalDevice &physicalDevice,
+    Surface        &surface) -> void
 {
-    queue.handle.waitIdle();
+    device.graphicsQueue.waitIdle();
 
     frame.index = 0;
 
-    handle.clear();
+    vk::raii::SwapchainKHR oldSwapchain = std::move(handle);
+    imageViews.clear();
 
-    create(device);
+    handle = createSwapchain(device, physicalDevice, surface, *oldSwapchain);
+    images = handle.getImages();
 
+    const auto formats = physicalDevice.handle.getSurfaceFormatsKHR(surface.handle);
+    imageFormat        = chooseSurfaceFormat(formats).format;
+
+    for (vk::Image image : images) {
+        imageViews.emplace_back(
+            device.handle,
+            vk::ImageViewCreateInfo{
+                {},
+                image,
+                vk::ImageViewType::e2D,
+                imageFormat,
+                {},
+                {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
+    }
+
+    frame.recreate(device, images.size());
     needRecreate = false;
 }
 
+// -----------------------------------------------------------------------------
+// Per-frame operations
+// -----------------------------------------------------------------------------
 auto Swapchain::acquireNextImage() -> vk::Result
 {
     vk::Result result;
     std::tie(result, nextImageIndex) = handle.acquireNextImage(
         std::numeric_limits<uint64_t>::max(),
         getImageAvailableSemaphore());
-
     return result;
 }
 

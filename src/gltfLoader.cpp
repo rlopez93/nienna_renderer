@@ -377,7 +377,6 @@ auto Scene::createBuffersOnDevice(
     Device    &device,
     Command   &command,
     Allocator &allocator,
-    Queue     &queue,
     uint64_t   maxFramesInFlight) -> void
 {
     command.beginSingleTime();
@@ -440,7 +439,7 @@ auto Scene::createBuffersOnDevice(
                     1}}));
     }
 
-    command.endSingleTime(device, queue);
+    command.endSingleTime(device);
 }
 auto Scene::update(const std::chrono::duration<float> dt) -> void
 {

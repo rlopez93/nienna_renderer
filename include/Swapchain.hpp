@@ -2,20 +2,26 @@
 
 #include <vector>
 
-#include "vulkan_raii.hpp"
+#include <vulkan/vulkan_raii.hpp>
 
 #include "Device.hpp"
 #include "Frame.hpp"
-#include "Queue.hpp"
 
 struct Swapchain {
-    Swapchain(Device &device);
+    explicit Swapchain(
+        Device         &device,
+        PhysicalDevice &physicalDevice,
+        Surface        &surface);
 
-    auto create(Device &device) -> void;
+    auto create(
+        Device         &device,
+        PhysicalDevice &physicalDevice,
+        Surface        &surface) -> void;
 
     auto recreate(
-        Device &device,
-        Queue  &queue)
+        Device         &device,
+        PhysicalDevice &physicalDevice,
+        Surface        &surface)
 
         -> void;
 

@@ -43,8 +43,7 @@ auto main(
     Renderer r;
 
     // create transient command pool for single-time commands
-    auto transient =
-        Command{r.device, r.graphicsQueue, vk::CommandPoolCreateFlagBits::eTransient};
+    auto transient = Command{r.device, vk::CommandPoolCreateFlagBits::eTransient};
 
     // Transition image layout
     transient.beginSingleTime();
@@ -58,7 +57,7 @@ auto main(
             vk::ImageAspectFlagBits::eColor);
     }
 
-    transient.endSingleTime(r.device, r.graphicsQueue);
+    transient.endSingleTime(r.device);
 
     auto asset = getGltfAsset(gltfDirectory / gltfFilename);
     auto scene = getSceneData(asset, gltfDirectory);
@@ -70,7 +69,6 @@ auto main(
         r.device,
         transient,
         r.allocator,
-        r.graphicsQueue,
         r.swapchain.frame.maxFramesInFlight);
 
     uint32_t textureCount = scene.textureBuffers.image.size();

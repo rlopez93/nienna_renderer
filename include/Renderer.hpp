@@ -20,7 +20,6 @@
 #include "Frame.hpp"
 #include "Instance.hpp"
 #include "PhysicalDevice.hpp"
-#include "Queue.hpp"
 #include "Surface.hpp"
 #include "Swapchain.hpp"
 #include "Timeline.hpp"

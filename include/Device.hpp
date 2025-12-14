@@ -18,6 +18,7 @@ struct QueueFamilyIndices {
 struct Device {
     Device(
         const PhysicalDevice            &physicalDevice,
+        const Window                    &window,
         const Surface                   &surface,
         const std::vector<const char *> &requiredExtensions);
 
@@ -30,6 +31,7 @@ struct Device {
         const PhysicalDevice &physicalDevice,
         const Surface        &surface) -> QueueFamilyIndices;
 
+    const Window      &window;
     QueueFamilyIndices queueFamilyIndices;
     vk::raii::Device   handle;
     vk::raii::Queue    graphicsQueue;

@@ -29,7 +29,6 @@ target_sources(nienna PRIVATE
     src/gltfLoader.cpp
     src/Instance.cpp
     src/PhysicalDevice.cpp
-    src/Queue.cpp
     src/Renderer.cpp
     src/Shader.cpp
     src/stb_image.cpp

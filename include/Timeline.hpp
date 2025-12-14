@@ -11,7 +11,6 @@ struct Timeline {
 
     Timeline(
         Device        &device,
-        Queue         &queue,
         const uint32_t maxFramesInFlight);
 
     auto createTimelineSemaphore(

@@ -14,18 +14,18 @@ Renderer::Renderer()
           instance,
           window},
       requiredExtensions{
-          {VK_KHR_SWAPCHAIN_EXTENSION_NAME},
-          {VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME},
-          {VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME},
-          {VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME},
-          {VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME},
-          {VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME},
-          {VK_EXT_IMAGE_ROBUSTNESS_EXTENSION_NAME},
-          {VK_EXT_ROBUSTNESS_2_EXTENSION_NAME},
-          {VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME},
-          {VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME},
-          {VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME},
-          {VK_EXT_MEMORY_BUDGET_EXTENSION_NAME},
+          VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+          VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
+          VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
+          VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
+          VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME,
+          VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
+          VK_EXT_IMAGE_ROBUSTNESS_EXTENSION_NAME,
+          VK_EXT_ROBUSTNESS_2_EXTENSION_NAME,
+          VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME,
+          VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME,
+          VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME,
+          VK_EXT_MEMORY_BUDGET_EXTENSION_NAME,
 
       },
       physicalDevice{
@@ -33,9 +33,13 @@ Renderer::Renderer()
           requiredExtensions},
       device{
           physicalDevice,
+          window,
           surface,
           requiredExtensions},
-      swapchain{device},
+      swapchain{
+          device,
+          physicalDevice,
+          surface},
       allocator{
           instance,
           physicalDevice,
@@ -69,7 +73,6 @@ Renderer::Renderer()
                   1}})},
       timeline{
           device,
-          graphicsQueue,
           swapchain.frame.maxFramesInFlight},
 
       poolSizes{
@@ -119,8 +122,8 @@ Renderer::Renderer()
         .Instance            = *instance.handle,
         .PhysicalDevice      = *physicalDevice.handle,
         .Device              = *device.handle,
-        .QueueFamily         = graphicsQueue.index,
-        .Queue               = *graphicsQueue.handle,
+        .QueueFamily         = device.queueFamilyIndices.graphicsIndex,
+        .Queue               = *device.graphicsQueue,
         .DescriptorPool      = *imguiDescriptorPool,
         .MinImageCount       = 3,
         .ImageCount          = 3,
@@ -169,7 +172,7 @@ auto Renderer::submit() -> void
 
     auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{timeline.buffer()};
 
-    graphicsQueue.handle.submit2(
+    device.graphicsQueue.submit2(
         vk::SubmitInfo2{
             {},
             waitSemaphoreSubmitInfo,
@@ -180,7 +183,7 @@ auto Renderer::submit() -> void
 auto Renderer::present() -> void
 {
     auto renderFinishedSemaphore = swapchain.getRenderFinishedSemaphore();
-    auto presentResult           = presentQueue.handle.presentKHR(
+    auto presentResult           = device.presentQueue.presentKHR(
         vk::PresentInfoKHR{
             renderFinishedSemaphore,
             *swapchain.handle,
@@ -283,7 +286,7 @@ auto Renderer::beginFrame() -> void
 
     // check swapchain rebuild
     if (swapchain.needRecreate) {
-        swapchain.recreate(device, graphicsQueue);
+        swapchain.recreate(device, physicalDevice, surface);
     }
 
     {

@@ -20,7 +20,7 @@ PhysicalDevice::PhysicalDevice(
 // --------------------------------------------------------------
 // Helper: return a list of missing extensions for this device
 // --------------------------------------------------------------
-auto getMissingExtensions(
+auto PhysicalDevice::getMissingExtensions(
     const vk::raii::PhysicalDevice  &physicalDevice,
     const std::vector<const char *> &requiredExtensions) -> std::vector<std::string>
 {
@@ -43,7 +43,7 @@ auto getMissingExtensions(
     return missingExtensions;
 }
 
-auto choosePhysicalDevice(
+auto PhysicalDevice::choosePhysicalDevice(
     const Instance                  &instance,
     const std::vector<const char *> &requiredExtensions) -> vk::raii::PhysicalDevice
 {

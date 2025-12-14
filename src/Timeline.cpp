@@ -13,7 +13,6 @@ auto Timeline::createTimelineSemaphore(
 
 Timeline::Timeline(
     Device        &device,
-    Queue         &queue,
     const uint32_t maxFramesInFlight)
     : values{
           maxFramesInFlight,
@@ -22,7 +21,7 @@ Timeline::Timeline(
 
 {
     for (int n : std::views::iota(0u, maxFramesInFlight)) {
-        command.emplace_back(device, queue);
+        command.emplace_back(device);
     }
 
     std::ranges::iota(values, 0u);
