@@ -1,6 +1,6 @@
 # Nienna
 
-WIP real-time 3D graphics renderer targeting Vulkan 1.4
+WIP C++26 real-time 3D graphics renderer targeting Vulkan 1.4
 
 ## Current features
 
