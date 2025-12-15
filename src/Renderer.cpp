@@ -5,6 +5,8 @@
 #include "imgui_impl_vulkan.h"
 #include <ranges>
 
+#include <SDL3/SDL_video.h>
+
 Renderer::Renderer()
     : window{createWindow(
           windowWidth,
@@ -108,6 +110,19 @@ Renderer::Renderer()
               poolSizes}}
 
 {
+    // after depthImage + depthImageView creation
+    // create transient command pool for single-time commands
+    auto transient = Command{device, vk::CommandPoolCreateFlagBits::eTransient};
+    transient.beginSingleTime();
+
+    cmdTransitionImageLayout(
+        transient.buffer,
+        depthImage.image,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eAttachmentOptimal,
+        vk::ImageAspectFlagBits::eDepth);
+
+    transient.endSingleTime(device);
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -136,72 +151,6 @@ Renderer::Renderer()
     ImGui_ImplVulkan_Init(&init_info);
 }
 
-auto Renderer::submit() -> void
-{
-
-    // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
-    cmdTransitionImageLayout(
-        timeline.buffer(),
-        swapchain.getNextImage(),
-        vk::ImageLayout::eColorAttachmentOptimal,
-        vk::ImageLayout::ePresentSrcKHR);
-
-    timeline.buffer().end();
-
-    // end frame
-
-    // prepare to submit the current frame for rendering
-    // add the swapchain semaphore to wait for the image to be available
-
-    uint64_t signalFrameValue = timeline.value() + swapchain.frame.maxFramesInFlight;
-    timeline.value()          = signalFrameValue;
-
-    auto waitSemaphoreSubmitInfo = vk::SemaphoreSubmitInfo{
-        swapchain.getImageAvailableSemaphore(),
-        {},
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput};
-
-    auto signalSemaphoreSubmitInfos = std::array{
-        vk::SemaphoreSubmitInfo{
-            swapchain.getRenderFinishedSemaphore(),
-            {},
-            vk::PipelineStageFlagBits2::eColorAttachmentOutput},
-        vk::SemaphoreSubmitInfo{
-            timeline.semaphore,
-            signalFrameValue,
-            vk::PipelineStageFlagBits2::eColorAttachmentOutput}};
-
-    auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{timeline.buffer()};
-
-    device.graphicsQueue.submit2(
-        vk::SubmitInfo2{
-            {},
-            waitSemaphoreSubmitInfo,
-            commandBufferSubmitInfo,
-            signalSemaphoreSubmitInfos});
-}
-
-auto Renderer::present() -> void
-{
-    auto renderFinishedSemaphore = swapchain.getRenderFinishedSemaphore();
-    auto presentResult           = device.presentQueue.presentKHR(
-        vk::PresentInfoKHR{
-            renderFinishedSemaphore,
-            *swapchain.handle,
-            swapchain.nextImageIndex});
-
-    // FIXME:
-    // Swapchain recreation logic
-    if (presentResult == vk::Result::eErrorOutOfDateKHR
-        || presentResult == vk::Result::eSuboptimalKHR) {
-        swapchain.needRecreate = true;
-    }
-
-    else if (!(presentResult == vk::Result::eSuccess
-               || presentResult == vk::Result::eSuboptimalKHR)) {
-        throw std::exception{};
-    }
-}
 auto Renderer::getWindowExtent() const -> vk::Extent2D
 {
     const vk::SurfaceCapabilitiesKHR caps =
@@ -235,6 +184,173 @@ auto Renderer::getWindowExtent() const -> vk::Extent2D
         caps.maxImageExtent.height);
 
     return extent;
+}
+
+auto Renderer::drawFrame(
+    Scene                             &scene,
+    const std::chrono::duration<float> deltaTime,
+    vk::raii::Pipeline                &pipeline,
+    Descriptors                       &descriptors,
+    bool                               framebufferResized) -> void
+{
+    // If minimized, skip rendering
+    int w, h;
+    SDL_GetWindowSizeInPixels(window.get(), &w, &h);
+
+    if (w == 0 || h == 0) {
+        SDL_WaitEvent(nullptr); // sleep until something happens
+        return;
+    }
+
+    // FIXME:
+    // Swapchain recreation logic
+
+    // check swapchain rebuild
+    if (framebufferResized || swapchain.needRecreate) {
+        swapchain.recreate(device, physicalDevice, surface);
+
+        depthImage = allocator.createImage(
+            vk::ImageCreateInfo{
+                {},
+                vk::ImageType::e2D,
+                depthFormat,
+                vk::Extent3D(getWindowExtent(), 1),
+                1,
+                1,
+                vk::SampleCountFlagBits::e1,
+                vk::ImageTiling::eOptimal,
+                vk::ImageUsageFlagBits::eDepthStencilAttachment});
+
+        depthImageView = device.handle.createImageView(
+            vk::ImageViewCreateInfo{
+                {},
+                depthImage.image,
+                vk::ImageViewType::e2D,
+                depthFormat,
+                {},
+                vk::ImageSubresourceRange{
+                    vk::ImageAspectFlagBits::eDepth,
+                    0,
+                    1,
+                    0,
+                    1}});
+
+        // after depthImage + depthImageView creation
+        // create transient command pool for single-time commands
+        auto transient = Command{device, vk::CommandPoolCreateFlagBits::eTransient};
+        transient.beginSingleTime();
+
+        cmdTransitionImageLayout(
+            transient.buffer,
+            depthImage.image,
+            vk::ImageLayout::eUndefined,
+            vk::ImageLayout::eAttachmentOptimal,
+            vk::ImageAspectFlagBits::eDepth);
+
+        transient.endSingleTime(device);
+        framebufferResized = false;
+        return;
+    }
+
+    // ImGui_ImplVulkan_NewFrame();
+    // ImGui_ImplSDL3_NewFrame();
+    // ImGui::NewFrame();
+
+    // ImGui::ShowDemoWindow();
+
+    // ImGui::Render();
+    // auto imGuiDrawData = ImGui::GetDrawData();
+
+    scene.update(deltaTime);
+
+    // FIXME:
+    // Does copying uniform data to device go in scene.update()?
+    // Synchronization?
+
+    // update uniform buffers
+    for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
+        auto transform = Transform{
+            .modelMatrix          = mesh.modelMatrix,
+            .viewProjectionMatrix = scene.getCamera().getProjectionMatrix()
+                                  * scene.getCamera().getViewMatrix()};
+        // transform.viewProjectionMatrix[1][1] *= -1;
+
+        VK_CHECK(vmaCopyMemoryToAllocation(
+            allocator.allocator,
+            &transform,
+            scene.buffers.uniform[swapchain.frame.index].allocation,
+            sizeof(Transform) * meshIndex,
+            sizeof(Transform)));
+    }
+    auto light = Light{};
+
+    VK_CHECK(vmaCopyMemoryToAllocation(
+        allocator.allocator,
+        &light,
+        scene.buffers.light[swapchain.frame.index].allocation,
+        0,
+        sizeof(light)));
+
+    beginFrame();
+
+    // render scene
+    render(scene, pipeline, descriptors);
+
+    // render imGui
+    // r.beginRender(
+    //     vk::AttachmentLoadOp::eLoad,
+    //     vk::AttachmentStoreOp::eStore,
+    //     vk::AttachmentLoadOp::eLoad,
+    //     vk::AttachmentStoreOp::eStore);
+
+    // ImGui_ImplVulkan_RenderDrawData(imGuiDrawData, *r.timeline.buffer());
+
+    // r.endRender();
+
+    submit();
+    present();
+
+    endFrame();
+    // ImGui::EndFrame();
+
+    // ++totalFrames;
+
+    // if (totalFrames > 10) {
+    //     break;
+    // }
+}
+auto Renderer::beginFrame() -> void
+{
+
+    // begin frame
+    // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
+
+    {
+        // wait semaphore frame (n - numFrames)
+        auto result = device.handle.waitSemaphores(
+            vk::SemaphoreWaitInfo{{}, *timeline.semaphore, timeline.value()},
+            std::numeric_limits<uint64_t>::max());
+    }
+
+    // reset current frame's command pool to reuse the command buffer
+    timeline.pool().reset();
+    timeline.buffer().begin({});
+
+    auto result = swapchain.acquireNextImage();
+
+    // FIXME:
+    // Swapchain recreation logic
+    if (result == vk::Result::eErrorOutOfDateKHR
+        || result == vk::Result::eSuboptimalKHR) {
+        swapchain.needRecreate = true;
+    } else if (!(result == vk::Result::eSuccess
+                 || result == vk::Result::eSuboptimalKHR)) {
+        throw std::exception{};
+    }
+
+    if (swapchain.needRecreate) {
+        return;
+    }
 }
 
 auto Renderer::render(
@@ -304,55 +420,6 @@ auto Renderer::render(
     endRender();
 }
 
-auto Renderer::beginFrame() -> void
-{
-
-    // begin frame
-    // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
-
-    // FIXME:
-    // Swapchain recreation logic
-
-    // check swapchain rebuild
-    if (swapchain.needRecreate) {
-        swapchain.recreate(device, physicalDevice, surface);
-    }
-
-    {
-        // wait semaphore frame (n - numFrames)
-        auto result = device.handle.waitSemaphores(
-            vk::SemaphoreWaitInfo{{}, *timeline.semaphore, timeline.value()},
-            std::numeric_limits<uint64_t>::max());
-    }
-
-    // reset current frame's command pool to reuse the command buffer
-    timeline.pool().reset();
-    timeline.buffer().begin({});
-
-    auto result = swapchain.acquireNextImage();
-
-    // FIXME:
-    // Swapchain recreation logic
-    if (result == vk::Result::eErrorOutOfDateKHR
-        || result == vk::Result::eSuboptimalKHR) {
-        swapchain.needRecreate = true;
-    } else if (!(result == vk::Result::eSuccess
-                 || result == vk::Result::eSuboptimalKHR)) {
-        throw std::exception{};
-    }
-
-    if (swapchain.needRecreate) {
-        return;
-    }
-}
-
-auto Renderer::endFrame() -> void
-{
-    // advance to the next frame
-    swapchain.advance();
-    timeline.advance();
-}
-
 auto Renderer::beginRender(
     vk::AttachmentLoadOp  loadOp,
     vk::AttachmentStoreOp storeOp,
@@ -391,11 +458,42 @@ auto Renderer::beginRender(
         &renderingDepthAttachmentInfo};
 
     // transition swapchain image layout
-    cmdTransitionImageLayout(
-        timeline.buffer(),
+    // cmdTransitionImageLayout(
+    //     timeline.buffer(),
+    //     swapchain.getNextImage(),
+    //     vk::ImageLayout::eUndefined,
+    //     vk::ImageLayout::eColorAttachmentOptimal);
+
+    auto oldLayout = vk::ImageLayout{
+        (!swapchain.imageInitialized[swapchain.nextImageIndex])
+            ? vk::ImageLayout::eUndefined
+            : vk::ImageLayout::ePresentSrcKHR};
+
+    vk::ImageMemoryBarrier2 barrier{
+        // src: be conservative; assume last use was as a color attachment write
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::AccessFlagBits2::eColorAttachmentWrite,
+
+        // dst: color attachment read/write during rendering
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::AccessFlagBits2::eColorAttachmentRead
+            | vk::AccessFlagBits2::eColorAttachmentWrite,
+
+        // layout transition
+        oldLayout,
+        vk::ImageLayout::eColorAttachmentOptimal,
+
+        // queue family ownership unchanged
+        VK_QUEUE_FAMILY_IGNORED,
+        VK_QUEUE_FAMILY_IGNORED,
+
         swapchain.getNextImage(),
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eColorAttachmentOptimal);
+        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
+
+    timeline.buffer().pipelineBarrier2(
+        vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
+
+    swapchain.imageInitialized[swapchain.nextImageIndex] = true;
 
     timeline.buffer().beginRendering(renderingInfo);
 }
@@ -403,6 +501,100 @@ auto Renderer::beginRender(
 auto Renderer::endRender() -> void
 {
     timeline.buffer().endRendering();
+}
+
+auto Renderer::submit() -> void
+{
+
+    // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
+    // cmdTransitionImageLayout(
+    //     timeline.buffer(),
+    //     swapchain.getNextImage(),
+    //     vk::ImageLayout::eColorAttachmentOptimal,
+    //     vk::ImageLayout::ePresentSrcKHR);
+
+    vk::ImageMemoryBarrier2 barrier{
+        // src: rendering wrote the color attachment
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::AccessFlagBits2::eColorAttachmentWrite,
+
+        // dst: presentation engine
+        vk::PipelineStageFlagBits2::eBottomOfPipe,
+        vk::AccessFlagBits2::eNone,
+
+        // layout transition
+        vk::ImageLayout::eColorAttachmentOptimal,
+        vk::ImageLayout::ePresentSrcKHR,
+
+        VK_QUEUE_FAMILY_IGNORED,
+        VK_QUEUE_FAMILY_IGNORED,
+
+        swapchain.getNextImage(),
+        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
+
+    timeline.buffer().pipelineBarrier2(
+        vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
+    timeline.buffer().end();
+
+    // end frame
+
+    // prepare to submit the current frame for rendering
+    // add the swapchain semaphore to wait for the image to be available
+
+    uint64_t signalFrameValue = timeline.value() + swapchain.frame.maxFramesInFlight;
+    timeline.value()          = signalFrameValue;
+
+    auto waitSemaphoreSubmitInfo = vk::SemaphoreSubmitInfo{
+        swapchain.getImageAvailableSemaphore(),
+        {},
+        vk::PipelineStageFlagBits2::eAllCommands};
+
+    auto signalSemaphoreSubmitInfos = std::array{
+        vk::SemaphoreSubmitInfo{
+            swapchain.getRenderFinishedSemaphore(),
+            {},
+            vk::PipelineStageFlagBits2::eAllCommands},
+        vk::SemaphoreSubmitInfo{
+            timeline.semaphore,
+            signalFrameValue,
+            vk::PipelineStageFlagBits2::eAllCommands}};
+
+    auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{timeline.buffer()};
+
+    device.graphicsQueue.submit2(
+        vk::SubmitInfo2{
+            {},
+            waitSemaphoreSubmitInfo,
+            commandBufferSubmitInfo,
+            signalSemaphoreSubmitInfos});
+}
+
+auto Renderer::present() -> void
+{
+    auto renderFinishedSemaphore = swapchain.getRenderFinishedSemaphore();
+    auto presentResult           = device.presentQueue.presentKHR(
+        vk::PresentInfoKHR{
+            renderFinishedSemaphore,
+            *swapchain.handle,
+            swapchain.nextImageIndex});
+
+    // FIXME:
+    // Swapchain recreation logic
+    if (presentResult == vk::Result::eErrorOutOfDateKHR
+        || presentResult == vk::Result::eSuboptimalKHR) {
+        swapchain.needRecreate = true;
+    }
+
+    else if (!(presentResult == vk::Result::eSuccess
+               || presentResult == vk::Result::eSuboptimalKHR)) {
+        throw std::exception{};
+    }
+}
+auto Renderer::endFrame() -> void
+{
+    // advance to the next frame
+    swapchain.advance();
+    timeline.advance();
 }
 
 Renderer::~Renderer()

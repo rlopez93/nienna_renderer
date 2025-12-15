@@ -6,7 +6,7 @@ Command::Command(
       pool{
           device.handle,
           vk::CommandPoolCreateInfo{
-              poolFlags,
+              poolFlags | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
               device.queueFamilyIndices.graphicsIndex}},
       buffer{std::move(
           vk::raii::CommandBuffers{

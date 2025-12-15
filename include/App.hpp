@@ -25,7 +25,8 @@ auto createPipeline(
 auto updateDescriptorSets(
     vk::raii::Device                       &device,
     Descriptors                            &descriptors,
-    const std::vector<Buffer>              &sceneBuffers,
+    const std::vector<Buffer>              &transformUBOs,
+    const std::vector<Buffer>              &lightUBOs,
     const uint32_t                         &meshCount,
     const std::vector<vk::raii::ImageView> &textureImageViews,
     vk::raii::Sampler                      &sampler) -> void;

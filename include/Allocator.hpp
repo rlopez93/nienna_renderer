@@ -17,8 +17,9 @@ struct Buffer {
 };
 
 struct Image {
-    vk::Image     image{};
-    VmaAllocation allocation{};
+    vk::Image       image{};
+    VmaAllocation   allocation{};
+    vk::ImageLayout currentLayout;
 };
 
 struct Allocator {

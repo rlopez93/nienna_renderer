@@ -9,6 +9,16 @@ auto makePipelineStageAccessTuple(vk::ImageLayout state) -> std::tuple<
         return std::make_tuple(
             vk::PipelineStageFlagBits2::eTopOfPipe,
             vk::AccessFlagBits2::eNone);
+
+    case vk::ImageLayout::eAttachmentOptimal:
+        return std::make_tuple(
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput
+                | vk::PipelineStageFlagBits2::eEarlyFragmentTests
+                | vk::PipelineStageFlagBits2::eLateFragmentTests,
+            vk::AccessFlagBits2::eColorAttachmentRead
+                | vk::AccessFlagBits2::eColorAttachmentWrite
+                | vk::AccessFlagBits2::eDepthStencilAttachmentRead
+                | vk::AccessFlagBits2::eDepthStencilAttachmentWrite);
     case vk::ImageLayout::eColorAttachmentOptimal:
         return std::make_tuple(
             vk::PipelineStageFlagBits2::eColorAttachmentOutput,

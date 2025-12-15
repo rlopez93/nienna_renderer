@@ -43,21 +43,10 @@ auto main(
     Renderer r;
 
     // create transient command pool for single-time commands
-    auto transient = Command{r.device, vk::CommandPoolCreateFlagBits::eTransient};
-
-    // Transition image layout
-    transient.beginSingleTime();
-
-    for (auto image : r.swapchain.images) {
-        cmdTransitionImageLayout(
-            transient.buffer,
-            image,
-            vk::ImageLayout::eUndefined,
-            vk::ImageLayout::ePresentSrcKHR,
-            vk::ImageAspectFlagBits::eColor);
-    }
-
-    transient.endSingleTime(r.device);
+    auto transient = Command{
+        r.device,
+        vk::CommandPoolCreateFlagBits::eTransient
+            | vk::CommandPoolCreateFlagBits::eResetCommandBuffer};
 
     auto asset = getGltfAsset(gltfDirectory / gltfFilename);
     auto scene = getSceneData(asset, gltfDirectory);
@@ -86,6 +75,7 @@ auto main(
         r.device.handle,
         descriptors,
         scene.buffers.uniform,
+        scene.buffers.light,
         meshCount,
         scene.textureBuffers.imageView,
         sampler);
@@ -109,7 +99,9 @@ auto main(
     constexpr auto period       = 1.0s;
 
     SDL_Event e;
+    bool      framebufferResized = false;
     while (running) {
+        // fmt::println(stdout, "Frame {}", totalFrames);
         currentTime    = std::chrono::high_resolution_clock::now();
         auto deltaTime = currentTime - previousTime;
         runningTime += deltaTime;
@@ -125,75 +117,42 @@ auto main(
 
         previousTime = currentTime;
 
+        framebufferResized = false;
         while (SDL_PollEvent(&e)) {
 
-            ImGui_ImplSDL3_ProcessEvent(&e);
+            // ImGui_ImplSDL3_ProcessEvent(&e);
 
             if (e.type == SDL_EVENT_QUIT) {
                 running = false;
             }
 
+            else if (e.type == SDL_EVENT_WINDOW_RESIZED) {
+                framebufferResized = true;
+                fmt::println(stderr, "Window resized!");
+            }
+
+            else if (e.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
+                framebufferResized = true;
+                fmt::println(stderr, "Window pixel size changed!");
+
+            } else if (e.type == SDL_EVENT_WINDOW_MINIMIZED) {
+                // rendering will pause automatically
+                fmt::println(stderr, "Window minimized!");
+
+            } else if (e.type == SDL_EVENT_WINDOW_RESTORED) {
+                framebufferResized = true;
+                fmt::println(stderr, "Window restored!");
+            }
+
             scene.processInput(e);
         }
 
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-        ImGui::NewFrame();
-
-        ImGui::ShowDemoWindow();
-
-        ImGui::Render();
-        auto imGuiDrawData = ImGui::GetDrawData();
-
-        scene.update(deltaTime);
-
-        // FIXME:
-        // Does copying uniform data to device go in scene.update()?
-        // Synchronization?
-
-        // update uniform buffers
-        for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
-            auto transform = Transform{
-                .modelMatrix          = mesh.modelMatrix,
-                .viewProjectionMatrix = scene.getCamera().getProjectionMatrix()
-                                      * scene.getCamera().getViewMatrix()};
-            // transform.viewProjectionMatrix[1][1] *= -1;
-
-            VK_CHECK(vmaCopyMemoryToAllocation(
-                r.allocator.allocator,
-                &transform,
-                scene.buffers.uniform[r.swapchain.frame.index].allocation,
-                sizeof(Transform) * meshIndex,
-                sizeof(Transform)));
-        }
-
-        r.beginFrame();
-
-        // render scene
-        r.render(scene, graphicsPipeline, descriptors);
-
-        // render imGui
-        r.beginRender(
-            vk::AttachmentLoadOp::eLoad,
-            vk::AttachmentStoreOp::eStore,
-            vk::AttachmentLoadOp::eLoad,
-            vk::AttachmentStoreOp::eStore);
-
-        // ImGui_ImplVulkan_RenderDrawData(imGuiDrawData, *r.timeline.buffer());
-
-        r.endRender();
-
-        r.submit();
-        r.present();
-
-        r.endFrame();
-        ImGui::EndFrame();
-
-        ++totalFrames;
-
-        if (totalFrames > 4) {
-            break;
-        }
+        r.drawFrame(
+            scene,
+            deltaTime,
+            graphicsPipeline,
+            descriptors,
+            framebufferResized);
     }
 
     r.device.handle.waitIdle();

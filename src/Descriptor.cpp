@@ -53,6 +53,12 @@ auto Descriptors::createDescriptorSetLayout(
             vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment);
     };
 
+    descriptorSetLayoutBindings.emplace_back(
+        2,
+        vk::DescriptorType::eUniformBuffer,
+        1,
+        vk::ShaderStageFlagBits::eFragment);
+
     return {device, vk::DescriptorSetLayoutCreateInfo{{}, descriptorSetLayoutBindings}};
 }
 
@@ -68,10 +74,12 @@ auto Descriptors::createDescriptorPool(
 
     auto poolSizes = std::vector<vk::DescriptorPoolSize>{};
 
+    uint32_t lightCount = 1;
+
     if (meshCount > 0) {
         poolSizes.emplace_back(
             vk::DescriptorType::eUniformBuffer,
-            static_cast<uint32_t>(maxFramesInFlight) * meshCount);
+            static_cast<uint32_t>(maxFramesInFlight) * (meshCount + lightCount));
     }
 
     if (textureCount > 0) {
@@ -84,7 +92,8 @@ auto Descriptors::createDescriptorPool(
         device,
         vk::DescriptorPoolCreateInfo{
             vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-            static_cast<uint32_t>(maxFramesInFlight) * (textureCount + meshCount),
+            static_cast<uint32_t>(maxFramesInFlight)
+                * (textureCount + meshCount + lightCount),
             poolSizes}};
 }
 

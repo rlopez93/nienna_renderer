@@ -31,6 +31,13 @@ struct Renderer {
     Renderer();
     ~Renderer();
 
+    auto drawFrame(
+        Scene                             &scene,
+        const std::chrono::duration<float> deltaTime,
+        vk::raii::Pipeline                &pipeline,
+        Descriptors                       &descriptors,
+        bool                               framebufferResized) -> void;
+
     auto beginFrame() -> void;
 
     auto beginRender(

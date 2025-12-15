@@ -27,7 +27,11 @@ auto createWindow(
     }
 
     // create Vulkan window
-    auto window = SDL_CreateWindow("Vulkan + SDL3", 800, 600, SDL_WINDOW_VULKAN);
+    auto window = SDL_CreateWindow(
+        "Vulkan + SDL3",
+        800,
+        600,
+        SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
     if (!window) {
         fmt::print(stderr, "SDL_CreateWindow Error: {}\n", SDL_GetError());
         return nullptr;

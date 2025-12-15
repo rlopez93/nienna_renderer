@@ -147,12 +147,13 @@ auto createPipeline(
 void updateDescriptorSets(
     vk::raii::Device                       &device,
     Descriptors                            &descriptors,
-    const std::vector<Buffer>              &sceneBuffers,
+    const std::vector<Buffer>              &transformUBOs,
+    const std::vector<Buffer>              &lightUBOs,
     const uint32_t                         &meshCount,
     const std::vector<vk::raii::ImageView> &textureImageViews,
     vk::raii::Sampler                      &sampler)
 {
-    for (auto frameIndex : std::views::iota(0u, sceneBuffers.size())) {
+    for (auto frameIndex : std::views::iota(0u, transformUBOs.size())) {
         auto descriptorWrites = std::vector<vk::WriteDescriptorSet>{};
 
         auto descriptorBufferInfos = std::vector<vk::DescriptorBufferInfo>{};
@@ -160,7 +161,7 @@ void updateDescriptorSets(
         vk::DeviceSize transformBufferSize = sizeof(Transform) * meshCount;
         for (auto meshIndex : std::views::iota(0, static_cast<int32_t>(meshCount))) {
             descriptorBufferInfos.emplace_back(
-                sceneBuffers[frameIndex].buffer,
+                transformUBOs[frameIndex].buffer,
                 sizeof(Transform) * meshIndex,
                 sizeof(Transform));
         }
@@ -175,6 +176,19 @@ void updateDescriptorSets(
                     {},
                     descriptorBufferInfos});
         }
+
+        auto lightBufferInfo =
+            vk::DescriptorBufferInfo{lightUBOs[frameIndex].buffer, 0, sizeof(Light)};
+
+        descriptorWrites.push_back(
+            vk::WriteDescriptorSet{
+                descriptors.descriptorSets[frameIndex],
+                2,
+                0,
+                1,
+                vk::DescriptorType::eUniformBuffer,
+                {},
+                &lightBufferInfo});
 
         auto descriptorImageInfos = std::vector<vk::DescriptorImageInfo>{};
         for (const auto &view : textureImageViews) {

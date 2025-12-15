@@ -7,7 +7,7 @@
 struct Command {
     Command(
         Device                    &device,
-        vk::CommandPoolCreateFlags poolFlags = {});
+        vk::CommandPoolCreateFlags poolFlags);
 
     auto beginSingleTime() -> void;
     auto endSingleTime(Device &device) -> void;

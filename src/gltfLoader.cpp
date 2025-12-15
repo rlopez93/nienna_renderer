@@ -406,6 +406,17 @@ auto Scene::createBuffersOnDevice(
                 | VMA_ALLOCATION_CREATE_MAPPED_BIT));
     }
 
+    for (auto i : std::views::iota(0u, maxFramesInFlight)) {
+        buffers.light.emplace_back(allocator.createBuffer(
+            sizeof(Light),
+            vk::BufferUsageFlagBits2::eUniformBuffer
+                | vk::BufferUsageFlagBits2::eTransferDst,
+            false,
+            VMA_MEMORY_USAGE_AUTO,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                | VMA_ALLOCATION_CREATE_MAPPED_BIT));
+    }
+
     for (const auto &texture : textures) {
         fmt::println(stderr, "uploading texture '{}'", texture.name.string());
         textureBuffers.image.emplace_back(allocator.createImageAndUploadData(

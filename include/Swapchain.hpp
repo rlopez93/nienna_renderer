@@ -14,9 +14,10 @@ struct Swapchain {
         Surface        &surface);
 
     auto create(
-        Device         &device,
-        PhysicalDevice &physicalDevice,
-        Surface        &surface) -> void;
+        Device            &device,
+        PhysicalDevice    &physicalDevice,
+        Surface           &surface,
+        vk::SwapchainKHR &&oldSwapchain = {}) -> void;
 
     auto recreate(
         Device         &device,
@@ -38,6 +39,7 @@ struct Swapchain {
     auto advance() -> void;
 
     vk::raii::SwapchainKHR           handle;
+    std::vector<bool>                imageInitialized;
     uint32_t                         nextImageIndex = 0u;
     std::vector<vk::Image>           images;
     std::vector<vk::raii::ImageView> imageViews;

@@ -22,6 +22,13 @@
 #include <optional>
 #include <vector>
 
+struct Light {
+    glm::vec3 direction = {0.0f, 0.0f, -1.0f};
+    float     intensity = 1.0f;
+    glm::vec3 color     = {1.0f, 1.0f, 1.0f};
+    float     padding;
+};
+
 struct Transform {
     glm::mat4 modelMatrix;
     glm::mat4 viewProjectionMatrix;
@@ -74,6 +81,7 @@ struct Scene {
         std::vector<Buffer> index;
         std::vector<Buffer> vertex;
         std::vector<Buffer> uniform;
+        std::vector<Buffer> light;
     } buffers;
 
     struct TextureBuffers {

@@ -22,6 +22,14 @@ struct Transform
     float4x4 viewProjectionMatrix;
 }
 
+struct Light
+{
+        float3 direction;
+        float intensity;
+        float3 color;
+        float padding;
+}
+
 struct FragmentOutput
 {
 	float4 color : SV_TARGET;
@@ -36,6 +44,7 @@ struct PushConstantBlock
 }
 
 ConstantBuffer<Transform> transform[];
+ConstantBuffer<Light> light;
 Sampler2D texture[];
 [[vk::push_constant]] ConstantBuffer<PushConstantBlock> pushConstant;
 
@@ -52,23 +61,38 @@ FragmentPrimitive vertexMain(Primitive input)
                 float4(input.position, 1.0)
             )
         );
-    output.normal = input.normal;
+    float3 worldNormal = mul(
+        (float3x3)transform[pushConstant.transformIndex].modelMatrix, input.normal);
+
+    output.normal = normalize(worldNormal);
     output.uv = input.uv;
     output.color = input.color;
 	return output;
 }
 
 
-
 [shader("fragment")]
 FragmentOutput fragmentMain(FragmentPrimitive input) : SV_TARGET
 {
 	FragmentOutput output;
+
+    float3 N = normalize(input.normal);
+    float3 L = normalize(-light.direction);
+    float NdotL = max(dot(N, L), 0.0);
+
+    float4 baseColor;
+
     if (pushConstant.textureIndex < 0) {
-        output.color = input.color;
+            baseColor = input.color;
     } else {
-        output.color = texture[pushConstant.textureIndex].Sample(input.uv) * pushConstant.baseColorFactor;
+            baseColor = texture[pushConstant.textureIndex].Sample(input.uv) * pushConstant.baseColorFactor;
     }
+
+    output.color = 
+        float4(
+            baseColor.rgb * light.color * light.intensity * NdotL,
+            baseColor.a
+        );
 
 	return output;
 }

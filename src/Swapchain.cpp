@@ -166,11 +166,12 @@ vk::raii::SwapchainKHR createSwapchain(
 // Swapchain creation
 // -----------------------------------------------------------------------------
 auto Swapchain::create(
-    Device         &device,
-    PhysicalDevice &physicalDevice,
-    Surface        &surface) -> void
+    Device            &device,
+    PhysicalDevice    &physicalDevice,
+    Surface           &surface,
+    vk::SwapchainKHR &&oldSwapchain) -> void
 {
-    handle = createSwapchain(device, physicalDevice, surface, vk::SwapchainKHR{});
+    handle = createSwapchain(device, physicalDevice, surface, oldSwapchain);
 
     images = handle.getImages();
     imageViews.clear();
@@ -191,6 +192,7 @@ auto Swapchain::create(
     }
 
     frame.recreate(device, images.size());
+    imageInitialized.assign(images.size(), false);
 }
 
 // -----------------------------------------------------------------------------
@@ -205,29 +207,13 @@ auto Swapchain::recreate(
 
     frame.index = 0;
 
-    vk::raii::SwapchainKHR oldSwapchain = std::move(handle);
     imageViews.clear();
 
-    handle = createSwapchain(device, physicalDevice, surface, *oldSwapchain);
-    images = handle.getImages();
+    create(device, physicalDevice, surface, std::move(handle));
 
-    const auto formats = physicalDevice.handle.getSurfaceFormatsKHR(surface.handle);
-    imageFormat        = chooseSurfaceFormat(formats).format;
-
-    for (vk::Image image : images) {
-        imageViews.emplace_back(
-            device.handle,
-            vk::ImageViewCreateInfo{
-                {},
-                image,
-                vk::ImageViewType::e2D,
-                imageFormat,
-                {},
-                {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
-    }
-
-    frame.recreate(device, images.size());
     needRecreate = false;
+
+    fmt::println(stderr, "Swapchain recreated!");
 }
 
 // -----------------------------------------------------------------------------
