@@ -6,15 +6,8 @@
 #include "Renderer.hpp"
 #include "gltfLoader.hpp"
 
-#include "imgui.h"
-#include "imgui_impl_sdl3.h"
-#include "imgui_impl_vulkan.h"
-
 #include <SDL3/SDL_events.h>
 #include <fmt/base.h>
-
-#include <numeric>
-#include <ranges>
 
 auto main(
     int    argc,
@@ -121,6 +114,8 @@ auto main(
         previousTime = currentTime;
 
         framebufferResized = false;
+
+        // TODO: move into Input.hpp or something
         while (SDL_PollEvent(&e)) {
 
             // ImGui_ImplSDL3_ProcessEvent(&e);

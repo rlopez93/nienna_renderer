@@ -194,7 +194,7 @@ auto Swapchain::recreate(
     create(device, physicalDevice, surface, std::move(handle));
 
     needRecreate = false;
-    fmt::println(stderr, "Swapchain recreated!");
+    // fmt::println(stderr, "Swapchain recreated!");
 }
 
 // -----------------------------------------------------------------------------

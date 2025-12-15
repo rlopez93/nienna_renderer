@@ -28,17 +28,15 @@ auto reflectShader(const std::vector<char> &code) -> VertexReflectionData
     auto reflection = spv_reflect::ShaderModule(code.size(), code.data());
 
     if (reflection.GetResult() != SPV_REFLECT_RESULT_SUCCESS) {
-        fmt::print(
-            stderr,
-            "ERROR: could not process shader code (is it a valid SPIR-V bytecode?)\n");
-        throw std::exception{};
+        throw std::runtime_error{
+            "Could not process shader code (is it a valid SPIR-V bytecode?)"};
     }
 
     auto &shaderModule = reflection.GetShaderModule();
 
     const auto entry_point_name = std::string{shaderModule.entry_point_name};
 
-    fmt::print(stderr, "{}\n", entry_point_name);
+    // fmt::print(stderr, "{}\n", entry_point_name);
 
     auto result = SPV_REFLECT_RESULT_NOT_READY;
     auto count  = uint32_t{0};
@@ -106,7 +104,8 @@ auto reflectShader(const std::vector<char> &code) -> VertexReflectionData
         auto descriptor_type = ToStringDescriptorType(p_binding->descriptor_type);
         auto resource_type   = ToStringResourceType(p_binding->resource_type);
 
-        fmt::print(stderr, "{} {} {}\n", binding_name, descriptor_type, resource_type);
+        // fmt::print(stderr, "{} {} {}\n", binding_name, descriptor_type,
+        // resource_type);
         if ((p_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
             || (p_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE)
             || (p_binding->descriptor_type
@@ -119,14 +118,14 @@ auto reflectShader(const std::vector<char> &code) -> VertexReflectionData
             auto ms      = p_binding->image.ms;
             auto sampled = p_binding->image.sampled;
 
-            fmt::print(
-                stderr,
-                "dim {} depth {} arrayed {} ms {} sampled {}\n",
-                (int)dim,
-                depth,
-                arrayed,
-                ms,
-                sampled);
+            // fmt::print(
+            //     stderr,
+            //     "dim {} depth {} arrayed {} ms {} sampled {}\n",
+            //     (int)dim,
+            //     depth,
+            //     arrayed,
+            //     ms,
+            //     sampled);
         }
     }
 
@@ -137,7 +136,7 @@ auto createShaderModule(
     vk::raii::Device            &device,
     const std::filesystem::path &path) -> vk::raii::ShaderModule
 {
-    fmt::println(stderr, "creating shader module for {}", path.string());
+    // fmt::println(stderr, "creating shader module for {}", path.string());
     auto shaderCode = readShaders(path);
 
     auto data = reflectShader(shaderCode);

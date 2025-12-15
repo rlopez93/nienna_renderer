@@ -22,6 +22,7 @@ auto createPipeline(
     vk::Format                   depthFormat,
     vk::raii::PipelineLayout    &pipelineLayout) -> vk::raii::Pipeline;
 
+// TODO: change signature to just take a const Scene& instead of taking it by parts
 auto updateDescriptorSets(
     vk::raii::Device                       &device,
     Descriptors                            &descriptors,

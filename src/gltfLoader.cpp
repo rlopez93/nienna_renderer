@@ -5,6 +5,7 @@
 #include <fastgltf/tools.hpp>
 
 #include <fmt/base.h>
+#include <fmt/format.h>
 
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/quaternion_float.hpp>
@@ -36,20 +37,17 @@ auto getGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset
 
     auto gltfFile = fastgltf::GltfDataBuffer::FromPath(gltfPath);
     if (!bool(gltfFile)) {
-        fmt::println(
-            stderr,
+        throw std::runtime_error{fmt::format(
             "Failed to open glTF file: {}",
-            fastgltf::getErrorMessage(gltfFile.error()));
-        throw std::exception{};
+            fastgltf::getErrorMessage(gltfFile.error()))};
     }
 
     auto asset = parser.loadGltf(gltfFile.get(), gltfPath.parent_path(), gltfOptions);
 
     if (fastgltf::getErrorName(asset.error()) != "None") {
-        fmt::println(
-            stderr,
+        throw std::runtime_error{fmt::format(
             "Failed to open glTF file: {}",
-            fastgltf::getErrorMessage(gltfFile.error()));
+            fastgltf::getErrorMessage(gltfFile.error()))};
     }
 
     return std::move(asset.get());
@@ -314,7 +312,7 @@ auto getSceneData(
         0,
         fastgltf::math::fmat4x4{},
         [&](const fastgltf::Node &node, const fastgltf::math::fmat4x4 &matrix) {
-            fmt::println(stderr, "Node: {}\n", node.name);
+            // fmt::println(stderr, "Node: {}\n", node.name);
             if (node.cameraIndex.has_value()) {
                 scene.cameras.emplace_back(
                     getCamera(asset.cameras[node.cameraIndex.value()], matrix));

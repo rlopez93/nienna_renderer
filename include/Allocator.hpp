@@ -153,9 +153,9 @@ inline auto Allocator::createStagingBuffer(const std::vector<T> &vectorData) -> 
 {
     const vk::DeviceSize bufferSize = sizeof(T) * vectorData.size();
 
-    fmt::println(stderr, "size {}", vectorData.size() * sizeof(T));
+    // fmt::println(stderr, "size {}", vectorData.size() * sizeof(T));
 
-    fmt::println(stderr, "calling createBuffer()...");
+    // fmt::println(stderr, "calling createBuffer()...");
     // Create a staging buffer
     Buffer stagingBuffer = createBuffer(
         bufferSize,

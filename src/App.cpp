@@ -2,6 +2,8 @@
 #include "Shader.hpp"
 #include "gltfLoader.hpp"
 
+#include <ranges>
+
 auto createPipeline(
     vk::raii::Device            &device,
     const std::filesystem::path &shaderPath,
@@ -153,11 +155,9 @@ void updateDescriptorSets(
     vk::raii::Sampler                      &sampler)
 {
     for (auto frameIndex : std::views::iota(0u, transformUBOs.size())) {
-        auto descriptorWrites = std::vector<vk::WriteDescriptorSet>{};
-
+        auto descriptorWrites      = std::vector<vk::WriteDescriptorSet>{};
         auto descriptorBufferInfos = std::vector<vk::DescriptorBufferInfo>{};
 
-        vk::DeviceSize transformBufferSize = sizeof(Transform) * meshCount;
         for (auto meshIndex : std::views::iota(0, static_cast<int32_t>(meshCount))) {
             descriptorBufferInfos.emplace_back(
                 transformUBOs[frameIndex].buffer,
@@ -190,6 +190,7 @@ void updateDescriptorSets(
                 &lightBufferInfo});
 
         auto descriptorImageInfos = std::vector<vk::DescriptorImageInfo>{};
+
         for (const auto &view : textureImageViews) {
             descriptorImageInfos.emplace_back(
                 sampler,

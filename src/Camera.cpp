@@ -122,7 +122,7 @@ auto PerspectiveCamera::processInput(SDL_Event &e) -> void
 {
 
     if (e.type == SDL_EVENT_KEY_UP) {
-        fmt::println("I'm up!!");
+        // fmt::println("I'm up!!");
         switch (e.key.scancode) {
         case SDL_SCANCODE_W:
         case SDL_SCANCODE_S:
@@ -146,9 +146,9 @@ auto PerspectiveCamera::processInput(SDL_Event &e) -> void
     }
 
     if (e.type == SDL_EVENT_KEY_DOWN && !e.key.repeat) {
-        fmt::println("I'm down!!");
+        // fmt::println("I'm down!!");
         if (e.key.repeat) {
-            fmt::println("I'm repeating!!");
+            // fmt::println("I'm repeating!!");
         }
         switch (e.key.scancode) {
         case SDL_SCANCODE_W:

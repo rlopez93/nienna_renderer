@@ -116,7 +116,6 @@ Renderer::Renderer()
               poolSizes}}
 
 {
-    // TODO: create DepthImage class with create()/destroy()
     // after depthImage + depthImageView creation
     // create transient command pool for single-time commands
     auto transient = Command{device, vk::CommandPoolCreateFlagBits::eTransient};
