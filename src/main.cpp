@@ -1,8 +1,10 @@
 
-#include "vulkan_raii.hpp"
+#include <vulkan/vulkan_raii.hpp>
 
 #include "App.hpp"
+#include "Command.hpp"
 #include "Renderer.hpp"
+#include "gltfLoader.hpp"
 
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
@@ -62,8 +64,8 @@ auto main(
 
     uint32_t textureCount = scene.textureBuffers.image.size();
     uint32_t meshCount    = scene.meshes.size();
-    fmt::println(stderr, "textures.size(): {}", textureCount);
-    fmt::println(stderr, "meshes.size(): {}", meshCount);
+    // fmt::println(stderr, "textures.size(): {}", textureCount);
+    // fmt::println(stderr, "meshes.size(): {}", meshCount);
 
     auto descriptors = Descriptors{
         r.device.handle,
@@ -106,14 +108,15 @@ auto main(
         auto deltaTime = currentTime - previousTime;
         runningTime += deltaTime;
 
-        if (runningTime > period) {
-            auto fps =
-                totalFrames
-                / std::chrono::duration_cast<std::chrono::seconds>(currentTime - start)
-                      .count();
-            fmt::println(stderr, "{} fps", fps);
-            runningTime -= period;
-        }
+        // if (runningTime > period) {
+        //     auto fps =
+        //         totalFrames
+        //         / std::chrono::duration_cast<std::chrono::seconds>(currentTime -
+        //         start)
+        //               .count();
+        //     fmt::println(stderr, "{} fps", fps);
+        //     runningTime -= period;
+        // }
 
         previousTime = currentTime;
 
@@ -128,20 +131,20 @@ auto main(
 
             else if (e.type == SDL_EVENT_WINDOW_RESIZED) {
                 framebufferResized = true;
-                fmt::println(stderr, "Window resized!");
+                // fmt::println(stderr, "Window resized!");
             }
 
             else if (e.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
                 framebufferResized = true;
-                fmt::println(stderr, "Window pixel size changed!");
+                // fmt::println(stderr, "Window pixel size changed!");
 
             } else if (e.type == SDL_EVENT_WINDOW_MINIMIZED) {
                 // rendering will pause automatically
-                fmt::println(stderr, "Window minimized!");
+                // fmt::println(stderr, "Window minimized!");
 
             } else if (e.type == SDL_EVENT_WINDOW_RESTORED) {
                 framebufferResized = true;
-                fmt::println(stderr, "Window restored!");
+                // fmt::println(stderr, "Window restored!");
             }
 
             scene.processInput(e);

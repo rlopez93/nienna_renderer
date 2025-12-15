@@ -36,7 +36,6 @@ target_sources(nienna PRIVATE
     src/Swapchain.cpp
     src/Timeline.cpp
     src/Utility.cpp
-    src/vulkan_raii.cpp
     src/Window.cpp
 )
 
