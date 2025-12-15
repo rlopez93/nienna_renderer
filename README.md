@@ -22,6 +22,10 @@ WIP real-time 3D graphics renderer targeting Vulkan 1.4
 * ImGui integration for on-screen debug UI
 
 ## Rendered with Nienna
+Assets from KhronosGroup/glTF-Sample-Assets:
+<img width="800" height="600" alt="image" src="https://github.com/user-attachments/assets/586d1a77-b2ab-4986-ab08-58120d3732fc" />
+<img width="800" height="600" alt="Screenshot_20251215_080705" src="https://github.com/user-attachments/assets/4630ae7f-69b9-4e2a-b173-d9c721690679" />
+<img width="800" height="600" alt="Screenshot_20251215_080919" src="https://github.com/user-attachments/assets/42f52c53-6747-4dfe-85a7-9b6b73124502" />
 
 ## Tools & Libraries
 
@@ -51,6 +55,7 @@ Wouldn't have made it this far without:
 * docs.vulkan.org
 * so many KhronosGroup repos, but in particular Vulkan-Samples, glTF-Sample-Assets, Vulkan-Hpp (of course) and Vulkan-Docs
 * the LunarG VulkanSDK
+* HEAVY use of Vulkan Configurator validation layers
 * nvpro-samples/vk_minimal_latest
 * and just Sascha Willems, in general
 
