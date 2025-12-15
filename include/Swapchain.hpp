@@ -9,33 +9,42 @@
 
 struct Swapchain {
     explicit Swapchain(
-        Device         &device,
-        PhysicalDevice &physicalDevice,
-        Surface        &surface);
+        const Device         &device,
+        const PhysicalDevice &physicalDevice,
+        const Surface        &surface);
 
     auto create(
-        Device            &device,
-        PhysicalDevice    &physicalDevice,
-        Surface           &surface,
-        vk::SwapchainKHR &&oldSwapchain = {}) -> void;
+        const Device         &device,
+        const PhysicalDevice &physicalDevice,
+        const Surface        &surface,
+        vk::SwapchainKHR      oldSwapchain = {}) -> void;
 
     auto recreate(
-        Device         &device,
-        PhysicalDevice &physicalDevice,
-        Surface        &surface)
+        const Device         &device,
+        const PhysicalDevice &physicalDevice,
+        const Surface        &surface) -> void;
 
-        -> void;
+    auto chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats)
+        -> vk::SurfaceFormatKHR;
+
+    auto choosePresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes)
+        -> vk::PresentModeKHR;
+
+    auto chooseExtent(
+        const vk::SurfaceCapabilitiesKHR &caps,
+        const vk::Extent2D               &desired) -> vk::Extent2D;
+
+    auto createSwapchain(
+        const Device         &device,
+        const PhysicalDevice &physicalDevice,
+        const Surface        &surface,
+        vk::SwapchainKHR      oldSwapchain) -> vk::raii::SwapchainKHR;
 
     auto acquireNextImage() -> vk::Result;
-
     auto getNextImage() -> vk::Image;
-
     auto getNextImageView() -> vk::raii::ImageView &;
-
     auto getImageAvailableSemaphore() -> vk::Semaphore;
-
     auto getRenderFinishedSemaphore() -> vk::Semaphore;
-
     auto advance() -> void;
 
     vk::raii::SwapchainKHR           handle;

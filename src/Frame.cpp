@@ -3,15 +3,15 @@
 #include <ranges>
 
 Frame::Frame(
-    Device  &device,
-    uint32_t imagesSize)
+    const Device  &device,
+    const uint32_t imagesSize)
 {
     recreate(device, imagesSize);
 }
 
 auto Frame::recreate(
-    Device  &device,
-    uint32_t imagesSize) -> void
+    const Device  &device,
+    const uint32_t imagesSize) -> void
 {
     index = 0u;
     imageAvailableSemaphores.clear();

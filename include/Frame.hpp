@@ -9,12 +9,12 @@
 
 struct Frame {
     Frame(
-        Device  &device,
-        uint32_t imagesSize);
+        const Device  &device,
+        const uint32_t imagesSize);
 
     auto recreate(
-        Device  &device,
-        uint32_t imagesSize) -> void;
+        const Device  &device,
+        const uint32_t imagesSize) -> void;
 
     uint32_t                         index = 0u;
     uint32_t                         maxFramesInFlight;

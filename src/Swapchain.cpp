@@ -7,9 +7,9 @@
 #include <stdexcept>
 
 Swapchain::Swapchain(
-    Device         &device,
-    PhysicalDevice &physicalDevice,
-    Surface        &surface)
+    const Device         &device,
+    const PhysicalDevice &physicalDevice,
+    const Surface        &surface)
     : handle{nullptr},
       frame(
           device,
@@ -18,53 +18,45 @@ Swapchain::Swapchain(
     create(device, physicalDevice, surface);
 }
 
-namespace
-{
-
 // -----------------------------------------------------------------------------
 // Surface format selection
 // -----------------------------------------------------------------------------
-vk::SurfaceFormatKHR
-chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &formats)
+auto Swapchain::chooseSurfaceFormat(
+    const std::vector<vk::SurfaceFormatKHR> &availableFormats) -> vk::SurfaceFormatKHR
 {
-    for (const auto &f : formats) {
-        if (f.format == vk::Format::eR8G8B8A8Srgb
-            && f.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
-            return f;
+    constexpr auto preferredSurfaceFormats = std::array{
+        vk::Format::eR8G8B8A8Srgb,
+        vk::Format::eB8G8R8A8Unorm,
+        vk::Format::eR8G8B8A8Snorm};
+
+    constexpr auto preferredColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
+
+    for (auto preferredSurfaceFormat : preferredSurfaceFormats) {
+        for (auto format : availableFormats) {
+            if (format.format == preferredSurfaceFormat
+                && format.colorSpace == preferredColorSpace) {
+                return format;
+            }
         }
     }
 
-    for (const auto &f : formats) {
-        if (f.format == vk::Format::eB8G8R8A8Unorm
-            && f.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
-            return f;
-        }
-    }
-
-    for (const auto &f : formats) {
-        if (f.format == vk::Format::eR8G8B8A8Snorm
-            && f.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
-            return f;
-        }
-    }
-
-    return formats.front();
+    return availableFormats.front();
 }
 
 // -----------------------------------------------------------------------------
 // Present mode selection
 // -----------------------------------------------------------------------------
-vk::PresentModeKHR choosePresentMode(const std::vector<vk::PresentModeKHR> &modes)
+auto Swapchain::choosePresentMode(
+    const std::vector<vk::PresentModeKHR> &availablePresentModes) -> vk::PresentModeKHR
 {
-    for (auto m : modes) {
-        if (m == vk::PresentModeKHR::eMailbox) {
-            return m;
-        }
-    }
+    constexpr auto preferredPresentModes =
+        std::array{vk::PresentModeKHR::eMailbox, vk::PresentModeKHR::eImmediate};
 
-    for (auto m : modes) {
-        if (m == vk::PresentModeKHR::eImmediate) {
-            return m;
+    for (auto preferredPresentMode : preferredPresentModes) {
+        for (auto mode : availablePresentModes) {
+            if (mode == preferredPresentMode) {
+                return mode;
+            }
         }
     }
 
@@ -74,19 +66,19 @@ vk::PresentModeKHR choosePresentMode(const std::vector<vk::PresentModeKHR> &mode
 // -----------------------------------------------------------------------------
 // Extent selection
 // -----------------------------------------------------------------------------
-vk::Extent2D chooseExtent(
+auto Swapchain::chooseExtent(
     const vk::SurfaceCapabilitiesKHR &caps,
-    const vk::Extent2D               &desired)
+    const vk::Extent2D               &desired) -> vk::Extent2D
 {
     if (caps.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
         return caps.currentExtent;
     }
 
-    vk::Extent2D extent = desired;
+    vk::Extent2D extent{};
     extent.width =
-        std::clamp(extent.width, caps.minImageExtent.width, caps.maxImageExtent.width);
+        std::clamp(desired.width, caps.minImageExtent.width, caps.maxImageExtent.width);
     extent.height = std::clamp(
-        extent.height,
+        desired.height,
         caps.minImageExtent.height,
         caps.maxImageExtent.height);
 
@@ -96,11 +88,11 @@ vk::Extent2D chooseExtent(
 // -----------------------------------------------------------------------------
 // Swapchain creation helper
 // -----------------------------------------------------------------------------
-vk::raii::SwapchainKHR createSwapchain(
-    Device          &device,
-    PhysicalDevice  &physicalDevice,
-    Surface         &surface,
-    vk::SwapchainKHR oldSwapchain)
+auto Swapchain::createSwapchain(
+    const Device         &device,
+    const PhysicalDevice &physicalDevice,
+    const Surface        &surface,
+    vk::SwapchainKHR      oldSwapchain) -> vk::raii::SwapchainKHR
 {
     const auto capabilities =
         physicalDevice.handle.getSurfaceCapabilitiesKHR(surface.handle);
@@ -114,17 +106,10 @@ vk::raii::SwapchainKHR createSwapchain(
         throw std::runtime_error("Surface reports no formats or present modes");
     }
 
-    const vk::SurfaceFormatKHR surfaceFormat = chooseSurfaceFormat(formats);
-
-    const vk::PresentModeKHR presentMode = choosePresentMode(presentModes);
-
-    const vk::Extent2D desiredExtent = getFramebufferExtent(device.window.get());
-
-    fmt::print("(desiredExtent: [{}, {}]", desiredExtent.width, desiredExtent.height);
-
-    const vk::Extent2D extent = chooseExtent(capabilities, desiredExtent);
-
-    fmt::print("(extent: [{}, {}]", extent.width, extent.height);
+    const auto surfaceFormat = chooseSurfaceFormat(formats);
+    const auto presentMode   = choosePresentMode(presentModes);
+    const auto desiredExtent = getFramebufferExtent(device.window.get());
+    const auto extent        = chooseExtent(capabilities, desiredExtent);
 
     uint32_t imageCount = 3u;
     imageCount          = std::max(imageCount, capabilities.minImageCount);
@@ -132,12 +117,13 @@ vk::raii::SwapchainKHR createSwapchain(
         imageCount = std::min(imageCount, capabilities.maxImageCount);
     }
 
-    const uint32_t graphicsFamily = device.queueFamilyIndices.graphicsIndex;
-    const uint32_t presentFamily  = device.queueFamilyIndices.presentIndex;
+    const auto graphicsFamilyQueueIndex = device.queueFamilyIndices.graphicsIndex;
+    const auto presentFamilyQueueIndex  = device.queueFamilyIndices.presentIndex;
 
-    const bool concurrent = graphicsFamily != presentFamily;
+    const auto concurrent = (graphicsFamilyQueueIndex != presentFamilyQueueIndex);
 
-    const std::array<uint32_t, 2> queueFamilies{graphicsFamily, presentFamily};
+    const auto queueFamilies =
+        std::array{graphicsFamilyQueueIndex, presentFamilyQueueIndex};
 
     vk::SwapchainCreateInfoKHR createInfo{
         {},
@@ -154,22 +140,20 @@ vk::raii::SwapchainKHR createSwapchain(
         capabilities.currentTransform,
         vk::CompositeAlphaFlagBitsKHR::eOpaque,
         presentMode,
-        VK_TRUE,
+        vk::True,
         oldSwapchain};
 
     return vk::raii::SwapchainKHR(device.handle, createInfo);
 }
 
-} // namespace
-
 // -----------------------------------------------------------------------------
 // Swapchain creation
 // -----------------------------------------------------------------------------
 auto Swapchain::create(
-    Device            &device,
-    PhysicalDevice    &physicalDevice,
-    Surface           &surface,
-    vk::SwapchainKHR &&oldSwapchain) -> void
+    const Device         &device,
+    const PhysicalDevice &physicalDevice,
+    const Surface        &surface,
+    vk::SwapchainKHR      oldSwapchain) -> void
 {
     handle = createSwapchain(device, physicalDevice, surface, oldSwapchain);
 
@@ -199,20 +183,17 @@ auto Swapchain::create(
 // Swapchain recreation
 // -----------------------------------------------------------------------------
 auto Swapchain::recreate(
-    Device         &device,
-    PhysicalDevice &physicalDevice,
-    Surface        &surface) -> void
+    const Device         &device,
+    const PhysicalDevice &physicalDevice,
+    const Surface        &surface) -> void
 {
     device.graphicsQueue.waitIdle();
-
     frame.index = 0;
-
     imageViews.clear();
 
     create(device, physicalDevice, surface, std::move(handle));
 
     needRecreate = false;
-
     fmt::println(stderr, "Swapchain recreated!");
 }
 
