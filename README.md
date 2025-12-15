@@ -1,25 +1,58 @@
 # Nienna
 
-A work-in-progress real-time Vulkan 3D renderer that can render basic glTF files. Written to get hands-on experience with modern 3D graphics rendering using explicit, low level graphics APIs.
+WIP real-time 3D graphics renderer targeting Vulkan 1.4
 
-Rendered with Nienna:
+## Current features
 
-<img width="800" height="600" alt="Duck" src="https://github.com/user-attachments/assets/7e646053-fdd5-434a-8751-f35154a5e87a" />
-<img width="794" height="592" alt="DamagedHelmet" src="https://github.com/user-attachments/assets/72dd42f9-8bbd-4296-86f3-28a4d05d3e87" />
-<img width="800" height="600" alt="Screenshot_20251130_170625" src="https://github.com/user-attachments/assets/6f4f19b6-05b7-4cf0-8974-5421009931bd" />
-<img width="800" height="600" alt="Screenshot_20251130_170836" src="https://github.com/user-attachments/assets/1344cd00-d981-4d62-8685-96d79ac6621d" />
-<img width="800" height="600" alt="ToyCar" src="https://github.com/user-attachments/assets/ebfb7c74-b581-4134-becc-0695720395f2" />
+* full Vulkan dynamic rendering pipeline
+* basic glTF 2.0 scene loading
+  * mesh primitives
+  * baseColorFactor/baseColorTexture
+  * cameras
+* camera movement (currently buggy)
+* Lambert diffuse lighting
+* timeline semaphores
+* puts triangle on screen
+  * many of them, in fact
+
+## Planned features
+
+* basic lighting and shading improvements
+* simple material support
+* ImGui integration for on-screen debug UI
+
+## Rendered with Nienna
+
+## Tools & Libraries
+
+* Vulkan 1.4
+* C++26
+* Vulkan-Hpp RAII bindings
+* shaders written in Slang
+* SDL3 windowing and event handling
+* glTF 2.0 loading with fastgltf
+* VulkanMemoryAllocator
+* texture loading with stb_image
 
 Tested on Manjaro KDE Linux 25.0 with:
 
-- GCC 15.2.1 with C++26
-- CMake 4.1.1
-- VulkanSDK 1.4.321.1
-- SDL3 3.2.22-1
-- fmt 11.2.0-1
-- glm 1.0.1-1
+* GCC 15.2.1 with C++26
+* CMake 4.2.1
+* VulkanSDK 1.4.335.0
+* SDL3 3.2.28-1
+* fmt 12.1.0-1
+* glm 1.0.2-1
 
-Currently depends on the above being installed as system packages, which I plan to move into submodules.
+## Acknowledgements
+
+Wouldn't have made it this far without:
+
+* Khronos Vulkan tutorial (I did it BEFORE it used dynamic rendering *hmm*)
+* docs.vulkan.org
+* so many KhronosGroup repos, but in particular Vulkan-Samples, glTF-Sample-Assets, Vulkan-Hpp (of course) and Vulkan-Docs
+* the LunarG VulkanSDK
+* nvpro-samples/vk_minimal_latest
+* and just Sascha Willems, in general
 
 ## Build
 

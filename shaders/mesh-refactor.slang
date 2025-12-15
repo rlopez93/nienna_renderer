@@ -44,8 +44,8 @@ struct PushConstantBlock
 }
 
 ConstantBuffer<Transform> transform[];
-ConstantBuffer<Light> light;
 Sampler2D texture[];
+ConstantBuffer<Light> light;
 [[vk::push_constant]] ConstantBuffer<PushConstantBlock> pushConstant;
 
 
