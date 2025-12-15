@@ -3,6 +3,7 @@
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_vulkan.h>
 #include <fmt/base.h>
+#include <fmt/format.h>
 
 void WindowDeleter::operator()(SDL_Window *window) const
 {
@@ -16,14 +17,13 @@ auto createWindow(
 
     // init SDL3
     if (!SDL_Init(SDL_INIT_VIDEO)) {
-        fmt::print(stderr, "SDL_Init Error: {}\n", SDL_GetError());
-        return nullptr;
+        throw std::runtime_error{fmt::format("SDL_Init Error: {}\n", SDL_GetError())};
     }
 
     // Dynamically load Vulkan loader library
     if (!SDL_Vulkan_LoadLibrary(nullptr)) {
-        fmt::print(stderr, "SDL_Vulkan_LoadLibrary Error: {}\n", SDL_GetError());
-        return nullptr;
+        throw std::runtime_error{
+            fmt::format("SDL_Vulkan_LoadLibrary Error: {}\n", SDL_GetError())};
     }
 
     // create Vulkan window
@@ -33,8 +33,8 @@ auto createWindow(
         600,
         SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
     if (!window) {
-        fmt::print(stderr, "SDL_CreateWindow Error: {}\n", SDL_GetError());
-        return nullptr;
+        throw std::runtime_error{
+            fmt::format("SDL_CreateWindow Error: {}\n", SDL_GetError())};
     }
 
     return Window{window};

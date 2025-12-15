@@ -123,7 +123,6 @@ auto Instance::createInstance(const vk::raii::Context &context) -> vk::raii::Ins
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME, // debug messenger
         VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
         VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
-        VK_KHR_SURFACE_EXTENSION_NAME // ALWAYS include explicitly
     };
 
     // Add SDL platform extensions
@@ -141,6 +140,10 @@ auto Instance::createInstance(const vk::raii::Context &context) -> vk::raii::Ins
         instanceExtensions.end(),
         sdlInstanceExtensions,
         sdlInstanceExtensions + sdlExtensionCount);
+
+    // for (auto instanceExtension : instanceExtensions) {
+    //     fmt::println(stderr, "{}", std::string{instanceExtension});
+    // }
 
     // Validate that all instance extensions are available
     auto availableExtensions =
