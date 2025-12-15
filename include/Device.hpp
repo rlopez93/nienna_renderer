@@ -1,17 +1,20 @@
 #pragma once
 
+#include <limits>
 #include <vulkan/vulkan_raii.hpp>
 
 #include "PhysicalDevice.hpp"
 #include "Surface.hpp"
 
 struct QueueFamilyIndices {
-    uint32_t graphicsIndex = UINT32_MAX;
-    uint32_t presentIndex  = UINT32_MAX;
+    uint32_t graphicsIndex = std::numeric_limits<uint32_t>::max();
+    uint32_t presentIndex  = std::numeric_limits<uint32_t>::max();
 
     auto complete() const -> bool
     {
-        return graphicsIndex != UINT32_MAX && presentIndex != UINT32_MAX;
+        return graphicsIndex != std::numeric_limits<uint32_t>::max()
+            && presentIndex != std::numeric_limits<uint32_t>::max();
+        ;
     }
 };
 

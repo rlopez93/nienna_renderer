@@ -1,9 +1,7 @@
 #pragma once
-#include "vulkan_raii.hpp"
+#include <vulkan/vulkan_raii.hpp>
 
 #include <cstdint>
-#include <numeric>
-#include <ranges>
 
 #include "Command.hpp"
 

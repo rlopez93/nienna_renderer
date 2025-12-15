@@ -1,4 +1,5 @@
 #include "gltfLoader.hpp"
+#include "Camera.hpp"
 
 #include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/tools.hpp>
@@ -14,12 +15,8 @@
 
 #include <stb_image.h>
 
-#include <deque>
 #include <ranges>
 #include <vector>
-
-#include "Camera.hpp"
-#include "Utility.hpp"
 
 auto getGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset
 {
@@ -129,11 +126,11 @@ auto getTexture(
     const auto visitor = overloads{
         [&directory, &scene](const sources::URI &imageURI) {
             auto path = directory / imageURI.uri.fspath();
-            fmt::println(stderr, "\"{}\"", path.c_str());
+            // fmt::println(stderr, "\"{}\"", path.c_str());
             int  x, y, n;
             auto stbiData = stbi_load(path.c_str(), &x, &y, &n, 4);
 
-            fmt::println(stderr, "channels in file: {}", n);
+            // fmt::println(stderr, "channels in file: {}", n);
             assert(stbiData);
 
             scene.textures.push_back(
@@ -184,7 +181,8 @@ auto getMaterial(
 {
     const auto &material = asset.materials[primitive.materialIndex.value()];
     mesh.color           = toGLM(material.pbrData.baseColorFactor);
-    fmt::println("{} {} {} {}", mesh.color.r, mesh.color.g, mesh.color.b, mesh.color.a);
+    // fmt::println(stderr, "{} {} {} {}", mesh.color.r, mesh.color.g, mesh.color.b,
+    // mesh.color.a);
 
     if (material.pbrData.baseColorTexture.has_value()) {
         mesh.textureIndex = getTexture(
@@ -223,37 +221,37 @@ void getAttributes(
     }
 
     for (auto &attribute : primitive.attributes) {
-        fmt::println(stderr, "\n{}", attribute.name);
+        // fmt::println(stderr, "\n{}", attribute.name);
 
         auto &accessor = asset.accessors[attribute.accessorIndex];
 
-        switch (accessor.type) {
-            using fastgltf::AccessorType;
-        case AccessorType::Invalid:
-            fmt::println("Invalid");
-            break;
-        case AccessorType::Vec2:
-            fmt::println("Vec2");
-            break;
-        case AccessorType::Vec3:
-            fmt::println("Vec3");
-            break;
-        case AccessorType::Vec4:
-            fmt::println("Vec4");
-            break;
-        case AccessorType::Mat2:
-            fmt::println("Mat2");
-            break;
-        case AccessorType::Mat3:
-            fmt::println("Mat3");
-            break;
-        case AccessorType::Mat4:
-            fmt::println("Mat4");
-            break;
-        case AccessorType::Scalar:
-            fmt::println("Scalar");
-            break;
-        }
+        // switch (accessor.type) {
+        //     using fastgltf::AccessorType;
+        // case AccessorType::Invalid:
+        //     fmt::println(stderr, "Invalid");
+        //     break;
+        // case AccessorType::Vec2:
+        //     fmt::println(stderr, "Vec2");
+        //     break;
+        // case AccessorType::Vec3:
+        //     fmt::println(stderr, "Vec3");
+        //     break;
+        // case AccessorType::Vec4:
+        //     fmt::println(stderr, "Vec4");
+        //     break;
+        // case AccessorType::Mat2:
+        //     fmt::println(stderr, "Mat2");
+        //     break;
+        // case AccessorType::Mat3:
+        //     fmt::println(stderr, "Mat3");
+        //     break;
+        // case AccessorType::Mat4:
+        //     fmt::println(stderr, "Mat4");
+        //     break;
+        // case AccessorType::Scalar:
+        //     fmt::println(stderr, "Scalar");
+        //     break;
+        // }
 
         if (attribute.name == "NORMAL") {
             fastgltf::iterateAccessorWithIndex<glm::vec3>(
@@ -284,7 +282,7 @@ void getAttributes(
         }
 
         else if (attribute.name == "COLOR_0") {
-            fmt::println(stderr, "FOUND COLOR\n");
+            // fmt::println(stderr, "FOUND COLOR\n");
             if (accessor.type == fastgltf::AccessorType::Vec3) {
                 fastgltf::iterateAccessorWithIndex<glm::vec3>(
                     asset,
@@ -327,17 +325,17 @@ auto getSceneData(
                 auto &mesh       = scene.meshes.emplace_back();
                 mesh.modelMatrix = toGLM(matrix);
 
-                fmt::println(stderr, "Mesh: {}\n", assetMesh.name);
+                // fmt::println(stderr, "Mesh: {}\n", assetMesh.name);
                 for (auto &primitive : assetMesh.primitives) {
-                    fmt::println(stderr, "Primitive");
+                    // fmt::println(stderr, "Primitive");
 
                     getAttributes(asset, primitive, mesh);
 
                     if (primitive.materialIndex.has_value()) {
-                        fmt::println(
-                            stderr,
-                            "MaterialIndex: {}",
-                            primitive.materialIndex.value());
+                        // fmt::println(
+                        //     stderr,
+                        //     "MaterialIndex: {}",
+                        //     primitive.materialIndex.value());
                         getMaterial(asset, primitive, scene, mesh, directory);
                     }
                 }
@@ -393,7 +391,8 @@ auto Scene::createBuffersOnDevice(
             vk::BufferUsageFlagBits2::eIndexBuffer));
     }
 
-    fmt::println(stderr, "Uniform buffer size: {}", sizeof(Transform) * meshes.size());
+    // fmt::println(stderr, "Uniform buffer size: {}", sizeof(Transform) *
+    // meshes.size());
 
     for (auto i : std::views::iota(0u, maxFramesInFlight)) {
         buffers.uniform.emplace_back(allocator.createBuffer(
@@ -418,7 +417,7 @@ auto Scene::createBuffersOnDevice(
     }
 
     for (const auto &texture : textures) {
-        fmt::println(stderr, "uploading texture '{}'", texture.name.string());
+        // fmt::println(stderr, "uploading texture '{}'", texture.name.string());
         textureBuffers.image.emplace_back(allocator.createImageAndUploadData(
             command.buffer,
             texture.data,

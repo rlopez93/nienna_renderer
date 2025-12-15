@@ -1,12 +1,12 @@
 #pragma once
 
-#include "vulkan_raii.hpp"
+#include <glm/ext/vector_float4.hpp>
+#include <vulkan/vulkan_raii.hpp>
 
 #include <filesystem>
 
 #include "Allocator.hpp"
 #include "Descriptor.hpp"
-#include "gltfLoader.hpp"
 
 struct PushConstantBlock {
     uint32_t                transformIndex;

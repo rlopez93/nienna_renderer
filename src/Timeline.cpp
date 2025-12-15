@@ -1,5 +1,8 @@
 #include "Timeline.hpp"
 
+#include <numeric>
+#include <ranges>
+
 auto Timeline::createTimelineSemaphore(
     Device  &device,
     uint32_t maxFramesInFlight) -> vk::raii::Semaphore

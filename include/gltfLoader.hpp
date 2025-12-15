@@ -1,7 +1,6 @@
 #pragma once
 
 #include <fastgltf/core.hpp>
-#include <ranges>
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/mat4x4.hpp>
@@ -22,6 +21,7 @@
 #include <optional>
 #include <vector>
 
+// TODO: put these in header files: separate Scene data from Loader logic
 struct Light {
     glm::vec3 direction = {0.0f, 0.0f, -1.0f};
     float     intensity = 1.0f;

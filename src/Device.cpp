@@ -87,23 +87,26 @@ auto Device::findQueueFamilies(
         const auto &properties = queueFamilyProperties[index];
 
         if ((properties.queueFlags & vk::QueueFlagBits::eGraphics)
-            && queueFamilyIndices.graphicsIndex == UINT32_MAX) {
+            && queueFamilyIndices.graphicsIndex
+                   == std::numeric_limits<uint32_t>::max()) {
             queueFamilyIndices.graphicsIndex = index;
         }
 
         if (physicalDevice.handle.getSurfaceSupportKHR(index, *surface.handle)
-            && queueFamilyIndices.presentIndex == UINT32_MAX) {
+            && queueFamilyIndices.presentIndex
+                   == std::numeric_limits<uint32_t>::max()) {
             queueFamilyIndices.presentIndex = index;
         }
 
-        if (queueFamilyIndices.graphicsIndex != UINT32_MAX
-            && queueFamilyIndices.presentIndex != UINT32_MAX) {
+        if (queueFamilyIndices.graphicsIndex != std::numeric_limits<uint32_t>::max()
+            && queueFamilyIndices.presentIndex
+                   != std::numeric_limits<uint32_t>::max()) {
             break;
         }
     }
 
-    if (queueFamilyIndices.graphicsIndex == UINT32_MAX
-        && queueFamilyIndices.presentIndex == UINT32_MAX) {
+    if (queueFamilyIndices.graphicsIndex == std::numeric_limits<uint32_t>::max()
+        && queueFamilyIndices.presentIndex == std::numeric_limits<uint32_t>::max()) {
         throw std::runtime_error(
             "Device does not have necessary graphics queue and present queue.");
     }

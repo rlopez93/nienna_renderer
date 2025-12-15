@@ -1,6 +1,9 @@
 #pragma once
 
-#include "vulkan_raii.hpp"
+#include <vulkan/vulkan_raii.hpp>
+
+#include <cstdint>
+#include <vector>
 
 struct Descriptors {
     Descriptors(

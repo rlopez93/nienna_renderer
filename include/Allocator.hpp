@@ -4,7 +4,7 @@
 #define VMA_USE_STL_CONTAINERS 1
 #include <vma/vk_mem_alloc.h>
 
-#include "vulkan_raii.hpp"
+#include <vulkan/vulkan_raii.hpp>
 
 #include "Device.hpp"
 #include "Instance.hpp"

@@ -1,11 +1,17 @@
 #include "Renderer.hpp"
 #include "App.hpp"
+#include "Command.hpp"
+#include "Frame.hpp"
+#include "Utility.hpp"
+
+#include <SDL3/SDL_video.h>
+
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_vulkan.h"
-#include <ranges>
 
-#include <SDL3/SDL_video.h>
+#include <cstdint>
+#include <ranges>
 
 Renderer::Renderer()
     : window{createWindow(
@@ -110,6 +116,7 @@ Renderer::Renderer()
               poolSizes}}
 
 {
+    // TODO: create DepthImage class with create()/destroy()
     // after depthImage + depthImageView creation
     // create transient command pool for single-time commands
     auto transient = Command{device, vk::CommandPoolCreateFlagBits::eTransient};
