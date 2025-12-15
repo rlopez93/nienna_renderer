@@ -82,6 +82,17 @@ auto main(
         r.depthFormat,
         descriptors.pipelineLayout);
 
+    int  joystickIDsCount;
+    auto sdlJoystickIDs = SDL_GetGamepads(&joystickIDsCount);
+    auto joystickIDs = std::vector(sdlJoystickIDs, sdlJoystickIDs + joystickIDsCount);
+    std::vector<SDL_Gamepad *> gamepads;
+
+    for (auto joystickID : joystickIDs) {
+        gamepads.push_back(SDL_OpenGamepad(joystickID));
+    }
+
+    // auto gamepad = SDL_OpenGamepad(SDL_JoystickID instance_id)
+
     uint32_t totalFrames = 0;
 
     using namespace std::literals;
@@ -140,6 +151,14 @@ auto main(
             } else if (e.type == SDL_EVENT_WINDOW_RESTORED) {
                 framebufferResized = true;
                 // fmt::println(stderr, "Window restored!");
+            }
+
+            else if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
+                fmt::println(stderr, "Gamepad button down!");
+            }
+
+            else if (e.type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
+                fmt::println(stderr, "Gamepad button up!");
             }
 
             scene.processInput(e);

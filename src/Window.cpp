@@ -15,8 +15,10 @@ auto createWindow(
     int height) -> Window
 {
 
+#define SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS 1
+
     // init SDL3
-    if (!SDL_Init(SDL_INIT_VIDEO)) {
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         throw std::runtime_error{fmt::format("SDL_Init Error: {}\n", SDL_GetError())};
     }
 

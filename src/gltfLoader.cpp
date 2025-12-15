@@ -357,6 +357,32 @@ auto Scene::processInput(SDL_Event &e) -> void
     }
 
     getCamera().processInput(e);
+    pointLight.processInput(e);
+}
+
+void PointLight::processInput(const SDL_Event &e)
+{
+    if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
+        switch (e.gbutton.button) {
+        case SDL_GAMEPAD_BUTTON_SOUTH:
+            fmt::println("ha ha i pressed x");
+            break;
+
+        case SDL_GAMEPAD_BUTTON_WEST:
+            fmt::println("he he i pressed square");
+        }
+    }
+
+    else if (e.type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
+        switch (e.gbutton.button) {
+        case SDL_GAMEPAD_BUTTON_SOUTH:
+            fmt::println("uh oh i let go of x :(");
+            break;
+        case SDL_GAMEPAD_BUTTON_WEST:
+            fmt::println("aw heck i let go of square :(");
+            break;
+        }
+    }
 }
 
 auto Scene::getCamera() const -> const PerspectiveCamera &

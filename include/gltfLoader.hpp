@@ -29,6 +29,16 @@ struct Light {
     float     padding;
 };
 
+struct PointLight {
+    glm::vec3 position{0.0f, 2.0f, 0.0f};
+    glm::vec3 color{1.0f, 1.0f, 1.0f};
+    float     intensity = 1.0f;
+
+    float moveSpeed = 5.0f;
+
+    void processInput(const SDL_Event &e);
+};
+
 struct Transform {
     glm::mat4 modelMatrix;
     glm::mat4 viewProjectionMatrix;
@@ -76,6 +86,7 @@ struct Scene {
     std::vector<Material>          materials;
     std::vector<PerspectiveCamera> cameras;
     uint32_t                       cameraIndex = 0u;
+    PointLight                     pointLight;
 
     struct Buffers {
         std::vector<Buffer> index;
