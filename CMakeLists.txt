@@ -26,6 +26,7 @@ target_sources(nienna PRIVATE
     src/Descriptor.cpp
     src/Device.cpp
     src/Frame.cpp
+    src/FrameContext.cpp
     src/gltfLoader.cpp
     src/Instance.cpp
     src/PhysicalDevice.cpp
