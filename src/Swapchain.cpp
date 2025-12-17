@@ -10,10 +10,7 @@ Swapchain::Swapchain(
     const Device         &device,
     const PhysicalDevice &physicalDevice,
     const Surface        &surface)
-    : handle{nullptr},
-      frame(
-          device,
-          0u)
+    : handle{nullptr}
 {
     create(device, physicalDevice, surface);
 }
@@ -175,7 +172,7 @@ auto Swapchain::create(
                 {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
     }
 
-    frame.recreate(device, images.size());
+    // frame.recreate(device, images.size());
     imageInitialized.assign(images.size(), false);
 }
 
@@ -188,7 +185,7 @@ auto Swapchain::recreate(
     const Surface        &surface) -> void
 {
     device.graphicsQueue.waitIdle();
-    frame.index = 0;
+    // frame.index = 0;
     imageViews.clear();
 
     create(device, physicalDevice, surface, std::move(handle));
@@ -219,17 +216,17 @@ auto Swapchain::getNextImageView() -> vk::raii::ImageView &
     return imageViews[nextImageIndex];
 }
 
-auto Swapchain::getImageAvailableSemaphore() -> vk::Semaphore
-{
-    return frame.imageAvailableSemaphores[frame.index];
-}
+// auto Swapchain::getImageAvailableSemaphore() -> vk::Semaphore
+// {
+//     return frame.imageAvailableSemaphores[frame.index];
+// }
 
-auto Swapchain::getRenderFinishedSemaphore() -> vk::Semaphore
-{
-    return frame.renderFinishedSemaphores[nextImageIndex];
-}
+// auto Swapchain::getRenderFinishedSemaphore() -> vk::Semaphore
+// {
+//     return frame.renderFinishedSemaphores[nextImageIndex];
+// }
 
-auto Swapchain::advance() -> void
-{
-    frame.index = (frame.index + 1) % frame.maxFramesInFlight;
-}
+// auto Swapchain::advance() -> void
+// {
+//     frame.index = (frame.index + 1) % frame.maxFramesInFlight;
+// }

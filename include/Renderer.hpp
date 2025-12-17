@@ -11,14 +11,12 @@
 #include <vector>
 
 #include "Allocator.hpp"
-#include "Descriptor.hpp"
 #include "Device.hpp"
 #include "Instance.hpp"
 #include "PhysicalDevice.hpp"
+#include "Scene.hpp"
 #include "Surface.hpp"
 #include "Swapchain.hpp"
-#include "Timeline.hpp"
-#include "gltfLoader.hpp"
 
 struct Renderer {
 
@@ -63,11 +61,11 @@ struct Renderer {
     PhysicalDevice                      physicalDevice;
     Device                              device;
     Swapchain                           swapchain;
-    Allocator                           allocator;
-    vk::Format                          depthFormat;
-    Image                               depthImage;
-    vk::raii::ImageView                 depthImageView;
-    Timeline                            timeline;
+    // Allocator                           allocator;
+    // vk::Format                          depthFormat;
+    // Image                               depthImage;
+    // vk::raii::ImageView                 depthImageView;
+    // Timeline                            timeline;
     std::vector<vk::DescriptorPoolSize> poolSizes;
     vk::raii::DescriptorPool            imguiDescriptorPool;
 };

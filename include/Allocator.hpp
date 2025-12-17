@@ -1,26 +1,15 @@
 #pragma once
-#define VMA_STATIC_VULKAN_FUNCTIONS 0
-#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
-#define VMA_USE_STL_CONTAINERS 1
-#include <vma/vk_mem_alloc.h>
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include "vma.hpp"
+
+#include "Buffer.hpp"
 #include "Device.hpp"
+#include "Image.hpp"
 #include "Instance.hpp"
 #include "PhysicalDevice.hpp"
 #include "Utility.hpp"
-
-struct Buffer {
-    vk::Buffer    buffer{};
-    VmaAllocation allocation{};
-};
-
-struct Image {
-    vk::Image       image{};
-    VmaAllocation   allocation{};
-    vk::ImageLayout currentLayout;
-};
 
 struct Allocator {
     Allocator(

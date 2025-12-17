@@ -17,27 +17,33 @@ find_package(glm REQUIRED)
 add_executable(nienna)
 
 target_sources(nienna PRIVATE
-    src/main.cpp
-    src/spirv_reflect.c
     src/Allocator.cpp
-    src/App.cpp
     src/Camera.cpp
     src/Command.cpp
-    src/Descriptor.cpp
     src/Device.cpp
-    src/Frame.cpp
     src/FrameContext.cpp
-    src/gltfLoader.cpp
     src/Instance.cpp
     src/PhysicalDevice.cpp
+    src/Pipeline.cpp
+    src/PipelineLayout.cpp
     src/Renderer.cpp
+    src/ResourceAllocator.cpp
+    src/ResourceBindings.cpp
+    src/ResourceLayout.cpp
+    src/ResourceUpdate.cpp
+    src/Scene.cpp
+    src/SceneResources.cpp
     src/Shader.cpp
-    src/stb_image.cpp
     src/Surface.cpp
     src/Swapchain.cpp
     src/Timeline.cpp
     src/Utility.cpp
     src/Window.cpp
+    src/gltfLoader.cpp
+    src/main.cpp
+    src/spirv_reflect.c
+    src/stb_image.cpp
+    src/vma.cpp
 )
 
 file(GLOB IMGUI_SOURCES "third_party/imgui/*.cpp")

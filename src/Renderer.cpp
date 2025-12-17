@@ -1,7 +1,5 @@
 #include "Renderer.hpp"
-#include "App.hpp"
 #include "Command.hpp"
-#include "Frame.hpp"
 #include "Utility.hpp"
 
 #include <SDL3/SDL_video.h>
@@ -11,7 +9,6 @@
 #include "imgui_impl_vulkan.h"
 
 #include <cstdint>
-#include <ranges>
 
 Renderer::Renderer()
     : window{createWindow(
@@ -49,41 +46,41 @@ Renderer::Renderer()
           device,
           physicalDevice,
           surface},
-      allocator{
-          instance,
-          physicalDevice,
-          device},
-      depthFormat{findDepthFormat(physicalDevice.handle)},
-      depthImage{allocator.createImage(
-          vk::ImageCreateInfo{
-              {},
-              vk::ImageType::e2D,
-              depthFormat,
-              vk::Extent3D(
-                  getWindowExtent(),
-                  1),
-              1,
-              1,
-              vk::SampleCountFlagBits::e1,
-              vk::ImageTiling::eOptimal,
-              vk::ImageUsageFlagBits::eDepthStencilAttachment})},
-      depthImageView{device.handle.createImageView(
-          vk::ImageViewCreateInfo{
-              {},
-              depthImage.image,
-              vk::ImageViewType::e2D,
-              depthFormat,
-              {},
-              vk::ImageSubresourceRange{
-                  vk::ImageAspectFlagBits::eDepth,
-                  0,
-                  1,
-                  0,
-                  1}})},
-      timeline{
-          device,
-          swapchain.frame.maxFramesInFlight},
-
+      // allocator{
+      //     instance,
+      //     physicalDevice,
+      //     device},
+      // depthFormat{findDepthFormat(physicalDevice.handle)},
+      // depthImage{allocator.createImage(
+      //     vk::ImageCreateInfo{
+      //         {},
+      //         vk::ImageType::e2D,
+      //         depthFormat,
+      //         vk::Extent3D(
+      //             getWindowExtent(),
+      //             1),
+      //         1,
+      //         1,
+      //         vk::SampleCountFlagBits::e1,
+      //         vk::ImageTiling::eOptimal,
+      //         vk::ImageUsageFlagBits::eDepthStencilAttachment})},
+      // depthImageView{device.handle.createImageView(
+      //     vk::ImageViewCreateInfo{
+      //         {},
+      //         depthImage.image,
+      //         vk::ImageViewType::e2D,
+      //         depthFormat,
+      //         {},
+      //         vk::ImageSubresourceRange{
+      //             vk::ImageAspectFlagBits::eDepth,
+      //             0,
+      //             1,
+      //             0,
+      //             1}})},
+      // timeline{
+      //     device,
+      //     swapchain.frame.maxFramesInFlight},
+      //
       poolSizes{
           {vk::DescriptorType::eSampler,
            1000},

@@ -5,7 +5,6 @@
 #include <vulkan/vulkan_raii.hpp>
 
 #include "Device.hpp"
-#include "Frame.hpp"
 
 struct Swapchain {
     explicit Swapchain(
@@ -54,6 +53,5 @@ struct Swapchain {
     std::vector<vk::raii::ImageView> imageViews;
     vk::Format                       imageFormat;
     vk::Format                       depthFormat;
-    Frame                            frame;
     bool                             needRecreate = false;
 };

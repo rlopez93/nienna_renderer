@@ -1,26 +1,22 @@
 #pragma once
-
-#include <vulkan/vulkan_raii.hpp>
-
 #include <cstdint>
 #include <vector>
+#include <vulkan/vulkan_raii.hpp>
 
 struct FrameContext {
-    explicit FrameContext(uint32_t framesInFlight)
-        : commandBuffers(framesInFlight),
-          descriptorSets(framesInFlight),
-          uniformBuffers(framesInFlight),
-          frameTimelineValue(
-              framesInFlight,
-              0),
-          swapchainImageIndex(
-              framesInFlight,
-              0)
+    uint32_t frameIndex        = 0;
+    uint32_t maxFramesInFlight = 0;
+
+    // Per-frame descriptor bindings
+    std::vector<vk::raii::DescriptorSet> resourceBindings;
+
+    auto current() const -> uint32_t
     {
+        return frameIndex;
     }
-    std::vector<vk::CommandBuffer> commandBuffers;
-    std::vector<vk::DescriptorSet> descriptorSets;
-    std::vector<vk::Buffer>        uniformBuffers;
-    std::vector<uint64_t>          frameTimelineValue;
-    std::vector<uint32_t>          swapchainImageIndex;
+
+    auto advance() -> void
+    {
+        frameIndex = (frameIndex + 1) % maxFramesInFlight;
+    }
 };
