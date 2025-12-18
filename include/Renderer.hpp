@@ -8,27 +8,28 @@
 
 #include <fmt/base.h>
 
-#include <vector>
-
-#include "Allocator.hpp"
 #include "Device.hpp"
 #include "Instance.hpp"
 #include "PhysicalDevice.hpp"
-#include "Scene.hpp"
 #include "Surface.hpp"
 #include "Swapchain.hpp"
+
+#include <chrono>
+#include <vector>
+
+struct Scene;
 
 struct Renderer {
 
     Renderer();
     ~Renderer();
 
-    auto drawFrame(
-        Scene                             &scene,
-        const std::chrono::duration<float> deltaTime,
-        vk::raii::Pipeline                &pipeline,
-        Descriptors                       &descriptors,
-        bool                               framebufferResized) -> void;
+    // auto drawFrame(
+    //     Scene                             &scene,
+    //     const std::chrono::duration<float> deltaTime,
+    //     vk::raii::Pipeline                &pipeline,
+    //     Descriptors                       &descriptors,
+    //     bool                               framebufferResized) -> void;
 
     auto beginFrame() -> void;
 
