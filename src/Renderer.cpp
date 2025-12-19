@@ -174,24 +174,26 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
         *descriptors.descriptorSets[swapchain.frame.index],
         {});
 
-    for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
-        // fmt::println(stderr, "scene.meshes[{}]", meshIndex);
-        // bind vertex data
+    for (const auto &draw : sceneResources.draws) {
+        // Current upload path is one vertex+index buffer per mesh => buffer index
+        // equals draw item index. If you later batch/merge buffers, replace these
+        // indices with draw.vertexBufferIndex / draw.indexBufferIndex.
+        const uint32_t bufferIndex = draw.transformIndex;
+
         timeline.buffer().bindVertexBuffers(
             0,
-            scene.buffers.vertex[meshIndex].buffer,
+            sceneResources.buffers.vertex[bufferIndex].buffer,
             {0});
 
-        // bind index data
         timeline.buffer().bindIndexBuffer(
-            scene.buffers.index[meshIndex].buffer,
+            sceneResources.buffers.index[bufferIndex].buffer,
             0,
             vk::IndexType::eUint16);
 
         auto pushConstant = PushConstantBlock{
-            .transformIndex  = static_cast<uint32_t>(meshIndex),
-            .textureIndex    = static_cast<int32_t>(mesh.textureIndex.value_or(-1)),
-            .baseColorFactor = mesh.color};
+            .transformIndex  = draw.transformIndex,
+            .textureIndex    = draw.textureIndex,
+            .baseColorFactor = draw.baseColor};
 
         timeline.buffer().pushConstants2(
             vk::PushConstantsInfo{
@@ -201,9 +203,8 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
                 sizeof(PushConstantBlock),
                 &pushConstant});
 
-        // render draw call
         timeline.buffer()
-            .drawIndexed(scene.meshes[meshIndex].indices.size(), 1, 0, 0, 0);
+            .drawIndexed(draw.indexCount, 1, draw.firstIndex, draw.vertexOffset, 0);
     }
 
     timeline.buffer().endRendering();
