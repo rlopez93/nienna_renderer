@@ -3,8 +3,11 @@
 #include <vulkan/vulkan_raii.hpp>
 
 #include "Device.hpp"
+#include "FrameContext.hpp"
 #include "Instance.hpp"
 #include "PhysicalDevice.hpp"
+#include "Pipeline.hpp"
+#include "PipelineLayout.hpp"
 #include "Surface.hpp"
 #include "Swapchain.hpp"
 
@@ -31,7 +34,10 @@ struct Renderer {
     std::vector<const char *>           requiredExtensions;
     PhysicalDevice                      physicalDevice;
     Device                              device;
+    FrameContext                        frames;
     Swapchain                           swapchain;
+    vk::raii::PipelineLayout            pipelineLayout;
+    vk::raii::Pipeline                  graphicsPipeline;
     std::vector<vk::DescriptorPoolSize> poolSizes;
     vk::raii::DescriptorPool            imguiDescriptorPool;
 

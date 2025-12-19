@@ -1,5 +1,6 @@
 #include "Renderer.hpp"
 #include "Command.hpp"
+#include "SceneResources.hpp"
 #include "Utility.hpp"
 
 #include <SDL3/SDL_video.h>
@@ -44,43 +45,30 @@ auto Renderer::getWindowExtent() const -> vk::Extent2D
 
     return extent;
 }
-
 auto Renderer::beginFrame() -> bool
 {
+    [[maybe_unused]]
+    auto waitResult = device.handle.waitSemaphores(
+        vk::SemaphoreWaitInfo{{}, *frames.timelineSemaphore, frames.value()},
+        std::numeric_limits<uint64_t>::max());
 
-    // begin frame
-    // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
+    frames.pool().reset();
+    frames.buffer().begin({});
 
-    {
-        // wait semaphore frame (n - numFrames)
-        auto result = device.handle.waitSemaphores(
-            vk::SemaphoreWaitInfo{{}, *timeline.semaphore, timeline.value()},
-            std::numeric_limits<uint64_t>::max());
-    }
+    auto acquireResult = swapchain.acquireNextImage();
 
-    // reset current frame's command pool to reuse the command buffer
-    timeline.pool().reset();
-    timeline.buffer().begin({});
-
-    auto result = swapchain.acquireNextImage();
-
-    // FIXME:
-    // Swapchain recreation logic
-    if (result == vk::Result::eErrorOutOfDateKHR
-        || result == vk::Result::eSuboptimalKHR) {
+    if (acquireResult == vk::Result::eErrorOutOfDateKHR
+        || acquireResult == vk::Result::eSuboptimalKHR) {
         swapchain.needRecreate = true;
-    } else if (!(result == vk::Result::eSuccess
-                 || result == vk::Result::eSuboptimalKHR)) {
-        throw std::exception{};
+        return false;
     }
 
-    if (swapchain.needRecreate) {
-        return false;
+    if (acquireResult != vk::Result::eSuccess) {
+        throw std::exception{};
     }
 
     return true;
 }
-
 auto Renderer::render(const SceneResources &sceneResources) -> void
 {
     // color attachment image to render to: vk::RenderingAttachmentInfo
@@ -147,13 +135,13 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
         swapchain.getNextImage(),
         vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
 
-    timeline.buffer().pipelineBarrier2(
+    frames.buffer().pipelineBarrier2(
         vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
 
     swapchain.imageInitialized[swapchain.nextImageIndex] = true;
 
-    timeline.buffer().beginRendering(renderingInfo);
-    timeline.buffer().setViewportWithCount(
+    frames.buffer().beginRendering(renderingInfo);
+    frames.buffer().setViewportWithCount(
         vk::Viewport(
             0.0f,
             0.0f,
@@ -161,17 +149,17 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
             getWindowExtent().height,
             0.0f,
             1.0f));
-    timeline.buffer().setScissorWithCount(
+    frames.buffer().setScissorWithCount(
         vk::Rect2D{vk::Offset2D(0, 0), getWindowExtent()});
 
-    timeline.buffer().bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
+    frames.buffer().bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
     // bind texture resources passed to shader
-    timeline.buffer().bindDescriptorSets(
+    frames.buffer().bindDescriptorSets(
         vk::PipelineBindPoint::eGraphics,
-        *descriptors.pipelineLayout,
+        *pipelineLayout,
         0,
-        *descriptors.descriptorSets[swapchain.frame.index],
+        *frames.resourceBindings[frames.current()],
         {});
 
     for (const auto &draw : sceneResources.draws) {
@@ -180,12 +168,12 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
         // indices with draw.vertexBufferIndex / draw.indexBufferIndex.
         const uint32_t bufferIndex = draw.transformIndex;
 
-        timeline.buffer().bindVertexBuffers(
+        frames.buffer().bindVertexBuffers(
             0,
             sceneResources.buffers.vertex[bufferIndex].buffer,
             {0});
 
-        timeline.buffer().bindIndexBuffer(
+        frames.buffer().bindIndexBuffer(
             sceneResources.buffers.index[bufferIndex].buffer,
             0,
             vk::IndexType::eUint16);
@@ -195,19 +183,19 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
             .textureIndex    = draw.textureIndex,
             .baseColorFactor = draw.baseColor};
 
-        timeline.buffer().pushConstants2(
+        frames.buffer().pushConstants2(
             vk::PushConstantsInfo{
-                *descriptors.pipelineLayout,
+                *pipelineLayout,
                 vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
                 0,
                 sizeof(PushConstantBlock),
                 &pushConstant});
 
-        timeline.buffer()
+        frames.buffer()
             .drawIndexed(draw.indexCount, 1, draw.firstIndex, draw.vertexOffset, 0);
     }
 
-    timeline.buffer().endRendering();
+    frames.buffer().endRendering();
 }
 
 Renderer::Renderer()
@@ -242,77 +230,73 @@ Renderer::Renderer()
           window,
           surface,
           requiredExtensions},
+      frames{
+          device,
+          3},
       swapchain{
           device,
           physicalDevice,
           surface},
-      // allocator{
-      //     instance,
-      //     physicalDevice,
-      //     device},
-      // depthFormat{findDepthFormat(physicalDevice.handle)},
-      // depthImage{allocator.createImage(
-      //     vk::ImageCreateInfo{
-      //         {},
-      //         vk::ImageType::e2D,
-      //         depthFormat,
-      //         vk::Extent3D(
-      //             getWindowExtent(),
-      //             1),
-      //         1,
-      //         1,
-      //         vk::SampleCountFlagBits::e1,
-      //         vk::ImageTiling::eOptimal,
-      //         vk::ImageUsageFlagBits::eDepthStencilAttachment})},
-      // depthImageView{device.handle.createImageView(
-      //     vk::ImageViewCreateInfo{
-      //         {},
-      //         depthImage.image,
-      //         vk::ImageViewType::e2D,
-      //         depthFormat,
-      //         {},
-      //         vk::ImageSubresourceRange{
-      //             vk::ImageAspectFlagBits::eDepth,
-      //             0,
-      //             1,
-      //             0,
-      //             1}})},
-      // timeline{
-      //     device,
-      //     swapchain.frame.maxFramesInFlight},
-      //
-      poolSizes{
-          {vk::DescriptorType::eSampler,
-           1000},
-          {vk::DescriptorType::eCombinedImageSampler,
-           1000},
-          {vk::DescriptorType::eSampledImage,
-           1000},
-          {vk::DescriptorType::eStorageImage,
-           1000},
-          {vk::DescriptorType::eUniformTexelBuffer,
-           1000},
-          {vk::DescriptorType::eStorageTexelBuffer,
-           1000},
-          {vk::DescriptorType::eUniformBuffer,
-           1000},
-          {vk::DescriptorType::eStorageBuffer,
-           1000},
-          {vk::DescriptorType::eUniformBufferDynamic,
-           1000},
-          {vk::DescriptorType::eStorageBufferDynamic,
-           1000},
-          {vk::DescriptorType::eInputAttachment,
-           1000}},
+    pipelineLayout(createPipelineLayout(device.handle, resourceLayouts),
+                   graphicsPipeline{
+    createPipeline(device, shaderPath, imageFormat, depthFormat, pipelineLayout)}
 
-      imguiDescriptorPool{
-          device.handle,
-          vk::DescriptorPoolCreateInfo{
-              vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-              static_cast<uint32_t>(1000u * poolSizes.size()),
-              poolSizes}}
+        // allocator{
+        //     instance,
+        //     physicalDevice,
+        //     device},
+        // depthFormat{findDepthFormat(physicalDevice.handle)},
+        // depthImage{allocator.createImage(
+        //     vk::ImageCreateInfo{
+        //         {},
+        //         vk::ImageType::e2D,
+        //         depthFormat,
+        //         vk::Extent3D(
+        //             getWindowExtent(),
+        //             1),
+        //         1,
+        //         1,
+        //         vk::SampleCountFlagBits::e1,
+        //         vk::ImageTiling::eOptimal,
+        //         vk::ImageUsageFlagBits::eDepthStencilAttachment})},
+        // depthImageView{device.handle.createImageView(
+        //     vk::ImageViewCreateInfo{
+        //         {},
+        //         depthImage.image,
+        //         vk::ImageViewType::e2D,
+        //         depthFormat,
+        //         {},
+        //         vk::ImageSubresourceRange{
+        //             vk::ImageAspectFlagBits::eDepth,
+        //             0,
+        //             1,
+        //             0,
+        //             1}})},
+        // timeline{
+        //     device,
+        //     swapchain.frame.maxFramesInFlight},
+        //
+        poolSizes{
+            {vk::DescriptorType::eSampler, 1000},
+            {vk::DescriptorType::eCombinedImageSampler, 1000},
+            {vk::DescriptorType::eSampledImage, 1000},
+            {vk::DescriptorType::eStorageImage, 1000},
+            {vk::DescriptorType::eUniformTexelBuffer, 1000},
+            {vk::DescriptorType::eStorageTexelBuffer, 1000},
+            {vk::DescriptorType::eUniformBuffer, 1000},
+            {vk::DescriptorType::eStorageBuffer, 1000},
+            {vk::DescriptorType::eUniformBufferDynamic, 1000},
+            {vk::DescriptorType::eStorageBufferDynamic, 1000},
+            {vk::DescriptorType::eInputAttachment, 1000}},
 
-{
+        imguiDescriptorPool{
+            device.handle,
+            vk::DescriptorPoolCreateInfo{
+                vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+                static_cast<uint32_t>(1000u * poolSizes.size()),
+                poolSizes}}
+
+    {
     // after depthImage + depthImageView creation
     // create transient command pool for single-time commands
     auto transient = Command{device, vk::CommandPoolCreateFlagBits::eTransient};
@@ -352,143 +336,143 @@ Renderer::Renderer()
             vk::PipelineRenderingCreateInfo{{}, swapchain.imageFormat}};
 
     ImGui_ImplVulkan_Init(&init_info);
-}
-auto Renderer::drawFrame(
-    Scene                             &scene,
-    const std::chrono::duration<float> deltaTime,
-    vk::raii::Pipeline                &pipeline,
-    Descriptors                       &descriptors,
-    bool                               framebufferResized) -> void
-{
-    // If minimized, skip rendering
-    int w, h;
-    SDL_GetWindowSizeInPixels(window.get(), &w, &h);
-
-    if (w == 0 || h == 0) {
-        SDL_WaitEvent(nullptr); // sleep until something happens
-        return;
     }
 
-    // FIXME:
-    // Swapchain recreation logic
-
-    // check swapchain rebuild
-    if (framebufferResized || swapchain.needRecreate) {
-        swapchain.recreate(device, physicalDevice, surface);
-
-        depthImage = allocator.createImage(
-            vk::ImageCreateInfo{
-                {},
-                vk::ImageType::e2D,
-                depthFormat,
-                vk::Extent3D(getWindowExtent(), 1),
-                1,
-                1,
-                vk::SampleCountFlagBits::e1,
-                vk::ImageTiling::eOptimal,
-                vk::ImageUsageFlagBits::eDepthStencilAttachment});
-
-        depthImageView = device.handle.createImageView(
-            vk::ImageViewCreateInfo{
-                {},
-                depthImage.image,
-                vk::ImageViewType::e2D,
-                depthFormat,
-                {},
-                vk::ImageSubresourceRange{
-                    vk::ImageAspectFlagBits::eDepth,
-                    0,
-                    1,
-                    0,
-                    1}});
-
-        // after depthImage + depthImageView creation
-        // create transient command pool for single-time commands
-        auto transient = Command{device, vk::CommandPoolCreateFlagBits::eTransient};
-        transient.beginSingleTime();
-
-        cmdTransitionImageLayout(
-            transient.buffer,
-            depthImage.image,
-            vk::ImageLayout::eUndefined,
-            vk::ImageLayout::eAttachmentOptimal,
-            vk::ImageAspectFlagBits::eDepth);
-
-        transient.endSingleTime(device);
-        framebufferResized = false;
-        return;
-    }
-
-    // ImGui_ImplVulkan_NewFrame();
-    // ImGui_ImplSDL3_NewFrame();
-    // ImGui::NewFrame();
-
-    // ImGui::ShowDemoWindow();
-
-    // ImGui::Render();
-    // auto imGuiDrawData = ImGui::GetDrawData();
-
-    scene.update(deltaTime);
-
-    // FIXME:
-    // Does copying uniform data to device go in scene.update()?
-    // Synchronization?
-
-    // update uniform buffers
-    for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
-        auto transform = Transform{
-            .modelMatrix          = mesh.modelMatrix,
-            .viewProjectionMatrix = scene.getCamera().getProjectionMatrix()
-                                  * scene.getCamera().getViewMatrix()};
-        // transform.viewProjectionMatrix[1][1] *= -1;
-
-        VK_CHECK(vmaCopyMemoryToAllocation(
-            allocator.allocator,
-            &transform,
-            scene.buffers.uniform[swapchain.frame.index].allocation,
-            sizeof(Transform) * meshIndex,
-            sizeof(Transform)));
-    }
-    auto light = Light{};
-
-    VK_CHECK(vmaCopyMemoryToAllocation(
-        allocator.allocator,
-        &light,
-        scene.buffers.light[swapchain.frame.index].allocation,
-        0,
-        sizeof(light)));
-
-    beginFrame();
-
-    // render scene
-    render(scene, pipeline, descriptors);
-
-    // render imGui
-    // r.beginRender(
-    //     vk::AttachmentLoadOp::eLoad,
-    //     vk::AttachmentStoreOp::eStore,
-    //     vk::AttachmentLoadOp::eLoad,
-    //     vk::AttachmentStoreOp::eStore);
-
-    // ImGui_ImplVulkan_RenderDrawData(imGuiDrawData, *r.timeline.buffer());
-
-    // r.endRender();
-
-    submit();
-    present();
-
-    endFrame();
-    // ImGui::EndFrame();
-
-    // ++totalFrames;
-
-    // if (totalFrames > 10) {
-    //     break;
+    // auto Renderer::drawFrame(
+    //     Scene                             &scene,
+    //     const std::chrono::duration<float> deltaTime,
+    //     vk::raii::Pipeline                &pipeline,
+    //     Descriptors                       &descriptors,
+    //     bool                               framebufferResized) -> void
+    // {
+    //     // If minimized, skip rendering
+    //     int w, h;
+    //     SDL_GetWindowSizeInPixels(window.get(), &w, &h);
+    //
+    //     if (w == 0 || h == 0) {
+    //         SDL_WaitEvent(nullptr); // sleep until something happens
+    //         return;
+    //     }
+    //
+    //     // FIXME:
+    //     // Swapchain recreation logic
+    //
+    //     // check swapchain rebuild
+    //     if (framebufferResized || swapchain.needRecreate) {
+    //         swapchain.recreate(device, physicalDevice, surface);
+    //
+    //         depthImage = allocator.createImage(
+    //             vk::ImageCreateInfo{
+    //                 {},
+    //                 vk::ImageType::e2D,
+    //                 depthFormat,
+    //                 vk::Extent3D(getWindowExtent(), 1),
+    //                 1,
+    //                 1,
+    //                 vk::SampleCountFlagBits::e1,
+    //                 vk::ImageTiling::eOptimal,
+    //                 vk::ImageUsageFlagBits::eDepthStencilAttachment});
+    //
+    //         depthImageView = device.handle.createImageView(
+    //             vk::ImageViewCreateInfo{
+    //                 {},
+    //                 depthImage.image,
+    //                 vk::ImageViewType::e2D,
+    //                 depthFormat,
+    //                 {},
+    //                 vk::ImageSubresourceRange{
+    //                     vk::ImageAspectFlagBits::eDepth,
+    //                     0,
+    //                     1,
+    //                     0,
+    //                     1}});
+    //
+    //         // after depthImage + depthImageView creation
+    //         // create transient command pool for single-time commands
+    //         auto transient = Command{device,
+    //         vk::CommandPoolCreateFlagBits::eTransient}; transient.beginSingleTime();
+    //
+    //         cmdTransitionImageLayout(
+    //             transient.buffer,
+    //             depthImage.image,
+    //             vk::ImageLayout::eUndefined,
+    //             vk::ImageLayout::eAttachmentOptimal,
+    //             vk::ImageAspectFlagBits::eDepth);
+    //
+    //         transient.endSingleTime(device);
+    //         framebufferResized = false;
+    //         return;
+    //     }
+    //
+    //     // ImGui_ImplVulkan_NewFrame();
+    //     // ImGui_ImplSDL3_NewFrame();
+    //     // ImGui::NewFrame();
+    //
+    //     // ImGui::ShowDemoWindow();
+    //
+    //     // ImGui::Render();
+    //     // auto imGuiDrawData = ImGui::GetDrawData();
+    //
+    //     scene.update(deltaTime);
+    //
+    //     // FIXME:
+    //     // Does copying uniform data to device go in scene.update()?
+    //     // Synchronization?
+    //
+    //     // update uniform buffers
+    //     for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
+    //         auto transform = Transform{
+    //             .modelMatrix          = mesh.modelMatrix,
+    //             .viewProjectionMatrix = scene.getCamera().getProjectionMatrix()
+    //                                   * scene.getCamera().getViewMatrix()};
+    //         // transform.viewProjectionMatrix[1][1] *= -1;
+    //
+    //         VK_CHECK(vmaCopyMemoryToAllocation(
+    //             allocator.allocator,
+    //             &transform,
+    //             scene.buffers.uniform[swapchain.frame.index].allocation,
+    //             sizeof(Transform) * meshIndex,
+    //             sizeof(Transform)));
+    //     }
+    //     auto light = Light{};
+    //
+    //     VK_CHECK(vmaCopyMemoryToAllocation(
+    //         allocator.allocator,
+    //         &light,
+    //         scene.buffers.light[swapchain.frame.index].allocation,
+    //         0,
+    //         sizeof(light)));
+    //
+    //     beginFrame();
+    //
+    //     // render scene
+    //     render(scene, pipeline, descriptors);
+    //
+    //     // render imGui
+    //     // r.beginRender(
+    //     //     vk::AttachmentLoadOp::eLoad,
+    //     //     vk::AttachmentStoreOp::eStore,
+    //     //     vk::AttachmentLoadOp::eLoad,
+    //     //     vk::AttachmentStoreOp::eStore);
+    //
+    //     // ImGui_ImplVulkan_RenderDrawData(imGuiDrawData, *r.timeline.buffer());
+    //
+    //     // r.endRender();
+    //
+    //     submit();
+    //     present();
+    //
+    //     endFrame();
+    //     // ImGui::EndFrame();
+    //
+    //     // ++totalFrames;
+    //
+    //     // if (totalFrames > 10) {
+    //     //     break;
+    //     // }
     // }
-}
-auto Renderer::submit() -> void
-{
-
+    auto Renderer::submit() -> void
+    {
     // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
     // cmdTransitionImageLayout(
     //     timeline.buffer(),
@@ -515,17 +499,17 @@ auto Renderer::submit() -> void
         swapchain.getNextImage(),
         vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
 
-    timeline.buffer().pipelineBarrier2(
+    frames.buffer().pipelineBarrier2(
         vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
-    timeline.buffer().end();
+    frames.buffer().end();
 
     // end frame
 
     // prepare to submit the current frame for rendering
     // add the swapchain semaphore to wait for the image to be available
 
-    uint64_t signalFrameValue = timeline.value() + swapchain.frame.maxFramesInFlight;
-    timeline.value()          = signalFrameValue;
+    uint64_t signalFrameValue = frames.value() + frames.maxFramesInFlight;
+    frames.value()            = signalFrameValue;
 
     auto waitSemaphoreSubmitInfo = vk::SemaphoreSubmitInfo{
         swapchain.getImageAvailableSemaphore(),
@@ -538,11 +522,11 @@ auto Renderer::submit() -> void
             {},
             vk::PipelineStageFlagBits2::eAllCommands},
         vk::SemaphoreSubmitInfo{
-            timeline.semaphore,
+            frames.timelineSemaphore,
             signalFrameValue,
             vk::PipelineStageFlagBits2::eAllCommands}};
 
-    auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{timeline.buffer()};
+    auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{frames.buffer()};
 
     device.graphicsQueue.submit2(
         vk::SubmitInfo2{
@@ -550,10 +534,10 @@ auto Renderer::submit() -> void
             waitSemaphoreSubmitInfo,
             commandBufferSubmitInfo,
             signalSemaphoreSubmitInfos});
-}
+    }
 
-auto Renderer::present() -> void
-{
+    auto Renderer::present() -> void
+    {
     auto renderFinishedSemaphore = swapchain.getRenderFinishedSemaphore();
     auto presentResult           = device.presentQueue.presentKHR(
         vk::PresentInfoKHR{
@@ -572,17 +556,17 @@ auto Renderer::present() -> void
                || presentResult == vk::Result::eSuboptimalKHR)) {
         throw std::exception{};
     }
-}
-auto Renderer::endFrame() -> void
-{
+    }
+    auto Renderer::endFrame() -> void
+    {
     // advance to the next frame
     swapchain.advance();
-    timeline.advance();
-}
+    frames.advance();
+    }
 
-Renderer::~Renderer()
-{
+    Renderer::~Renderer()
+    {
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
-}
+    }

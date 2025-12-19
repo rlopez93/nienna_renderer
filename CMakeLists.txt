@@ -36,7 +36,6 @@ target_sources(nienna PRIVATE
     src/Shader.cpp
     src/Surface.cpp
     src/Swapchain.cpp
-    src/Timeline.cpp
     src/Utility.cpp
     src/Window.cpp
     src/gltfLoader.cpp
