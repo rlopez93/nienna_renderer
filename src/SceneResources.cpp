@@ -78,4 +78,25 @@ auto SceneResources::create(
     }
 
     command.endSingleTime(device);
+
+    // Clear any previous draw list
+    draws.clear();
+    draws.reserve(scene.meshes.size());
+
+    for (const auto &[meshIndex, mesh] : std::ranges::views::enumerate(scene.meshes)) {
+
+        DrawItem draw{
+            draw.indexCount   = static_cast<uint32_t>(mesh.indices.size()),
+            draw.firstIndex   = 0,
+            draw.vertexOffset = 0,
+            // Shader-facing indices
+            draw.transformIndex = meshIndex,
+            draw.textureIndex   = mesh.textureIndex.has_value()
+                                    ? static_cast<int32_t>(*mesh.textureIndex)
+                                    : -1};
+
+        draw.baseColor = mesh.color;
+
+        draws.emplace_back(draw);
+    }
 }
