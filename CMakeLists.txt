@@ -29,11 +29,11 @@ target_sources(nienna PRIVATE
     src/Renderer.cpp
     src/ResourceAllocator.cpp
     src/ResourceBindings.cpp
-    src/ResourceLayout.cpp
     src/ResourceUpdate.cpp
     src/Scene.cpp
     src/SceneResources.cpp
     src/Shader.cpp
+    src/ShaderInterface.cpp
     src/Surface.cpp
     src/Swapchain.cpp
     src/Utility.cpp

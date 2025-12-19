@@ -1,7 +1,7 @@
-#include "ResourceLayout.hpp"
+#include "ShaderInterface.hpp"
 #include <vector>
 
-ResourceLayout::ResourceLayout(
+ShaderInterface::ShaderInterface(
     vk::raii::Device &device,
     uint32_t          meshCount,
     uint32_t          textureCount)
@@ -12,7 +12,7 @@ ResourceLayout::ResourceLayout(
 {
 }
 
-auto ResourceLayout::create(
+auto ShaderInterface::create(
     vk::raii::Device &device,
     uint32_t          meshCount,
     uint32_t          textureCount) -> vk::raii::DescriptorSetLayout
