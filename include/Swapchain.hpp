@@ -39,12 +39,9 @@ struct Swapchain {
         const Surface        &surface,
         vk::SwapchainKHR      oldSwapchain) -> vk::raii::SwapchainKHR;
 
-    auto acquireNextImage() -> vk::Result;
+    auto acquireNextImage(vk::Semaphore signalSemaphore) -> vk::Result;
     auto getNextImage() -> vk::Image;
     auto getNextImageView() -> vk::raii::ImageView &;
-    auto getImageAvailableSemaphore() -> vk::Semaphore;
-    auto getRenderFinishedSemaphore() -> vk::Semaphore;
-    auto advance() -> void;
 
     vk::raii::SwapchainKHR           handle;
     std::vector<bool>                imageInitialized;

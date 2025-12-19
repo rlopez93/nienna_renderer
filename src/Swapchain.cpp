@@ -197,12 +197,11 @@ auto Swapchain::recreate(
 // -----------------------------------------------------------------------------
 // Per-frame operations
 // -----------------------------------------------------------------------------
-auto Swapchain::acquireNextImage() -> vk::Result
+auto Swapchain::acquireNextImage(vk::Semaphore signalSemaphore) -> vk::Result
 {
     vk::Result result;
-    std::tie(result, nextImageIndex) = handle.acquireNextImage(
-        std::numeric_limits<uint64_t>::max(),
-        getImageAvailableSemaphore());
+    std::tie(result, nextImageIndex) =
+        handle.acquireNextImage(std::numeric_limits<uint64_t>::max(), signalSemaphore);
     return result;
 }
 
@@ -215,18 +214,3 @@ auto Swapchain::getNextImageView() -> vk::raii::ImageView &
 {
     return imageViews[nextImageIndex];
 }
-
-// auto Swapchain::getImageAvailableSemaphore() -> vk::Semaphore
-// {
-//     return frame.imageAvailableSemaphores[frame.index];
-// }
-
-// auto Swapchain::getRenderFinishedSemaphore() -> vk::Semaphore
-// {
-//     return frame.renderFinishedSemaphores[nextImageIndex];
-// }
-
-// auto Swapchain::advance() -> void
-// {
-//     frame.index = (frame.index + 1) % frame.maxFramesInFlight;
-// }

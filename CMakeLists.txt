@@ -26,6 +26,7 @@ target_sources(nienna PRIVATE
     src/PhysicalDevice.cpp
     src/Pipeline.cpp
     src/PipelineLayout.cpp
+    src/RenderContext.cpp
     src/Renderer.cpp
     src/ResourceAllocator.cpp
     src/ResourceBindings.cpp

@@ -15,4 +15,6 @@ struct RendererConfig {
     // Render target formats (swapchain + depth)
     vk::Format colorFormat;
     vk::Format depthFormat;
+
+    uint32_t maxFramesInFlight;
 };
