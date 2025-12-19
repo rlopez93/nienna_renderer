@@ -4,6 +4,7 @@
 #include "Buffer.hpp"
 #include "Command.hpp"
 #include "Device.hpp"
+#include "DrawItem.hpp"
 #include "Image.hpp"
 
 #include <vector>
@@ -30,4 +31,6 @@ struct SceneResources {
         Command     &command,
         Allocator   &allocator,
         uint64_t     maxFramesInFlight);
+
+    std::vector<DrawItem> draws;
 };

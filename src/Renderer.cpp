@@ -10,6 +10,205 @@
 
 #include <cstdint>
 
+auto Renderer::getWindowExtent() const -> vk::Extent2D
+{
+    const vk::SurfaceCapabilitiesKHR caps =
+        physicalDevice.handle.getSurfaceCapabilitiesKHR(surface.handle);
+
+    // If the surface dictates the extent, use it.
+    if (caps.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+        return caps.currentExtent;
+    }
+
+    // Otherwise, we must derive it from the window framebuffer size and clamp.
+    int fbWidth  = 0;
+    int fbHeight = 0;
+    SDL_GetWindowSizeInPixels(window.get(), &fbWidth, &fbHeight);
+
+    // If minimized / not ready, return 0 extent; caller must handle it.
+    if (fbWidth <= 0 || fbHeight <= 0) {
+        return vk::Extent2D{0u, 0u};
+    }
+
+    vk::Extent2D extent{
+        static_cast<uint32_t>(fbWidth),
+        static_cast<uint32_t>(fbHeight)};
+
+    extent.width =
+        std::clamp(extent.width, caps.minImageExtent.width, caps.maxImageExtent.width);
+
+    extent.height = std::clamp(
+        extent.height,
+        caps.minImageExtent.height,
+        caps.maxImageExtent.height);
+
+    return extent;
+}
+
+auto Renderer::beginFrame() -> bool
+{
+
+    // begin frame
+    // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
+
+    {
+        // wait semaphore frame (n - numFrames)
+        auto result = device.handle.waitSemaphores(
+            vk::SemaphoreWaitInfo{{}, *timeline.semaphore, timeline.value()},
+            std::numeric_limits<uint64_t>::max());
+    }
+
+    // reset current frame's command pool to reuse the command buffer
+    timeline.pool().reset();
+    timeline.buffer().begin({});
+
+    auto result = swapchain.acquireNextImage();
+
+    // FIXME:
+    // Swapchain recreation logic
+    if (result == vk::Result::eErrorOutOfDateKHR
+        || result == vk::Result::eSuboptimalKHR) {
+        swapchain.needRecreate = true;
+    } else if (!(result == vk::Result::eSuccess
+                 || result == vk::Result::eSuboptimalKHR)) {
+        throw std::exception{};
+    }
+
+    if (swapchain.needRecreate) {
+        return false;
+    }
+
+    return true;
+}
+
+auto Renderer::render(const SceneResources &sceneResources) -> void
+{
+    // color attachment image to render to: vk::RenderingAttachmentInfo
+    auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
+        swapchain.getNextImageView(),
+        vk::ImageLayout::eAttachmentOptimal,
+        {},
+        {},
+        {},
+        vk::AttachmentLoadOp::eClear,
+        vk::AttachmentStoreOp::eStore,
+        vk::ClearColorValue{std::array{0.2f, 0.5f, 1.0f, 1.0f}}};
+
+    // depth attachment buffer: vk::RenderingAttachmentInfo
+    auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
+        depthImageView,
+        vk::ImageLayout::eAttachmentOptimal,
+        {},
+        {},
+        {},
+        vk::AttachmentLoadOp::eClear,
+        vk::AttachmentStoreOp::eDontCare,
+        vk::ClearDepthStencilValue{1.0f, 0}};
+
+    // rendering info for dynamic rendering
+    auto renderingInfo = vk::RenderingInfo{
+        {},
+        vk::Rect2D{{}, getWindowExtent()},
+        1,
+        {},
+        renderingColorAttachmentInfo,
+        &renderingDepthAttachmentInfo};
+
+    // transition swapchain image layout
+    // cmdTransitionImageLayout(
+    //     timeline.buffer(),
+    //     swapchain.getNextImage(),
+    //     vk::ImageLayout::eUndefined,
+    //     vk::ImageLayout::eColorAttachmentOptimal);
+
+    auto oldLayout = vk::ImageLayout{
+        (!swapchain.imageInitialized[swapchain.nextImageIndex])
+            ? vk::ImageLayout::eUndefined
+            : vk::ImageLayout::ePresentSrcKHR};
+
+    vk::ImageMemoryBarrier2 barrier{
+        // src: be conservative; assume last use was as a color attachment write
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::AccessFlagBits2::eColorAttachmentWrite,
+
+        // dst: color attachment read/write during rendering
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::AccessFlagBits2::eColorAttachmentRead
+            | vk::AccessFlagBits2::eColorAttachmentWrite,
+
+        // layout transition
+        oldLayout,
+        vk::ImageLayout::eColorAttachmentOptimal,
+
+        // queue family ownership unchanged
+        VK_QUEUE_FAMILY_IGNORED,
+        VK_QUEUE_FAMILY_IGNORED,
+
+        swapchain.getNextImage(),
+        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
+
+    timeline.buffer().pipelineBarrier2(
+        vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
+
+    swapchain.imageInitialized[swapchain.nextImageIndex] = true;
+
+    timeline.buffer().beginRendering(renderingInfo);
+    timeline.buffer().setViewportWithCount(
+        vk::Viewport(
+            0.0f,
+            0.0f,
+            getWindowExtent().width,
+            getWindowExtent().height,
+            0.0f,
+            1.0f));
+    timeline.buffer().setScissorWithCount(
+        vk::Rect2D{vk::Offset2D(0, 0), getWindowExtent()});
+
+    timeline.buffer().bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
+
+    // bind texture resources passed to shader
+    timeline.buffer().bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics,
+        *descriptors.pipelineLayout,
+        0,
+        *descriptors.descriptorSets[swapchain.frame.index],
+        {});
+
+    for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
+        // fmt::println(stderr, "scene.meshes[{}]", meshIndex);
+        // bind vertex data
+        timeline.buffer().bindVertexBuffers(
+            0,
+            scene.buffers.vertex[meshIndex].buffer,
+            {0});
+
+        // bind index data
+        timeline.buffer().bindIndexBuffer(
+            scene.buffers.index[meshIndex].buffer,
+            0,
+            vk::IndexType::eUint16);
+
+        auto pushConstant = PushConstantBlock{
+            .transformIndex  = static_cast<uint32_t>(meshIndex),
+            .textureIndex    = static_cast<int32_t>(mesh.textureIndex.value_or(-1)),
+            .baseColorFactor = mesh.color};
+
+        timeline.buffer().pushConstants2(
+            vk::PushConstantsInfo{
+                *descriptors.pipelineLayout,
+                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+                0,
+                sizeof(PushConstantBlock),
+                &pushConstant});
+
+        // render draw call
+        timeline.buffer()
+            .drawIndexed(scene.meshes[meshIndex].indices.size(), 1, 0, 0, 0);
+    }
+
+    timeline.buffer().endRendering();
+}
+
 Renderer::Renderer()
     : window{createWindow(
           windowWidth,
@@ -153,42 +352,6 @@ Renderer::Renderer()
 
     ImGui_ImplVulkan_Init(&init_info);
 }
-
-auto Renderer::getWindowExtent() const -> vk::Extent2D
-{
-    const vk::SurfaceCapabilitiesKHR caps =
-        physicalDevice.handle.getSurfaceCapabilitiesKHR(surface.handle);
-
-    // If the surface dictates the extent, use it.
-    if (caps.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
-        return caps.currentExtent;
-    }
-
-    // Otherwise, we must derive it from the window framebuffer size and clamp.
-    int fbWidth  = 0;
-    int fbHeight = 0;
-    SDL_GetWindowSizeInPixels(window.get(), &fbWidth, &fbHeight);
-
-    // If minimized / not ready, return 0 extent; caller must handle it.
-    if (fbWidth <= 0 || fbHeight <= 0) {
-        return vk::Extent2D{0u, 0u};
-    }
-
-    vk::Extent2D extent{
-        static_cast<uint32_t>(fbWidth),
-        static_cast<uint32_t>(fbHeight)};
-
-    extent.width =
-        std::clamp(extent.width, caps.minImageExtent.width, caps.maxImageExtent.width);
-
-    extent.height = std::clamp(
-        extent.height,
-        caps.minImageExtent.height,
-        caps.maxImageExtent.height);
-
-    return extent;
-}
-
 auto Renderer::drawFrame(
     Scene                             &scene,
     const std::chrono::duration<float> deltaTime,
@@ -322,190 +485,6 @@ auto Renderer::drawFrame(
     //     break;
     // }
 }
-auto Renderer::beginFrame() -> void
-{
-
-    // begin frame
-    // fmt::print(stderr, "\n\n<start rendering frame> <{}>\n\n", totalFrames);
-
-    {
-        // wait semaphore frame (n - numFrames)
-        auto result = device.handle.waitSemaphores(
-            vk::SemaphoreWaitInfo{{}, *timeline.semaphore, timeline.value()},
-            std::numeric_limits<uint64_t>::max());
-    }
-
-    // reset current frame's command pool to reuse the command buffer
-    timeline.pool().reset();
-    timeline.buffer().begin({});
-
-    auto result = swapchain.acquireNextImage();
-
-    // FIXME:
-    // Swapchain recreation logic
-    if (result == vk::Result::eErrorOutOfDateKHR
-        || result == vk::Result::eSuboptimalKHR) {
-        swapchain.needRecreate = true;
-    } else if (!(result == vk::Result::eSuccess
-                 || result == vk::Result::eSuboptimalKHR)) {
-        throw std::exception{};
-    }
-
-    if (swapchain.needRecreate) {
-        return;
-    }
-}
-
-auto Renderer::render(
-    Scene              &scene,
-    vk::raii::Pipeline &graphicsPipeline,
-    Descriptors        &descriptors) -> void
-{
-    beginRender(
-        vk::AttachmentLoadOp::eClear,
-        vk::AttachmentStoreOp::eStore,
-        vk::AttachmentLoadOp::eClear,
-        vk::AttachmentStoreOp::eDontCare);
-
-    timeline.buffer().setViewportWithCount(
-        vk::Viewport(
-            0.0f,
-            0.0f,
-            getWindowExtent().width,
-            getWindowExtent().height,
-            0.0f,
-            1.0f));
-    timeline.buffer().setScissorWithCount(
-        vk::Rect2D{vk::Offset2D(0, 0), getWindowExtent()});
-
-    timeline.buffer().bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
-
-    // bind texture resources passed to shader
-    timeline.buffer().bindDescriptorSets(
-        vk::PipelineBindPoint::eGraphics,
-        *descriptors.pipelineLayout,
-        0,
-        *descriptors.descriptorSets[swapchain.frame.index],
-        {});
-
-    for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
-        // fmt::println(stderr, "scene.meshes[{}]", meshIndex);
-        // bind vertex data
-        timeline.buffer().bindVertexBuffers(
-            0,
-            scene.buffers.vertex[meshIndex].buffer,
-            {0});
-
-        // bind index data
-        timeline.buffer().bindIndexBuffer(
-            scene.buffers.index[meshIndex].buffer,
-            0,
-            vk::IndexType::eUint16);
-
-        auto pushConstant = PushConstantBlock{
-            .transformIndex  = static_cast<uint32_t>(meshIndex),
-            .textureIndex    = static_cast<int32_t>(mesh.textureIndex.value_or(-1)),
-            .baseColorFactor = mesh.color};
-
-        timeline.buffer().pushConstants2(
-            vk::PushConstantsInfo{
-                *descriptors.pipelineLayout,
-                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-                0,
-                sizeof(PushConstantBlock),
-                &pushConstant});
-
-        // render draw call
-        timeline.buffer()
-            .drawIndexed(scene.meshes[meshIndex].indices.size(), 1, 0, 0, 0);
-    }
-
-    endRender();
-}
-
-auto Renderer::beginRender(
-    vk::AttachmentLoadOp  loadOp,
-    vk::AttachmentStoreOp storeOp,
-    vk::AttachmentLoadOp  depthLoadOp,
-    vk::AttachmentStoreOp depthStoreOp) -> void
-{
-    // color attachment image to render to: vk::RenderingAttachmentInfo
-    auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
-        swapchain.getNextImageView(),
-        vk::ImageLayout::eAttachmentOptimal,
-        {},
-        {},
-        {},
-        loadOp,
-        storeOp,
-        vk::ClearColorValue{std::array{0.2f, 0.5f, 1.0f, 1.0f}}};
-
-    // depth attachment buffer: vk::RenderingAttachmentInfo
-    auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
-        depthImageView,
-        vk::ImageLayout::eAttachmentOptimal,
-        {},
-        {},
-        {},
-        depthLoadOp,
-        depthStoreOp,
-        vk::ClearDepthStencilValue{1.0f, 0}};
-
-    // rendering info for dynamic rendering
-    auto renderingInfo = vk::RenderingInfo{
-        {},
-        vk::Rect2D{{}, getWindowExtent()},
-        1,
-        {},
-        renderingColorAttachmentInfo,
-        &renderingDepthAttachmentInfo};
-
-    // transition swapchain image layout
-    // cmdTransitionImageLayout(
-    //     timeline.buffer(),
-    //     swapchain.getNextImage(),
-    //     vk::ImageLayout::eUndefined,
-    //     vk::ImageLayout::eColorAttachmentOptimal);
-
-    auto oldLayout = vk::ImageLayout{
-        (!swapchain.imageInitialized[swapchain.nextImageIndex])
-            ? vk::ImageLayout::eUndefined
-            : vk::ImageLayout::ePresentSrcKHR};
-
-    vk::ImageMemoryBarrier2 barrier{
-        // src: be conservative; assume last use was as a color attachment write
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::AccessFlagBits2::eColorAttachmentWrite,
-
-        // dst: color attachment read/write during rendering
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::AccessFlagBits2::eColorAttachmentRead
-            | vk::AccessFlagBits2::eColorAttachmentWrite,
-
-        // layout transition
-        oldLayout,
-        vk::ImageLayout::eColorAttachmentOptimal,
-
-        // queue family ownership unchanged
-        VK_QUEUE_FAMILY_IGNORED,
-        VK_QUEUE_FAMILY_IGNORED,
-
-        swapchain.getNextImage(),
-        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
-
-    timeline.buffer().pipelineBarrier2(
-        vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
-
-    swapchain.imageInitialized[swapchain.nextImageIndex] = true;
-
-    timeline.buffer().beginRendering(renderingInfo);
-}
-
-auto Renderer::endRender() -> void
-{
-    timeline.buffer().endRendering();
-}
-
 auto Renderer::submit() -> void
 {
 
