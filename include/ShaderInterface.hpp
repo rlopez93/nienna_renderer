@@ -1,17 +1,18 @@
 #pragma once
-#include <cstdint>
+#include "Device.hpp"
+#include "ShaderInterfaceDescription.hpp"
+
 #include <vulkan/vulkan_raii.hpp>
 
 struct ShaderInterface {
     vk::raii::DescriptorSetLayout handle;
 
     ShaderInterface(
-        vk::raii::Device &device,
-        uint32_t          meshCount,
-        uint32_t          textureCount);
+        Device                           &device,
+        const ShaderInterfaceDescription &description);
 
+  private:
     static auto create(
-        vk::raii::Device &device,
-        uint32_t          meshCount,
-        uint32_t          textureCount) -> vk::raii::DescriptorSetLayout;
+        Device                           &device,
+        const ShaderInterfaceDescription &description) -> vk::raii::DescriptorSetLayout;
 };
