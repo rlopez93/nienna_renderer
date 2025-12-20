@@ -1,13 +1,14 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
-#include "App.hpp"
 #include "Command.hpp"
 #include "Renderer.hpp"
 #include "gltfLoader.hpp"
 
 #include <SDL3/SDL_events.h>
 #include <fmt/base.h>
+
+#include <filesystem>
 
 auto main(
     int    argc,
@@ -18,7 +19,7 @@ auto main(
         if (argc < 2) {
             return "third_party/glTF-Sample-Assets/Models/Duck/glTF/Duck.gltf";
         } else {
-            return std::string{argv[1]};
+            return argv[1];
         }
     }();
 
