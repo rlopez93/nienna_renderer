@@ -11,7 +11,7 @@ struct Command;
 struct DepthTarget {
     vk::Format          format{};
     Image               image;
-    vk::raii::ImageView view;
+    vk::raii::ImageView view = nullptr;
 
     void recreate(
         Device      &device,

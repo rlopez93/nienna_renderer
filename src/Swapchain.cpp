@@ -10,14 +10,10 @@ Swapchain::Swapchain(
     const Device         &device,
     const PhysicalDevice &physicalDevice,
     const Surface        &surface)
-    : handle{nullptr}
 {
     create(device, physicalDevice, surface);
 }
 
-// -----------------------------------------------------------------------------
-// Surface format selection
-// -----------------------------------------------------------------------------
 auto Swapchain::chooseSurfaceFormat(
     const std::vector<vk::SurfaceFormatKHR> &availableFormats) -> vk::SurfaceFormatKHR
 {
@@ -40,9 +36,6 @@ auto Swapchain::chooseSurfaceFormat(
     return availableFormats.front();
 }
 
-// -----------------------------------------------------------------------------
-// Present mode selection
-// -----------------------------------------------------------------------------
 auto Swapchain::choosePresentMode(
     const std::vector<vk::PresentModeKHR> &availablePresentModes) -> vk::PresentModeKHR
 {
@@ -60,9 +53,6 @@ auto Swapchain::choosePresentMode(
     return vk::PresentModeKHR::eFifo;
 }
 
-// -----------------------------------------------------------------------------
-// Extent selection
-// -----------------------------------------------------------------------------
 auto Swapchain::chooseExtent(
     const vk::SurfaceCapabilitiesKHR &caps,
     const vk::Extent2D               &desired) -> vk::Extent2D
@@ -82,9 +72,6 @@ auto Swapchain::chooseExtent(
     return extent;
 }
 
-// -----------------------------------------------------------------------------
-// Swapchain creation helper
-// -----------------------------------------------------------------------------
 auto Swapchain::createSwapchain(
     const Device         &device,
     const PhysicalDevice &physicalDevice,
@@ -106,7 +93,7 @@ auto Swapchain::createSwapchain(
     const auto surfaceFormat = chooseSurfaceFormat(formats);
     const auto presentMode   = choosePresentMode(presentModes);
     const auto desiredExtent = getFramebufferExtent(device.window.get());
-    const auto extent        = chooseExtent(capabilities, desiredExtent);
+    swapchainExtent          = chooseExtent(capabilities, desiredExtent);
 
     uint32_t imageCount = 3u;
     imageCount          = std::max(imageCount, capabilities.minImageCount);
@@ -128,7 +115,7 @@ auto Swapchain::createSwapchain(
         imageCount,
         surfaceFormat.format,
         surfaceFormat.colorSpace,
-        extent,
+        swapchainExtent,
         1u,
         vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst,
         concurrent ? vk::SharingMode::eConcurrent : vk::SharingMode::eExclusive,
@@ -172,31 +159,22 @@ auto Swapchain::create(
                 {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
     }
 
-    // frame.recreate(device, images.size());
     imageInitialized.assign(images.size(), false);
 }
 
-// -----------------------------------------------------------------------------
-// Swapchain recreation
-// -----------------------------------------------------------------------------
 auto Swapchain::recreate(
     const Device         &device,
     const PhysicalDevice &physicalDevice,
     const Surface        &surface) -> void
 {
     device.graphicsQueue.waitIdle();
-    // frame.index = 0;
     imageViews.clear();
 
     create(device, physicalDevice, surface, std::move(handle));
 
     needRecreate = false;
-    // fmt::println(stderr, "Swapchain recreated!");
 }
 
-// -----------------------------------------------------------------------------
-// Per-frame operations
-// -----------------------------------------------------------------------------
 auto Swapchain::acquireNextImage(vk::Semaphore signalSemaphore) -> vk::Result
 {
     vk::Result result;
@@ -205,12 +183,17 @@ auto Swapchain::acquireNextImage(vk::Semaphore signalSemaphore) -> vk::Result
     return result;
 }
 
-auto Swapchain::getNextImage() -> vk::Image
+auto Swapchain::nextImage() -> vk::Image
 {
     return images[nextImageIndex];
 }
 
-auto Swapchain::getNextImageView() -> vk::raii::ImageView &
+auto Swapchain::nextImageView() -> vk::raii::ImageView &
 {
     return imageViews[nextImageIndex];
+}
+
+auto Swapchain::extent() const -> vk::Extent2D
+{
+    return swapchainExtent;
 }

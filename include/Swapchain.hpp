@@ -40,10 +40,15 @@ struct Swapchain {
         vk::SwapchainKHR      oldSwapchain) -> vk::raii::SwapchainKHR;
 
     auto acquireNextImage(vk::Semaphore signalSemaphore) -> vk::Result;
-    auto getNextImage() -> vk::Image;
-    auto getNextImageView() -> vk::raii::ImageView &;
 
-    vk::raii::SwapchainKHR           handle;
+    auto nextImage() -> vk::Image;
+
+    auto nextImageView() -> vk::raii::ImageView &;
+
+    auto extent() const -> vk::Extent2D;
+
+    vk::raii::SwapchainKHR           handle = nullptr;
+    vk::Extent2D                     swapchainExtent;
     std::vector<bool>                imageInitialized;
     uint32_t                         nextImageIndex = 0u;
     std::vector<vk::Image>           images;

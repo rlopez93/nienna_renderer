@@ -7,10 +7,6 @@ Renderer::Renderer(
     RenderContext        &context_,
     const RendererConfig &config)
     : context{context_},
-      swapchain{
-          context.device,
-          context.physicalDevice,
-          context.surface},
       frames{
           context.device,
           config.maxFramesInFlight},
@@ -75,11 +71,12 @@ auto Renderer::beginFrame() -> bool
     frames.cmdPool().reset();
     frames.cmd().begin({});
 
-    auto acquireResult = swapchain.acquireNextImage(frames.imageAvailableSemaphore());
+    auto acquireResult =
+        context.swapchain.acquireNextImage(frames.imageAvailableSemaphore());
 
     if (acquireResult == vk::Result::eErrorOutOfDateKHR
         || acquireResult == vk::Result::eSuboptimalKHR) {
-        swapchain.needRecreate = true;
+        context.swapchain.needRecreate = true;
         return false;
     }
 
@@ -93,7 +90,7 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
 {
     // color attachment image to render to: vk::RenderingAttachmentInfo
     auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
-        swapchain.getNextImageView(),
+        context.swapchain.nextImageView(),
         vk::ImageLayout::eAttachmentOptimal,
         {},
         {},
@@ -104,7 +101,7 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
 
     // depth attachment buffer: vk::RenderingAttachmentInfo
     auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
-        depthImageView,
+        context.depth.view,
         vk::ImageLayout::eAttachmentOptimal,
         {},
         {},
@@ -130,7 +127,7 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
     //     vk::ImageLayout::eColorAttachmentOptimal);
 
     auto oldLayout = vk::ImageLayout{
-        (!swapchain.imageInitialized[swapchain.nextImageIndex])
+        (!context.swapchain.imageInitialized[context.swapchain.nextImageIndex])
             ? vk::ImageLayout::eUndefined
             : vk::ImageLayout::ePresentSrcKHR};
 
@@ -152,12 +149,12 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
         vk::QueueFamilyIgnored,
         vk::QueueFamilyIgnored,
 
-        swapchain.getNextImage(),
+        context.swapchain.nextImage(),
         vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
 
     frames.cmd().pipelineBarrier2(vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
 
-    swapchain.imageInitialized[swapchain.nextImageIndex] = true;
+    context.swapchain.imageInitialized[context.swapchain.nextImageIndex] = true;
 
     frames.cmd().beginRendering(renderingInfo);
     frames.cmd().setViewportWithCount(
@@ -514,7 +511,7 @@ auto Renderer::submit() -> void
         vk::QueueFamilyIgnored,
         vk::QueueFamilyIgnored,
 
-        swapchain.getNextImage(),
+        context.swapchain.nextImage(),
         vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
 
     frames.cmd().pipelineBarrier2(vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
@@ -559,14 +556,14 @@ auto Renderer::present() -> void
     auto presentResult           = context.device.presentQueue.presentKHR(
         vk::PresentInfoKHR{
             renderFinishedSemaphore,
-            *swapchain.handle,
-            swapchain.nextImageIndex});
+            *context.swapchain.handle,
+            context.swapchain.nextImageIndex});
 
     // FIXME:
     // Swapchain recreation logic
     if (presentResult == vk::Result::eErrorOutOfDateKHR
         || presentResult == vk::Result::eSuboptimalKHR) {
-        swapchain.needRecreate = true;
+        context.swapchain.needRecreate = true;
     }
 
     else if (!(presentResult == vk::Result::eSuccess

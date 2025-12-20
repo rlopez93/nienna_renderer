@@ -7,7 +7,6 @@
 #include "RenderContext.hpp"
 #include "RendererConfig.hpp"
 #include "ShaderInterface.hpp"
-#include "Swapchain.hpp"
 
 struct SceneResources;
 
@@ -33,7 +32,6 @@ struct Renderer {
     RenderContext &context;
 
     // Renderer-owned execution state
-    Swapchain                swapchain;
     FrameContext             frames;
     ShaderInterface          shaderInterface;
     vk::raii::PipelineLayout pipelineLayout;
