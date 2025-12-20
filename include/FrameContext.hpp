@@ -8,8 +8,9 @@
 #include "Command.hpp"
 #include "Device.hpp"
 
-struct FrameContext {
-
+class FrameContext
+{
+  public:
     FrameContext(
         Device  &device,
         uint32_t maxFramesInFlight);
@@ -17,28 +18,33 @@ struct FrameContext {
     // Current frame slot
     [[nodiscard]]
     auto current() const -> uint32_t;
+    auto maxFrames() const -> uint32_t;
 
     // Advance to next frame slot
     auto advance() -> void;
 
-    auto buffer() -> vk::raii::CommandBuffer &;
-    auto pool() -> vk::raii::CommandPool &;
+    auto cmd() -> vk::raii::CommandBuffer &;
+    auto cmdPool() -> vk::raii::CommandPool &;
 
     [[nodiscard]]
-    auto value() const -> const uint64_t &;
-    auto value() -> uint64_t &;
+    auto timelineValue() const -> const uint64_t &;
+    auto timelineValue() -> uint64_t &;
+
+    auto timelineSemaphore() const -> vk::Semaphore;
+
+    auto imageAvailableSemaphore() const -> vk::Semaphore;
+    auto renderFinishedSemaphore() const -> vk::Semaphore;
+    auto currentResourceBindings() const -> vk::DescriptorSet;
+
+    // Timeline synchronization
+    vk::raii::Semaphore timelineSemaphoreHandle;
 
   private:
     static auto createTimelineSemaphore(
         Device  &device,
         uint32_t maxFramesInFlight) -> vk::raii::Semaphore;
-
-  public:
     uint32_t frameIndex        = 0;
     uint32_t maxFramesInFlight = 0;
-
-    // Timeline synchronization
-    vk::raii::Semaphore timelineSemaphore;
 
     // Per-frame timeline values
     std::vector<uint64_t> timelineValues;
@@ -48,4 +54,8 @@ struct FrameContext {
 
     // Per-frame descriptor bindings
     std::vector<vk::raii::DescriptorSet> resourceBindings;
+
+    // Per-frame synchronization
+    std::vector<vk::raii::Semaphore> imageAvailableSemaphores;
+    std::vector<vk::raii::Semaphore> renderFinishedSemaphores;
 };

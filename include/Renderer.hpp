@@ -17,8 +17,6 @@ struct Renderer {
         RenderContext        &context,
         const RendererConfig &config);
 
-    ~Renderer() = default;
-
     [[nodiscard]]
     auto beginFrame() -> bool;
 

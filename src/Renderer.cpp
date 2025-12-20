@@ -65,15 +65,17 @@ auto Renderer::getWindowExtent() const -> vk::Extent2D
 }
 auto Renderer::beginFrame() -> bool
 {
+    const auto &timelineSemaphore = frames.timelineSemaphore();
+    const auto &timelineValue     = frames.timelineValue();
     [[maybe_unused]]
     auto waitResult = context.device.handle.waitSemaphores(
-        vk::SemaphoreWaitInfo{{}, *frames.timelineSemaphore, frames.value()},
+        vk::SemaphoreWaitInfo{{}, timelineSemaphore, timelineValue},
         std::numeric_limits<uint64_t>::max());
 
-    frames.pool().reset();
-    frames.buffer().begin({});
+    frames.cmdPool().reset();
+    frames.cmd().begin({});
 
-    auto acquireResult = swapchain.acquireNextImage();
+    auto acquireResult = swapchain.acquireNextImage(frames.imageAvailableSemaphore());
 
     if (acquireResult == vk::Result::eErrorOutOfDateKHR
         || acquireResult == vk::Result::eSuboptimalKHR) {
@@ -147,19 +149,18 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
         vk::ImageLayout::eColorAttachmentOptimal,
 
         // queue family ownership unchanged
-        VK_QUEUE_FAMILY_IGNORED,
-        VK_QUEUE_FAMILY_IGNORED,
+        vk::QueueFamilyIgnored,
+        vk::QueueFamilyIgnored,
 
         swapchain.getNextImage(),
         vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
 
-    frames.buffer().pipelineBarrier2(
-        vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
+    frames.cmd().pipelineBarrier2(vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
 
     swapchain.imageInitialized[swapchain.nextImageIndex] = true;
 
-    frames.buffer().beginRendering(renderingInfo);
-    frames.buffer().setViewportWithCount(
+    frames.cmd().beginRendering(renderingInfo);
+    frames.cmd().setViewportWithCount(
         vk::Viewport(
             0.0f,
             0.0f,
@@ -167,17 +168,16 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
             getWindowExtent().height,
             0.0f,
             1.0f));
-    frames.buffer().setScissorWithCount(
-        vk::Rect2D{vk::Offset2D(0, 0), getWindowExtent()});
+    frames.cmd().setScissorWithCount(vk::Rect2D{vk::Offset2D(0, 0), getWindowExtent()});
 
-    frames.buffer().bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
+    frames.cmd().bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
     // bind texture resources passed to shader
-    frames.buffer().bindDescriptorSets(
+    frames.cmd().bindDescriptorSets(
         vk::PipelineBindPoint::eGraphics,
         *pipelineLayout,
         0,
-        *frames.resourceBindings[frames.current()],
+        frames.currentResourceBindings(),
         {});
 
     for (const auto &draw : sceneResources.draws) {
@@ -186,12 +186,12 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
         // indices with draw.vertexBufferIndex / draw.indexBufferIndex.
         const uint32_t bufferIndex = draw.transformIndex;
 
-        frames.buffer().bindVertexBuffers(
+        frames.cmd().bindVertexBuffers(
             0,
             sceneResources.buffers.vertex[bufferIndex].buffer,
             {0});
 
-        frames.buffer().bindIndexBuffer(
+        frames.cmd().bindIndexBuffer(
             sceneResources.buffers.index[bufferIndex].buffer,
             0,
             vk::IndexType::eUint16);
@@ -201,7 +201,7 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
             .textureIndex    = draw.textureIndex,
             .baseColorFactor = draw.baseColor};
 
-        frames.buffer().pushConstants2(
+        frames.cmd().pushConstants2(
             vk::PushConstantsInfo{
                 *pipelineLayout,
                 vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
@@ -209,11 +209,11 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
                 sizeof(PushConstantBlock),
                 &pushConstant});
 
-        frames.buffer()
+        frames.cmd()
             .drawIndexed(draw.indexCount, 1, draw.firstIndex, draw.vertexOffset, 0);
     }
 
-    frames.buffer().endRendering();
+    frames.cmd().endRendering();
 }
 
 // Renderer::Renderer()
@@ -517,34 +517,33 @@ auto Renderer::submit() -> void
         swapchain.getNextImage(),
         vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
 
-    frames.buffer().pipelineBarrier2(
-        vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
-    frames.buffer().end();
+    frames.cmd().pipelineBarrier2(vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
+    frames.cmd().end();
 
     // end frame
 
     // prepare to submit the current frame for rendering
     // add the swapchain semaphore to wait for the image to be available
 
-    uint64_t signalFrameValue = frames.value() + frames.maxFramesInFlight;
-    frames.value()            = signalFrameValue;
+    uint64_t signalFrameValue = frames.timelineValue() + frames.maxFrames();
+    frames.timelineValue()    = signalFrameValue;
 
     auto waitSemaphoreSubmitInfo = vk::SemaphoreSubmitInfo{
-        swapchain.getImageAvailableSemaphore(),
+        frames.imageAvailableSemaphore(),
         {},
         vk::PipelineStageFlagBits2::eAllCommands};
 
     auto signalSemaphoreSubmitInfos = std::array{
         vk::SemaphoreSubmitInfo{
-            swapchain.getRenderFinishedSemaphore(),
+            frames.renderFinishedSemaphore(),
             {},
             vk::PipelineStageFlagBits2::eAllCommands},
         vk::SemaphoreSubmitInfo{
-            frames.timelineSemaphore,
+            frames.timelineSemaphore(),
             signalFrameValue,
             vk::PipelineStageFlagBits2::eAllCommands}};
 
-    auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{frames.buffer()};
+    auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{frames.cmd()};
 
     context.device.graphicsQueue.submit2(
         vk::SubmitInfo2{
@@ -556,7 +555,7 @@ auto Renderer::submit() -> void
 
 auto Renderer::present() -> void
 {
-    auto renderFinishedSemaphore = swapchain.getRenderFinishedSemaphore();
+    auto renderFinishedSemaphore = frames.renderFinishedSemaphore();
     auto presentResult           = context.device.presentQueue.presentKHR(
         vk::PresentInfoKHR{
             renderFinishedSemaphore,
@@ -578,7 +577,6 @@ auto Renderer::present() -> void
 auto Renderer::endFrame() -> void
 {
     // advance to the next frame
-    swapchain.advance();
     frames.advance();
 }
 

@@ -20,16 +20,25 @@ FrameContext::FrameContext(
     uint32_t maxFrames)
     : frameIndex(0),
       maxFramesInFlight(maxFrames),
-      timelineSemaphore{createTimelineSemaphore(
+      timelineSemaphoreHandle{createTimelineSemaphore(
           device,
           maxFrames)}
 {
-    // Per-frame command pools + buffers
+    if (maxFrames == 0) {
+        throw std::invalid_argument("maxFramesInFlight must be >= 1");
+    }
+
     commands.reserve(maxFramesInFlight);
+    imageAvailableSemaphores.reserve(maxFramesInFlight);
+    renderFinishedSemaphores.reserve(maxFramesInFlight);
     for (uint32_t i = 0; i < maxFramesInFlight; ++i) {
         commands.emplace_back(
             device,
             vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
+        // Binary semaphores per frame
+        imageAvailableSemaphores.emplace_back(device.handle, vk::SemaphoreCreateInfo{});
+
+        renderFinishedSemaphores.emplace_back(device.handle, vk::SemaphoreCreateInfo{});
     }
 
     timelineValues.resize(maxFramesInFlight);
@@ -41,27 +50,51 @@ auto FrameContext::current() const -> uint32_t
     return frameIndex;
 }
 
+auto FrameContext::maxFrames() const -> uint32_t
+{
+    return maxFramesInFlight;
+}
 auto FrameContext::advance() -> void
 {
     frameIndex = (frameIndex + 1) % maxFramesInFlight;
 }
 
-auto FrameContext::buffer() -> vk::raii::CommandBuffer &
+auto FrameContext::cmd() -> vk::raii::CommandBuffer &
 {
     return commands[frameIndex].buffer;
 }
 
-auto FrameContext::pool() -> vk::raii::CommandPool &
+auto FrameContext::cmdPool() -> vk::raii::CommandPool &
 {
     return commands[frameIndex].pool;
 }
 
-auto FrameContext::value() const -> const uint64_t &
+auto FrameContext::timelineValue() const -> const uint64_t &
 {
     return timelineValues[frameIndex];
 }
 
-auto FrameContext::value() -> uint64_t &
+auto FrameContext::timelineValue() -> uint64_t &
 {
     return timelineValues[frameIndex];
+}
+
+auto FrameContext::timelineSemaphore() const -> vk::Semaphore
+{
+    return *timelineSemaphoreHandle;
+}
+
+auto FrameContext::imageAvailableSemaphore() const -> vk::Semaphore
+{
+    return *imageAvailableSemaphores[frameIndex];
+}
+
+auto FrameContext::renderFinishedSemaphore() const -> vk::Semaphore
+{
+    return *renderFinishedSemaphores[frameIndex];
+}
+
+auto FrameContext::currentResourceBindings() const -> vk::DescriptorSet
+{
+    return *resourceBindings[frameIndex];
 }
