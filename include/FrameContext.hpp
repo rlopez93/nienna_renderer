@@ -36,15 +36,15 @@ class FrameContext
     auto renderFinishedSemaphore() const -> vk::Semaphore;
     auto currentResourceBindings() const -> vk::DescriptorSet;
 
-    // Timeline synchronization
-    vk::raii::Semaphore timelineSemaphoreHandle;
-
   private:
     static auto createTimelineSemaphore(
         Device  &device,
         uint32_t maxFramesInFlight) -> vk::raii::Semaphore;
     uint32_t frameIndex        = 0;
     uint32_t maxFramesInFlight = 0;
+
+    // Timeline synchronization
+    vk::raii::Semaphore timelineSemaphoreHandle;
 
     // Per-frame timeline values
     std::vector<uint64_t> timelineValues;

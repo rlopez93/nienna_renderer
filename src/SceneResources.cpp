@@ -100,3 +100,64 @@ auto SceneResources::create(
         draws.emplace_back(draw);
     }
 }
+
+void SceneResources::updateDescriptorSet(
+    Device            &device,
+    vk::DescriptorSet  descriptorSet,
+    uint32_t           frameIndex,
+    uint32_t           meshCount,
+    vk::raii::Sampler &sampler) const
+{
+    auto writes      = std::vector<vk::WriteDescriptorSet>{};
+    auto bufferInfos = std::vector<vk::DescriptorBufferInfo>{};
+
+    constexpr auto TransformStride = vk::DeviceSize{sizeof(Transform)};
+
+    for (auto meshIndex : std::views::iota(0u, meshCount)) {
+        bufferInfos.emplace_back(
+            buffers.uniform[frameIndex].buffer,
+            TransformStride * meshIndex,
+            TransformStride);
+    }
+
+    if (!bufferInfos.empty()) {
+        writes.emplace_back(
+            vk::WriteDescriptorSet{
+                descriptorSet,
+                0,
+                0,
+                vk::DescriptorType::eUniformBuffer,
+                {},
+                bufferInfos});
+    }
+
+    auto lightInfo =
+        vk::DescriptorBufferInfo{buffers.light[frameIndex].buffer, 0, sizeof(Light)};
+
+    writes.emplace_back(
+        vk::WriteDescriptorSet{
+            descriptorSet,
+            2,
+            0,
+            1,
+            vk::DescriptorType::eUniformBuffer,
+            {},
+            &lightInfo});
+
+    auto images = std::vector<vk::DescriptorImageInfo>{};
+    for (const auto &view : textureBuffers.imageView) {
+        images.emplace_back(*sampler, *view, vk::ImageLayout::eShaderReadOnlyOptimal);
+    }
+
+    if (!images.empty()) {
+        writes.emplace_back(
+            vk::WriteDescriptorSet{
+                descriptorSet,
+                1,
+                0,
+                vk::DescriptorType::eCombinedImageSampler,
+                images});
+    }
+
+    device.handle.updateDescriptorSets(writes, {});
+}

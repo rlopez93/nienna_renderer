@@ -32,5 +32,12 @@ struct SceneResources {
         Allocator   &allocator,
         uint64_t     maxFramesInFlight);
 
+    void updateDescriptorSet(
+        Device            &device,
+        vk::DescriptorSet  descriptorSet,
+        uint32_t           frameIndex,
+        uint32_t           meshCount,
+        vk::raii::Sampler &sampler) const;
+
     std::vector<DrawItem> draws;
 };

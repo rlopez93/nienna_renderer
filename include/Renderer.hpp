@@ -17,6 +17,8 @@ struct Renderer {
         RenderContext        &context,
         const RendererConfig &config);
 
+    auto allocateFrameDescriptorSets(FrameContext &frames);
+
     [[nodiscard]]
     auto beginFrame() -> bool;
 

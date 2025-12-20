@@ -3,6 +3,7 @@
 #include "ResourceUpdate.hpp"
 #include "Buffer.hpp"
 #include "FrameContext.hpp"
+#include "Scene.hpp"
 
 #include <ranges>
 
@@ -15,7 +16,7 @@ auto ResourceUpdate::updatePerFrame(
     const std::vector<vk::raii::ImageView> &textureImageViews,
     vk::raii::Sampler                      &sampler) -> void
 {
-    for (auto frameIndex : std::views::iota(0u, frames.maxFramesInFlight)) {
+    for (auto frameIndex : std::views::iota(0u, frames.maxFrames())) {
 
         auto writes  = std::vector<vk::WriteDescriptorSet>{};
         auto buffers = std::vector<vk::DescriptorBufferInfo>{};
@@ -30,7 +31,7 @@ auto ResourceUpdate::updatePerFrame(
         if (!buffers.empty()) {
             writes.emplace_back(
                 vk::WriteDescriptorSet{
-                    *frames.resourceBindings[frameIndex],
+                    frames.currentResourceBindings(),
                     0,
                     0,
                     vk::DescriptorType::eUniformBuffer,
@@ -43,7 +44,7 @@ auto ResourceUpdate::updatePerFrame(
 
         writes.emplace_back(
             vk::WriteDescriptorSet{
-                *frames.resourceBindings[frameIndex],
+                frames.currentResourceBindings(),
                 2,
                 0,
                 1,
@@ -62,7 +63,7 @@ auto ResourceUpdate::updatePerFrame(
         if (!images.empty()) {
             writes.emplace_back(
                 vk::WriteDescriptorSet{
-                    *frames.resourceBindings[frameIndex],
+                    frames.currentResourceBindings(),
                     1,
                     0,
                     vk::DescriptorType::eCombinedImageSampler,

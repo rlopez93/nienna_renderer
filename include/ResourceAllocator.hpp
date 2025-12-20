@@ -2,8 +2,6 @@
 #include <cstdint>
 #include <vulkan/vulkan_raii.hpp>
 
-struct ResourceLayout;
-
 struct ResourceAllocator {
     vk::raii::DescriptorPool handle;
 
