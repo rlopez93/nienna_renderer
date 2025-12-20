@@ -12,7 +12,7 @@
 
 struct Scene;
 
-struct SceneResources {
+struct SceneRenderData {
     struct Buffers {
         std::vector<Buffer> index;
         std::vector<Buffer> vertex;

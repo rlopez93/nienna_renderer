@@ -3,7 +3,7 @@
 
 #include <ranges>
 
-auto SceneResources::create(
+auto SceneRenderData::create(
     const Scene &scene,
     Device      &device,
     Command     &command,
@@ -101,7 +101,7 @@ auto SceneResources::create(
     }
 }
 
-void SceneResources::updateDescriptorSet(
+void SceneRenderData::updateDescriptorSet(
     Device            &device,
     vk::DescriptorSet  descriptorSet,
     uint32_t           frameIndex,
