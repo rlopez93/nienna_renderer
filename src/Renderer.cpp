@@ -25,40 +25,6 @@ Renderer::Renderer(
 {
 }
 
-auto Renderer::getWindowExtent() const -> vk::Extent2D
-{
-    const vk::SurfaceCapabilitiesKHR caps =
-        context.physicalDevice.handle.getSurfaceCapabilitiesKHR(context.surface.handle);
-
-    // If the surface dictates the extent, use it.
-    if (caps.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
-        return caps.currentExtent;
-    }
-
-    // Otherwise, we must derive it from the window framebuffer size and clamp.
-    int fbWidth  = 0;
-    int fbHeight = 0;
-    SDL_GetWindowSizeInPixels(window.get(), &fbWidth, &fbHeight);
-
-    // If minimized / not ready, return 0 extent; caller must handle it.
-    if (fbWidth <= 0 || fbHeight <= 0) {
-        return vk::Extent2D{0u, 0u};
-    }
-
-    vk::Extent2D extent{
-        static_cast<uint32_t>(fbWidth),
-        static_cast<uint32_t>(fbHeight)};
-
-    extent.width =
-        std::clamp(extent.width, caps.minImageExtent.width, caps.maxImageExtent.width);
-
-    extent.height = std::clamp(
-        extent.height,
-        caps.minImageExtent.height,
-        caps.maxImageExtent.height);
-
-    return extent;
-}
 auto Renderer::beginFrame() -> bool
 {
     const auto &timelineSemaphore = frames.timelineSemaphore();
@@ -113,7 +79,7 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
     // rendering info for dynamic rendering
     auto renderingInfo = vk::RenderingInfo{
         {},
-        vk::Rect2D{{}, getWindowExtent()},
+        vk::Rect2D{{}, context.extent()},
         1,
         {},
         renderingColorAttachmentInfo,
@@ -161,11 +127,11 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
         vk::Viewport(
             0.0f,
             0.0f,
-            getWindowExtent().width,
-            getWindowExtent().height,
+            context.extent().width,
+            context.extent().height,
             0.0f,
             1.0f));
-    frames.cmd().setScissorWithCount(vk::Rect2D{vk::Offset2D(0, 0), getWindowExtent()});
+    frames.cmd().setScissorWithCount(vk::Rect2D{vk::Offset2D(0, 0), context.extent()});
 
     frames.cmd().bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
@@ -573,6 +539,8 @@ auto Renderer::present() -> void
 }
 auto Renderer::endFrame() -> void
 {
+    submit();
+    present();
     // advance to the next frame
     frames.advance();
 }

@@ -48,5 +48,9 @@ auto getFramebufferExtent(SDL_Window *window) -> vk::Extent2D
     int height = 0;
     SDL_GetWindowSizeInPixels(window, &width, &height);
 
-    return vk::Extent2D{static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
+    if (width <= 0 || height <= 0) {
+        return {0u, 0u};
+    }
+
+    return {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 }

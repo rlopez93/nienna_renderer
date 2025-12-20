@@ -54,20 +54,21 @@ auto Swapchain::choosePresentMode(
 }
 
 auto Swapchain::chooseExtent(
-    const vk::SurfaceCapabilitiesKHR &caps,
+    const vk::SurfaceCapabilitiesKHR &capabilities,
     const vk::Extent2D               &desired) -> vk::Extent2D
 {
-    if (caps.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
-        return caps.currentExtent;
+    if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+        return capabilities.currentExtent;
     }
-
-    vk::Extent2D extent{};
-    extent.width =
-        std::clamp(desired.width, caps.minImageExtent.width, caps.maxImageExtent.width);
-    extent.height = std::clamp(
-        desired.height,
-        caps.minImageExtent.height,
-        caps.maxImageExtent.height);
+    vk::Extent2D extent{
+        std::clamp(
+            desired.width,
+            capabilities.minImageExtent.width,
+            capabilities.maxImageExtent.width),
+        std::clamp(
+            desired.height,
+            capabilities.minImageExtent.height,
+            capabilities.maxImageExtent.height)};
 
     return extent;
 }
@@ -95,11 +96,14 @@ auto Swapchain::createSwapchain(
     const auto desiredExtent = getFramebufferExtent(device.window.get());
     swapchainExtent          = chooseExtent(capabilities, desiredExtent);
 
-    uint32_t imageCount = 3u;
-    imageCount          = std::max(imageCount, capabilities.minImageCount);
-    if (capabilities.maxImageCount > 0u) {
-        imageCount = std::min(imageCount, capabilities.maxImageCount);
+    if (swapchainExtent.width == 0 || swapchainExtent.height == 0) {
+        throw std::runtime_error("Cannot create swapchain with zero extent");
     }
+
+    uint32_t imageCount = std::clamp(
+        3u,
+        capabilities.minImageCount,
+        capabilities.maxImageCount > 0 ? capabilities.maxImageCount : UINT32_MAX);
 
     const auto graphicsFamilyQueueIndex = device.queueFamilyIndices.graphicsIndex;
     const auto presentFamilyQueueIndex  = device.queueFamilyIndices.presentIndex;
@@ -130,9 +134,6 @@ auto Swapchain::createSwapchain(
     return vk::raii::SwapchainKHR(device.handle, createInfo);
 }
 
-// -----------------------------------------------------------------------------
-// Swapchain creation
-// -----------------------------------------------------------------------------
 auto Swapchain::create(
     const Device         &device,
     const PhysicalDevice &physicalDevice,
