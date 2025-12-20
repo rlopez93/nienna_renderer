@@ -21,6 +21,7 @@ target_sources(nienna PRIVATE
     src/Camera.cpp
     src/Command.cpp
     src/Device.cpp
+    src/DepthTarget.cpp
     src/FrameContext.cpp
     src/Instance.cpp
     src/PhysicalDevice.cpp

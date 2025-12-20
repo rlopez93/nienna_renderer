@@ -1,4 +1,3 @@
-// RenderContext.hpp
 #pragma once
 
 #include "Device.hpp"
