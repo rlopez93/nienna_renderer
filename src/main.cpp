@@ -157,8 +157,10 @@ auto main(
 
     renderer.initializePerFrameUniforms(context.allocator, scene.meshes.size());
 
-    auto running      = true;
-    auto previousTime = std::chrono::high_resolution_clock::now();
+    auto     running        = true;
+    auto     previousTime   = std::chrono::high_resolution_clock::now();
+    auto     cumulativeTime = previousTime - previousTime;
+    uint64_t frameCount     = 0;
 
     SDL_Event e;
     while (running) {
@@ -176,6 +178,19 @@ auto main(
         auto currentTime = std::chrono::high_resolution_clock::now();
         auto dt          = currentTime - previousTime;
         previousTime     = currentTime;
+
+        cumulativeTime += dt;
+        ++frameCount;
+
+        using namespace std::chrono_literals;
+
+        if (cumulativeTime > 3s) {
+            auto fps = frameCount * 1000000000UL / cumulativeTime.count();
+            fmt::println(stderr, "{} FPS ({:.2} ms)", fps, 1000.0 / fps);
+
+            cumulativeTime -= 3s;
+            frameCount = 0;
+        }
 
         scene.update(dt);
 
