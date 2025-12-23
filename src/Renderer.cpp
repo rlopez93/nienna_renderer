@@ -79,6 +79,10 @@ Renderer::Renderer(
 
 auto Renderer::beginFrame() -> bool
 {
+    if (context.swapchain.needRecreate) {
+        context.recreateRenderTargets();
+    }
+
     const auto &timelineSemaphore = frames.timelineSemaphore();
     const auto &timelineValue     = frames.timelineValue();
     [[maybe_unused]]
@@ -89,21 +93,35 @@ auto Renderer::beginFrame() -> bool
     frames.cmdPool().reset();
     frames.cmd().begin({});
 
-    auto acquireResult =
-        context.swapchain.acquireNextImage(frames.imageAvailableSemaphore());
+    try {
+        auto acquireResult =
+            context.swapchain.acquireNextImage(frames.imageAvailableSemaphore());
 
-    if (acquireResult == vk::Result::eErrorOutOfDateKHR
-        || acquireResult == vk::Result::eSuboptimalKHR) {
-        context.swapchain.needRecreate = true;
-        return false;
+        if (acquireResult == vk::Result::eErrorOutOfDateKHR
+            || acquireResult == vk::Result::eSuboptimalKHR) {
+            context.swapchain.needRecreate = true;
+            return false;
+        }
+
+        if (acquireResult != vk::Result::eSuccess) {
+            context.swapchain.needRecreate = true;
+            return false;
+        }
     }
 
-    if (acquireResult != vk::Result::eSuccess) {
-        throw std::exception{};
+    catch (const vk::OutOfDateKHRError &) {
+        context.swapchain.needRecreate = true;
+        return false;
+    } catch (const vk::SystemError &e) {
+        fmt::println(stderr, "vk::SystemError: {}", e.what());
+        // std::cerr << "error_code: " << e.code().value() << " (" << e.code().message()
+        // << ")\n"; // if available in your version
+        throw;
     }
 
     return true;
 }
+
 auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
 {
     // color attachment image to render to: vk::RenderingAttachmentInfo
@@ -573,24 +591,27 @@ auto Renderer::submit() -> void
 auto Renderer::present() -> void
 {
     auto renderFinishedSemaphore = context.swapchain.renderFinishedSemaphore();
-    auto presentResult           = context.device.presentQueue.presentKHR(
-        vk::PresentInfoKHR{
-            renderFinishedSemaphore,
-            *context.swapchain.handle,
-            context.swapchain.nextImageIndex});
+    try {
+        auto presentResult = context.device.presentQueue.presentKHR(
+            vk::PresentInfoKHR{
+                renderFinishedSemaphore,
+                *context.swapchain.handle,
+                context.swapchain.nextImageIndex});
 
-    // FIXME:
-    // Swapchain recreation logic
-    if (presentResult == vk::Result::eErrorOutOfDateKHR
-        || presentResult == vk::Result::eSuboptimalKHR) {
+        if (presentResult == vk::Result::eErrorOutOfDateKHR
+            || presentResult == vk::Result::eSuboptimalKHR) {
+            context.swapchain.needRecreate = true;
+        }
+    } catch (const vk::OutOfDateKHRError &) {
         context.swapchain.needRecreate = true;
-    }
-
-    else if (!(presentResult == vk::Result::eSuccess
-               || presentResult == vk::Result::eSuboptimalKHR)) {
-        throw std::exception{};
+    } catch (const vk::SystemError &e) {
+        fmt::println(stderr, "vk::SystemError: {}", e.what());
+        // std::cerr << "error_code: " << e.code().value() << " (" << e.code().message()
+        // << ")\n"; // if available in your version
+        throw;
     }
 }
+
 auto Renderer::endFrame() -> void
 {
     submit();

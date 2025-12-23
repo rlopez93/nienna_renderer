@@ -33,7 +33,7 @@ struct RenderContext {
         Window                          &window,
         const std::vector<const char *> &requiredExtensions);
 
-    void recreateRenderTargets(Command &transientCommand);
+    void recreateRenderTargets();
 
     [[nodiscard]]
     auto extent() const -> vk::Extent2D;

@@ -166,9 +166,8 @@ auto main(
             if (e.type == SDL_EVENT_QUIT) {
                 running = false;
             }
+            scene.processInput(e);
         }
-
-        processEvents(running);
 
         if (!renderer.beginFrame()) {
             continue;

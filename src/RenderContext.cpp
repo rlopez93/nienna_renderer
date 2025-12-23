@@ -27,7 +27,7 @@ RenderContext::RenderContext(
 {
 }
 
-void RenderContext::recreateRenderTargets(Command &transientCommand)
+void RenderContext::recreateRenderTargets()
 {
     // Ensure no work is using old swapchain-dependent resources
     device.handle.waitIdle();
@@ -35,6 +35,7 @@ void RenderContext::recreateRenderTargets(Command &transientCommand)
     // Recreate swapchain first (defines extent + color format)
     swapchain.recreate(device, physicalDevice, surface);
 
+    auto transientCommand = Command(device, vk::CommandPoolCreateFlagBits::eTransient);
     // Recreate depth target using new extent
     depth.recreate(device, allocator, transientCommand, swapchain.extent());
 }
