@@ -1,4 +1,4 @@
-#include "SceneResources.hpp"
+#include "SceneRenderData.hpp"
 #include "Scene.hpp"
 
 #include <ranges>
@@ -7,47 +7,46 @@ auto SceneRenderData::create(
     const Scene &scene,
     Device      &device,
     Command     &command,
-    Allocator   &allocator,
-    uint64_t     maxFramesInFlight) -> void
+    Allocator   &allocator) -> void
 {
     command.beginSingleTime();
 
     for (const auto &mesh : scene.meshes) {
-        buffers.vertex.emplace_back(allocator.createBufferAndUploadData(
+        vertexBuffers.emplace_back(allocator.createBufferAndUploadData(
             command.buffer,
             mesh.primitives,
             vk::BufferUsageFlagBits2::eVertexBuffer));
 
-        buffers.index.emplace_back(allocator.createBufferAndUploadData(
+        indexBuffers.emplace_back(allocator.createBufferAndUploadData(
             command.buffer,
             mesh.indices,
             vk::BufferUsageFlagBits2::eIndexBuffer));
     }
 
-    for (auto i : std::views::iota(0u, maxFramesInFlight)) {
-        buffers.uniform.emplace_back(allocator.createBuffer(
-            sizeof(Transform) * scene.meshes.size(),
-            vk::BufferUsageFlagBits2::eUniformBuffer
-                | vk::BufferUsageFlagBits2::eTransferDst,
-            false,
-            VMA_MEMORY_USAGE_AUTO,
-            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-                | VMA_ALLOCATION_CREATE_MAPPED_BIT));
-    }
-
-    for (auto i : std::views::iota(0u, maxFramesInFlight)) {
-        buffers.light.emplace_back(allocator.createBuffer(
-            sizeof(Light),
-            vk::BufferUsageFlagBits2::eUniformBuffer
-                | vk::BufferUsageFlagBits2::eTransferDst,
-            false,
-            VMA_MEMORY_USAGE_AUTO,
-            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-                | VMA_ALLOCATION_CREATE_MAPPED_BIT));
-    }
-
+    // for (auto i : std::views::iota(0u, maxFramesInFlight)) {
+    //     buffers.uniform.emplace_back(allocator.createBuffer(
+    //         sizeof(Transform) * scene.meshes.size(),
+    //         vk::BufferUsageFlagBits2::eUniformBuffer
+    //             | vk::BufferUsageFlagBits2::eTransferDst,
+    //         false,
+    //         VMA_MEMORY_USAGE_AUTO,
+    //         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+    //             | VMA_ALLOCATION_CREATE_MAPPED_BIT));
+    // }
+    //
+    // for (auto i : std::views::iota(0u, maxFramesInFlight)) {
+    //     buffers.light.emplace_back(allocator.createBuffer(
+    //         sizeof(Light),
+    //         vk::BufferUsageFlagBits2::eUniformBuffer
+    //             | vk::BufferUsageFlagBits2::eTransferDst,
+    //         false,
+    //         VMA_MEMORY_USAGE_AUTO,
+    //         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+    //             | VMA_ALLOCATION_CREATE_MAPPED_BIT));
+    // }
+    //
     for (const auto &texture : scene.textures) {
-        textureBuffers.image.emplace_back(allocator.createImageAndUploadData(
+        textureImages.emplace_back(allocator.createImageAndUploadData(
             command.buffer,
             texture.data,
             vk::ImageCreateInfo{
@@ -62,10 +61,10 @@ auto SceneRenderData::create(
                 vk::ImageUsageFlagBits::eSampled},
             vk::ImageLayout::eShaderReadOnlyOptimal));
 
-        textureBuffers.imageView.emplace_back(device.handle.createImageView(
+        textureImageViews.emplace_back(device.handle.createImageView(
             vk::ImageViewCreateInfo{
                 {},
-                textureBuffers.image.back().image,
+                textureImages.back().image,
                 vk::ImageViewType::e2D,
                 vk::Format::eR8G8B8A8Srgb,
                 {},
@@ -100,52 +99,41 @@ auto SceneRenderData::create(
         draws.emplace_back(draw);
     }
 }
-
 void SceneRenderData::updateDescriptorSet(
     Device            &device,
     vk::DescriptorSet  descriptorSet,
-    uint32_t           frameIndex,
-    uint32_t           meshCount,
+    const Buffer      &transformUBO,
+    const Buffer      &lightUBO,
     vk::raii::Sampler &sampler) const
 {
-    auto writes      = std::vector<vk::WriteDescriptorSet>{};
-    auto bufferInfos = std::vector<vk::DescriptorBufferInfo>{};
+    auto writes = std::vector<vk::WriteDescriptorSet>{};
 
+    // binding 0: array of Transform structs (one per draw/mesh)
+    auto transformInfos = std::vector<vk::DescriptorBufferInfo>{};
+    transformInfos.reserve(draws.size());
     constexpr auto TransformStride = vk::DeviceSize{sizeof(Transform)};
 
-    for (auto meshIndex : std::views::iota(0u, meshCount)) {
-        bufferInfos.emplace_back(
-            buffers.uniform[frameIndex].buffer,
+    for (auto meshIndex : std::views::iota(0u, draws.size())) {
+        transformInfos.emplace_back(
+            transformUBO.buffer,
             TransformStride * meshIndex,
             TransformStride);
     }
 
-    if (!bufferInfos.empty()) {
+    if (!transformInfos.empty()) {
         writes.emplace_back(
             vk::WriteDescriptorSet{
                 descriptorSet,
-                0,
-                0,
+                0, // binding
+                0, // array element
                 vk::DescriptorType::eUniformBuffer,
                 {},
-                bufferInfos});
+                transformInfos});
     }
 
-    auto lightInfo =
-        vk::DescriptorBufferInfo{buffers.light[frameIndex].buffer, 0, sizeof(Light)};
-
-    writes.emplace_back(
-        vk::WriteDescriptorSet{
-            descriptorSet,
-            2,
-            0,
-            1,
-            vk::DescriptorType::eUniformBuffer,
-            {},
-            &lightInfo});
-
+    // binding 1: texture array
     auto images = std::vector<vk::DescriptorImageInfo>{};
-    for (const auto &view : textureBuffers.imageView) {
+    for (const auto &view : textureImageViews) {
         images.emplace_back(*sampler, *view, vk::ImageLayout::eShaderReadOnlyOptimal);
     }
 
@@ -158,6 +146,17 @@ void SceneRenderData::updateDescriptorSet(
                 vk::DescriptorType::eCombinedImageSampler,
                 images});
     }
+
+    // binding 2: Light UBO
+    auto lightInfo = vk::DescriptorBufferInfo{lightUBO.buffer, 0, sizeof(Light)};
+    writes.emplace_back(
+        vk::WriteDescriptorSet{
+            descriptorSet,
+            2,
+            0,
+            vk::DescriptorType::eUniformBuffer,
+            {},
+            lightInfo});
 
     device.handle.updateDescriptorSets(writes, {});
 }

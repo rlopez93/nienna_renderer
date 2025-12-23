@@ -20,8 +20,8 @@ target_sources(nienna PRIVATE
     src/Allocator.cpp
     src/Camera.cpp
     src/Command.cpp
-    src/Device.cpp
     src/DepthTarget.cpp
+    src/Device.cpp
     src/FrameContext.cpp
     src/Instance.cpp
     src/PhysicalDevice.cpp
@@ -29,11 +29,8 @@ target_sources(nienna PRIVATE
     src/PipelineLayout.cpp
     src/RenderContext.cpp
     src/Renderer.cpp
-    src/ResourceAllocator.cpp
-    src/ResourceBindings.cpp
-    src/ResourceUpdate.cpp
     src/Scene.cpp
-    src/SceneResources.cpp
+    src/SceneRenderData.cpp
     src/Shader.cpp
     src/ShaderInterface.cpp
     src/Surface.cpp
@@ -41,7 +38,7 @@ target_sources(nienna PRIVATE
     src/Utility.cpp
     src/Window.cpp
     src/gltfLoader.cpp
-    src/main.cpp
+    src/main2.cpp
     src/spirv_reflect.c
     src/stb_image.cpp
     src/vma.cpp

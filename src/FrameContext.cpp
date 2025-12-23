@@ -1,4 +1,5 @@
 #include "FrameContext.hpp"
+#include "Scene.hpp"
 
 #include <numeric>
 
@@ -30,15 +31,12 @@ FrameContext::FrameContext(
 
     commands.reserve(maxFramesInFlight);
     imageAvailableSemaphores.reserve(maxFramesInFlight);
-    renderFinishedSemaphores.reserve(maxFramesInFlight);
     for (uint32_t i = 0; i < maxFramesInFlight; ++i) {
         commands.emplace_back(
             device,
             vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
         // Binary semaphores per frame
         imageAvailableSemaphores.emplace_back(device.handle, vk::SemaphoreCreateInfo{});
-
-        renderFinishedSemaphores.emplace_back(device.handle, vk::SemaphoreCreateInfo{});
     }
 
     timelineValues.resize(maxFramesInFlight);
@@ -89,12 +87,47 @@ auto FrameContext::imageAvailableSemaphore() const -> vk::Semaphore
     return *imageAvailableSemaphores[frameIndex];
 }
 
-auto FrameContext::renderFinishedSemaphore() const -> vk::Semaphore
+auto FrameContext::currentDescriptorSet() const -> vk::DescriptorSet
 {
-    return *renderFinishedSemaphores[frameIndex];
+    return *descriptorSets[frameIndex];
 }
 
-auto FrameContext::currentResourceBindings() const -> vk::DescriptorSet
+auto FrameContext::setDescriptorSets(std::vector<vk::raii::DescriptorSet> &&sets)
 {
-    return *resourceBindings[frameIndex];
+    descriptorSets = std::move(sets);
+}
+
+auto FrameContext::createPerFrameUniformBuffers(
+    Allocator &allocator,
+    uint32_t   meshCount) -> void
+{
+    // Recreate-safe: clear and rebuild
+    transformUBO.clear();
+    lightUBO.clear();
+
+    transformUBO.reserve(maxFramesInFlight);
+    lightUBO.reserve(maxFramesInFlight);
+
+    const vk::DeviceSize transformBytes = static_cast<vk::DeviceSize>(sizeof(Transform))
+                                        * static_cast<vk::DeviceSize>(meshCount);
+
+    for (uint32_t i = 0; i < maxFramesInFlight; ++i) {
+        transformUBO.emplace_back(allocator.createBuffer(
+            transformBytes,
+            vk::BufferUsageFlagBits2::eUniformBuffer
+                | vk::BufferUsageFlagBits2::eTransferDst,
+            false,
+            VMA_MEMORY_USAGE_AUTO,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                | VMA_ALLOCATION_CREATE_MAPPED_BIT));
+
+        lightUBO.emplace_back(allocator.createBuffer(
+            sizeof(Light),
+            vk::BufferUsageFlagBits2::eUniformBuffer
+                | vk::BufferUsageFlagBits2::eTransferDst,
+            false,
+            VMA_MEMORY_USAGE_AUTO,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                | VMA_ALLOCATION_CREATE_MAPPED_BIT));
+    }
 }

@@ -13,31 +13,26 @@
 struct Scene;
 
 struct SceneRenderData {
-    struct Buffers {
-        std::vector<Buffer> index;
-        std::vector<Buffer> vertex;
-        std::vector<Buffer> uniform;
-        std::vector<Buffer> light;
-    } buffers;
-
-    struct TextureBuffers {
-        std::vector<Image>               image;
-        std::vector<vk::raii::ImageView> imageView;
-    } textureBuffers;
-
     void create(
         const Scene &scene,
         Device      &device,
         Command     &command,
-        Allocator   &allocator,
-        uint64_t     maxFramesInFlight);
+        Allocator   &allocator);
 
     void updateDescriptorSet(
         Device            &device,
         vk::DescriptorSet  descriptorSet,
-        uint32_t           frameIndex,
-        uint32_t           meshCount,
+        const Buffer      &transformUBO,
+        const Buffer      &lightUBO,
         vk::raii::Sampler &sampler) const;
 
+    // draw list consumed by Renderer
     std::vector<DrawItem> draws;
+
+    // static GPU data consumed by Renderer
+    std::vector<Buffer> indexBuffers;
+    std::vector<Buffer> vertexBuffers;
+
+    std::vector<Image>               textureImages;
+    std::vector<vk::raii::ImageView> textureImageViews;
 };

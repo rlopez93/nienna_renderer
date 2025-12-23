@@ -3,13 +3,13 @@
 #include "Shader.hpp"
 
 auto createPipeline(
-    vk::raii::Device            &device,
+    Device                      &device,
     const std::filesystem::path &shaderPath,
     vk::Format                   imageFormat,
     vk::Format                   depthFormat,
     vk::raii::PipelineLayout    &pipelineLayout) -> vk::raii::Pipeline
 {
-    auto shaderModule = createShaderModule(device, shaderPath);
+    auto shaderModule = createShaderModule(device.handle, shaderPath);
 
     // The stages used by this pipeline
     const auto shaderStages = std::array{
@@ -140,5 +140,5 @@ auto createPipeline(
         {},
         &pipelineRenderingCreateInfo};
 
-    return vk::raii::Pipeline{device, nullptr, graphicsPipelineCreateInfo};
+    return vk::raii::Pipeline{device.handle, nullptr, graphicsPipelineCreateInfo};
 }

@@ -1,18 +1,66 @@
 #include "Renderer.hpp"
 #include "Pipeline.hpp"
 #include "PipelineLayout.hpp"
-#include "SceneResources.hpp"
+#include "SceneRenderData.hpp"
 
+auto Renderer::createDescriptorPool(
+    Device                           &device,
+    const ShaderInterfaceDescription &shaderInterfaceDescription,
+    uint32_t                          maxFramesInFlight) -> vk::raii::DescriptorPool
+{
+    std::vector<vk::DescriptorPoolSize> poolSizes;
+    poolSizes.reserve(shaderInterfaceDescription.bindings.size());
+
+    uint32_t maxSets = maxFramesInFlight;
+
+    for (const auto &binding : shaderInterfaceDescription.bindings) {
+
+        poolSizes.emplace_back(binding.type, binding.count * maxFramesInFlight);
+    }
+
+    return vk::raii::DescriptorPool{
+        device.handle,
+        vk::DescriptorPoolCreateInfo{
+            vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+            maxSets,
+            static_cast<uint32_t>(poolSizes.size()),
+            poolSizes.data()}};
+}
+
+auto Renderer::allocateFrameDescriptorSets() -> void
+{
+    frames.descriptorSets.clear();
+    frames.descriptorSets.reserve(frames.descriptorSets.capacity());
+
+    auto layouts = std::vector<vk::DescriptorSetLayout>(
+        frames.maxFrames(),
+        *shaderInterface.handle);
+
+    vk::DescriptorSetAllocateInfo allocInfo{*descriptorPool, layouts};
+    auto sets = context.device.handle.allocateDescriptorSets(allocInfo);
+
+    for (auto &set : sets) {
+        frames.descriptorSets.emplace_back(std::move(set));
+    }
+}
+
+auto Renderer::initializePerFrameUniforms(
+    Allocator &allocator,
+    uint32_t   meshCount) -> void
+{
+    frames.createPerFrameUniformBuffers(allocator, meshCount);
+}
 Renderer::Renderer(
     RenderContext        &context_,
     const RendererConfig &config)
     : context{context_},
-      frames{
-          context.device,
-          config.maxFramesInFlight},
       shaderInterface{
           context.device,
           config.shaderInterfaceDescription},
+      descriptorPool{createDescriptorPool(
+          context.device,
+          config.shaderInterfaceDescription,
+          config.maxFramesInFlight)},
       pipelineLayout{createPipelineLayout(
           context.device.handle,
           {*shaderInterface.handle})},
@@ -21,8 +69,12 @@ Renderer::Renderer(
           config.shaderPath,
           config.colorFormat,
           config.depthFormat,
-          pipelineLayout)}
+          pipelineLayout)},
+      frames{
+          context.device,
+          config.maxFramesInFlight}
 {
+    allocateFrameDescriptorSets();
 }
 
 auto Renderer::beginFrame() -> bool
@@ -52,7 +104,7 @@ auto Renderer::beginFrame() -> bool
 
     return true;
 }
-auto Renderer::render(const SceneResources &sceneResources) -> void
+auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
 {
     // color attachment image to render to: vk::RenderingAttachmentInfo
     auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
@@ -140,10 +192,11 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
         vk::PipelineBindPoint::eGraphics,
         *pipelineLayout,
         0,
-        frames.currentResourceBindings(),
+        frames.currentDescriptorSet(),
         {});
 
-    for (const auto &draw : sceneResources.draws) {
+    for (const auto &draw : sceneRenderData.draws) {
+        // fmt::println("I am here on frame {}.", frames.current());
         // Current upload path is one vertex+index buffer per mesh => buffer index
         // equals draw item index. If you later batch/merge buffers, replace these
         // indices with draw.vertexBufferIndex / draw.indexBufferIndex.
@@ -151,11 +204,11 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
 
         frames.cmd().bindVertexBuffers(
             0,
-            sceneResources.buffers.vertex[bufferIndex].buffer,
+            sceneRenderData.vertexBuffers[bufferIndex].buffer,
             {0});
 
         frames.cmd().bindIndexBuffer(
-            sceneResources.buffers.index[bufferIndex].buffer,
+            sceneRenderData.indexBuffers[bufferIndex].buffer,
             0,
             vk::IndexType::eUint16);
 
@@ -296,8 +349,9 @@ auto Renderer::render(const SceneResources &sceneResources) -> void
 //     ImGui::CreateContext();
 //     ImGuiIO &io = ImGui::GetIO();
 //     (void)io;
-//     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-//     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+//     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard
+//     Controls io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable
+//     Gamepad Controls
 //
 //     ImGui_ImplSDL3_InitForVulkan(window.get());
 //
@@ -498,7 +552,7 @@ auto Renderer::submit() -> void
 
     auto signalSemaphoreSubmitInfos = std::array{
         vk::SemaphoreSubmitInfo{
-            frames.renderFinishedSemaphore(),
+            context.swapchain.renderFinishedSemaphore(),
             {},
             vk::PipelineStageFlagBits2::eAllCommands},
         vk::SemaphoreSubmitInfo{
@@ -518,7 +572,7 @@ auto Renderer::submit() -> void
 
 auto Renderer::present() -> void
 {
-    auto renderFinishedSemaphore = frames.renderFinishedSemaphore();
+    auto renderFinishedSemaphore = context.swapchain.renderFinishedSemaphore();
     auto presentResult           = context.device.presentQueue.presentKHR(
         vk::PresentInfoKHR{
             renderFinishedSemaphore,
@@ -543,6 +597,21 @@ auto Renderer::endFrame() -> void
     present();
     // advance to the next frame
     frames.advance();
+}
+
+vk::DescriptorSet Renderer::currentDescriptorSet() const
+{
+    return frames.currentDescriptorSet();
+}
+
+Buffer &Renderer::currentTransformUBO()
+{
+    return frames.transformUBO[frames.current()];
+}
+
+Buffer &Renderer::currentLightUBO()
+{
+    return frames.lightUBO[frames.current()];
 }
 
 // Renderer::~Renderer()

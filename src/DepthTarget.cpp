@@ -3,6 +3,15 @@
 #include "Command.hpp"
 #include "Device.hpp"
 
+DepthTarget::DepthTarget(
+    Device      &device,
+    Allocator   &allocator,
+    Command     &command,
+    vk::Extent2D extent)
+{
+    recreate(device, allocator, command, extent);
+}
+
 void DepthTarget::recreate(
     Device      &device,
     Allocator   &allocator,

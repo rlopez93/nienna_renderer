@@ -1,13 +1,68 @@
 #include "RenderContext.hpp"
 #include "Renderer.hpp"
 #include "Scene.hpp"
-#include "SceneResources.hpp"
+#include "SceneRenderData.hpp"
+#include "Utility.hpp"
 #include "Window.hpp"
 #include "gltfLoader.hpp"
+#include <ranges>
 
 // TODO: add SDL event polling
 void processEvents(bool &running)
 {
+}
+
+auto chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats)
+    -> vk::SurfaceFormatKHR
+{
+    constexpr auto preferredSurfaceFormats = std::array{
+        vk::Format::eR8G8B8A8Srgb,
+        vk::Format::eB8G8R8A8Unorm,
+        vk::Format::eR8G8B8A8Snorm};
+
+    constexpr auto preferredColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
+
+    for (auto preferredSurfaceFormat : preferredSurfaceFormats) {
+        for (auto format : availableFormats) {
+            if (format.format == preferredSurfaceFormat
+                && format.colorSpace == preferredColorSpace) {
+                return format;
+            }
+        }
+    }
+
+    return availableFormats.front();
+}
+
+void updatePerFrameUniformBuffers(
+    const Allocator &allocator,
+    Buffer          &transformUBO,
+    Buffer          &lightUBO,
+    const Scene     &scene)
+{
+    // update uniform buffers
+    for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
+        auto transform = Transform{
+            .modelMatrix          = mesh.modelMatrix,
+            .viewProjectionMatrix = scene.getCamera().getProjectionMatrix()
+                                  * scene.getCamera().getViewMatrix()};
+        // transform.viewProjectionMatrix[1][1] *= -1;
+
+        VK_CHECK(vmaCopyMemoryToAllocation(
+            allocator.allocator,
+            &transform,
+            transformUBO.allocation,
+            sizeof(Transform) * meshIndex,
+            sizeof(Transform)));
+    }
+    auto light = Light{};
+
+    VK_CHECK(vmaCopyMemoryToAllocation(
+        allocator.allocator,
+        &light,
+        lightUBO.allocation,
+        0,
+        sizeof(light)));
 }
 
 auto main(
@@ -49,49 +104,99 @@ auto main(
 
     auto context = RenderContext{window, requiredExtensions};
 
-    // TODO: populate shader interface bindings
-    auto shaderInterfaceDescription =
-        ShaderInterfaceDescription{std::vector<ShaderInterfaceDescription::Binding>{}};
+    auto asset = getGltfAsset(gltfPath);
+    auto scene = getSceneData(asset, gltfDirectory);
 
-    auto rendererConfig = RendererConfig{
-        shaderInterfaceDescription,
-        shaderPath,
-        vk::Format{}, // TODO: color format
-        vk::Format{}, // TODO: depth format
-        {}            // TODO: maxFramesInFlight
-    };
+    const auto formats =
+        context.physicalDevice.handle.getSurfaceFormatsKHR(context.surface.handle);
+
+    const auto surfaceFormat = chooseSurfaceFormat(formats);
+    const auto depthFormat   = findDepthFormat(context.physicalDevice.handle);
+
+    context.depth.format = depthFormat;
+
+    Command uploadCmd{context.device, vk::CommandPoolCreateFlagBits::eTransient};
+
+    context.depth.recreate(
+        context.device,
+        context.allocator,
+        uploadCmd,
+        context.swapchain.extent());
+
+    RendererConfig rendererConfig{
+        .shaderInterfaceDescription =
+            ShaderInterfaceDescription{
+                {// binding 0: Transform[] UBO
+                 {0,
+                  vk::DescriptorType::eUniformBuffer,
+                  static_cast<uint32_t>(scene.meshes.size()),
+                  vk::ShaderStageFlagBits::eVertex},
+
+                 // binding 1: Texture[] sampler
+                 {1,
+                  vk::DescriptorType::eCombinedImageSampler,
+                  static_cast<uint32_t>(scene.textures.size()),
+                  vk::ShaderStageFlagBits::eFragment},
+
+                 // binding 2: Light UBO
+                 {2,
+                  vk::DescriptorType::eUniformBuffer,
+                  1,
+                  vk::ShaderStageFlagBits::eFragment}}},
+        .shaderPath        = shaderPath,
+        .colorFormat       = surfaceFormat.format,
+        .depthFormat       = depthFormat,
+        .maxFramesInFlight = 2};
 
     auto renderer = Renderer{context, rendererConfig};
-    auto asset    = getGltfAsset(gltfPath);
-    auto scene    = getSceneData(asset, gltfDirectory);
 
+    auto sceneRenderData = SceneRenderData{};
+    sceneRenderData.create(scene, context.device, uploadCmd, context.allocator);
     // TODO: parse sampler from .gltf
     auto sampler = vk::raii::Sampler{context.device.handle, vk::SamplerCreateInfo{}};
-    auto sceneResources = SceneResources{};
-    bool running        = true;
-    auto startTime      = std::chrono::high_resolution_clock::now();
-    auto previousTime   = startTime;
-    auto dt             = startTime - previousTime;
 
+    renderer.initializePerFrameUniforms(context.allocator, scene.meshes.size());
+
+    auto running      = true;
+    auto previousTime = std::chrono::high_resolution_clock::now();
+
+    SDL_Event e;
     while (running) {
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        dt               = currentTime - previousTime;
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_EVENT_QUIT) {
+                running = false;
+            }
+        }
+
         processEvents(running);
+
         if (!renderer.beginFrame()) {
             continue;
         }
 
-        previousTime = currentTime;
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        auto dt          = currentTime - previousTime;
+        previousTime     = currentTime;
 
         scene.update(dt);
-        sceneResources.updateDescriptorSet(
-            context.device,
 
-            {},
-            scene.meshes.size(),
+        updatePerFrameUniformBuffers(
+            context.allocator,
+            renderer.currentTransformUBO(),
+            renderer.currentLightUBO(),
+            scene);
+
+        sceneRenderData.updateDescriptorSet(
+            context.device,
+            renderer.currentDescriptorSet(),
+            renderer.currentTransformUBO(),
+            renderer.currentLightUBO(),
             sampler);
 
-        renderer.render(sceneResources);
+        renderer.render(sceneRenderData);
+
         renderer.endFrame();
     }
+
+    context.device.graphicsQueue.waitIdle();
 }

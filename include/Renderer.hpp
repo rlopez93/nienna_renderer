@@ -7,7 +7,7 @@
 #include "RendererConfig.hpp"
 #include "ShaderInterface.hpp"
 
-struct SceneResources;
+struct SceneRenderData;
 
 struct Renderer {
     Renderer(
@@ -20,24 +20,37 @@ struct Renderer {
     auto beginFrame() -> bool;
 
     // Records rendering commands into the current frame command buffer
-    auto render(const SceneResources &sceneResources) -> void;
+    auto render(const SceneRenderData &sceneRenderData) -> void;
 
     // Submits + presents + advances frame
     auto endFrame() -> void;
 
+    // Frame-relative resource access (read/write by application)
+    vk::DescriptorSet currentDescriptorSet() const;
+    Buffer           &currentTransformUBO();
+    Buffer           &currentLightUBO();
+
+    // Call once after scene load when meshCount is known.
+    auto initializePerFrameUniforms(
+        Allocator &allocator,
+        uint32_t   meshCount) -> void;
+
   private:
     RenderContext &context;
+
+    ShaderInterface          shaderInterface;
+    vk::raii::DescriptorPool descriptorPool;
+    vk::raii::PipelineLayout pipelineLayout;
+    vk::raii::Pipeline       graphicsPipeline;
 
     // Renderer-owned execution state
     FrameContext frames;
 
-    // Shader contract + pipeline state
-    ShaderInterface          shaderInterface;
-    vk::raii::PipelineLayout pipelineLayout;
-    vk::raii::Pipeline       graphicsPipeline;
-
-    // Internal mechanics
-    auto allocateFrameDescriptorSets() -> void;
-    auto submit() -> void;
-    auto present() -> void;
+    auto        submit() -> void;
+    auto        present() -> void;
+    auto        allocateFrameDescriptorSets() -> void;
+    static auto createDescriptorPool(
+        Device                           &device,
+        const ShaderInterfaceDescription &interfaceDesc,
+        uint32_t maxFramesInFlight) -> vk::raii::DescriptorPool;
 };

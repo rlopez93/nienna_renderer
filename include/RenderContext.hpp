@@ -3,6 +3,7 @@
 #include <vector>
 #include <vulkan/vulkan_raii.hpp>
 
+#include "Allocator.hpp"
 #include "DepthTarget.hpp"
 #include "Device.hpp"
 #include "Instance.hpp"
@@ -21,6 +22,7 @@ struct RenderContext {
     Surface        surface;
     PhysicalDevice physicalDevice;
     Device         device;
+    Allocator      allocator;
 
     // Surface-dependent resources
     Swapchain   swapchain;
@@ -31,9 +33,7 @@ struct RenderContext {
         Window                          &window,
         const std::vector<const char *> &requiredExtensions);
 
-    void recreateRenderTargets(
-        Allocator &allocator,
-        Command   &transientCommand);
+    void recreateRenderTargets(Command &transientCommand);
 
     [[nodiscard]]
     auto extent() const -> vk::Extent2D;

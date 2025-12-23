@@ -13,6 +13,14 @@ struct DepthTarget {
     Image               image;
     vk::raii::ImageView view = nullptr;
 
+    DepthTarget() = default;
+
+    DepthTarget(
+        Device      &device,
+        Allocator   &allocator,
+        Command     &command,
+        vk::Extent2D extent);
+
     void recreate(
         Device      &device,
         Allocator   &allocator,

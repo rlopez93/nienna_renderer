@@ -26,13 +26,10 @@ struct PointLight {
     float moveSpeed = 5.0f;
 };
 
-struct alignas(16) Transform {
+struct Transform {
     glm::mat4 modelMatrix;
     glm::mat4 viewProjectionMatrix;
 };
-
-static_assert(sizeof(Transform) % 16 == 0);
-static_assert(alignof(Transform) == 16);
 
 struct Texture {
     std::filesystem::path      name;

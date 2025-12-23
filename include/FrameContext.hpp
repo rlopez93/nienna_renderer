@@ -5,6 +5,8 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include "Allocator.hpp"
+#include "Buffer.hpp"
 #include "Command.hpp"
 #include "Device.hpp"
 
@@ -30,11 +32,26 @@ class FrameContext
     auto timelineValue() const -> const uint64_t &;
     auto timelineValue() -> uint64_t &;
 
+    [[nodiscard]]
     auto timelineSemaphore() const -> vk::Semaphore;
 
+    [[nodiscard]]
     auto imageAvailableSemaphore() const -> vk::Semaphore;
-    auto renderFinishedSemaphore() const -> vk::Semaphore;
-    auto currentResourceBindings() const -> vk::DescriptorSet;
+    [[nodiscard]]
+    auto currentDescriptorSet() const -> vk::DescriptorSet;
+
+    [[nodiscard]]
+    auto setDescriptorSets(std::vector<vk::raii::DescriptorSet> &&sets);
+
+    std::vector<Buffer> transformUBO;
+    std::vector<Buffer> lightUBO;
+
+    // Per-frame descriptor sets
+    std::vector<vk::raii::DescriptorSet> descriptorSets;
+
+    auto createPerFrameUniformBuffers(
+        Allocator &allocator,
+        uint32_t   meshCount) -> void;
 
   private:
     static auto createTimelineSemaphore(
@@ -52,10 +69,5 @@ class FrameContext
     // Per-frame command pools + buffers
     std::vector<Command> commands;
 
-    // Per-frame descriptor bindings
-    std::vector<vk::raii::DescriptorSet> resourceBindings;
-
-    // Per-frame synchronization
     std::vector<vk::raii::Semaphore> imageAvailableSemaphores;
-    std::vector<vk::raii::Semaphore> renderFinishedSemaphores;
 };

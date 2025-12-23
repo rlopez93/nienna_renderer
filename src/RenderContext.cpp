@@ -1,4 +1,5 @@
 #include "RenderContext.hpp"
+#include "Command.hpp"
 
 RenderContext::RenderContext(
     Window                          &window,
@@ -15,17 +16,18 @@ RenderContext::RenderContext(
           window,
           surface,
           requiredExtensions},
+      allocator{
+          instance,
+          physicalDevice,
+          device},
       swapchain(
           device,
           physicalDevice,
-          surface),
-      depth{}
+          surface)
 {
 }
 
-void RenderContext::recreateRenderTargets(
-    Allocator &allocator,
-    Command   &transientCommand)
+void RenderContext::recreateRenderTargets(Command &transientCommand)
 {
     // Ensure no work is using old swapchain-dependent resources
     device.handle.waitIdle();
