@@ -1,4 +1,5 @@
 #include "Renderer.hpp"
+#include "DebugView.hpp"
 #include "Pipeline.hpp"
 #include "PipelineLayout.hpp"
 #include "SceneRenderData.hpp"
@@ -191,6 +192,14 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
             1.0f));
     frames.cmd().setScissorWithCount(vk::Rect2D{vk::Offset2D(0, 0), context.extent()});
 
+    if (debugView == DebugView::Wireframe) {
+        frames.cmd().setPolygonModeEXT(vk::PolygonMode::eLine);
+    }
+
+    else {
+        frames.cmd().setPolygonModeEXT(vk::PolygonMode::eFill);
+    }
+
     frames.cmd().bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
     // bind texture resources passed to shader
@@ -221,7 +230,7 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
         auto pushConstant = PushConstantBlock{
             .transformIndex  = draw.transformIndex,
             .textureIndex    = draw.textureIndex,
-            .debugView       = 1,
+            .debugView       = static_cast<uint32_t>(debugView),
             .baseColorFactor = draw.baseColor};
 
         frames.cmd().pushConstants2(
@@ -613,6 +622,21 @@ Buffer &Renderer::currentTransformUBO()
 Buffer &Renderer::currentLightUBO()
 {
     return frames.lightUBO[frames.current()];
+}
+
+void Renderer::cycleDebugView()
+{
+    switch (debugView) {
+    case DebugView::Shaded:
+        debugView = DebugView::Normals;
+        break;
+    case DebugView::Normals:
+        debugView = DebugView::Wireframe;
+        break;
+    case DebugView::Wireframe:
+        debugView = DebugView::Shaded;
+        break;
+    }
 }
 
 // Renderer::~Renderer()

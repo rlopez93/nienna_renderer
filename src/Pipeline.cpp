@@ -113,7 +113,8 @@ auto createPipeline(
 
     const auto dynamicStates = std::array{
         vk::DynamicState::eViewportWithCount,
-        vk::DynamicState::eScissorWithCount};
+        vk::DynamicState::eScissorWithCount,
+        vk::DynamicState::ePolygonModeEXT};
 
     const auto pipelineDynamicStateCreateInfo =
         vk::PipelineDynamicStateCreateInfo{{}, dynamicStates};

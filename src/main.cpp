@@ -7,6 +7,8 @@
 #include "gltfLoader.hpp"
 #include <ranges>
 
+#include <SDL3/SDL_events.h>
+
 // TODO: add SDL event polling
 void processEvents(bool &running)
 {
@@ -168,6 +170,11 @@ auto main(
             if (e.type == SDL_EVENT_QUIT) {
                 running = false;
             }
+
+            else if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_RIGHTBRACKET) {
+                renderer.cycleDebugView();
+            }
+
             scene.processInput(e);
         }
 

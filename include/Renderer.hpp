@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include "DebugView.hpp"
 #include "FrameContext.hpp"
 #include "RenderContext.hpp"
 #include "RendererConfig.hpp"
@@ -35,6 +36,8 @@ struct Renderer {
         Allocator &allocator,
         uint32_t   meshCount) -> void;
 
+    void cycleDebugView();
+
   private:
     RenderContext &context;
 
@@ -45,6 +48,8 @@ struct Renderer {
 
     // Renderer-owned execution state
     FrameContext frames;
+
+    DebugView debugView = DebugView::Shaded;
 
     auto        submit() -> void;
     auto        present() -> void;
