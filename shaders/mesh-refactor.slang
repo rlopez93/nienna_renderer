@@ -39,7 +39,8 @@ struct PushConstantBlock
 {
         uint32_t transformIndex;
         int32_t textureIndex;
-        uint32_t padding[2];
+        uint32_t debugView;
+        uint32_t padding;
         float4 baseColorFactor;
 }
 
@@ -77,6 +78,14 @@ FragmentOutput fragmentMain(FragmentPrimitive input) : SV_TARGET
 	FragmentOutput output;
 
     float3 N = normalize(input.normal);
+
+    // Debug view override
+    if (pushConstant.debugView == 1) {
+            // map normals to color
+            output.color = float4(N * 0.5f + 0.5f, 1.0f);
+            return output;
+    }
+
     float3 L = normalize(-light.direction);
     float NdotL = max(dot(N, L), 0.0);
 

@@ -221,6 +221,7 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
         auto pushConstant = PushConstantBlock{
             .transformIndex  = draw.transformIndex,
             .textureIndex    = draw.textureIndex,
+            .debugView       = 1,
             .baseColorFactor = draw.baseColor};
 
         frames.cmd().pushConstants2(

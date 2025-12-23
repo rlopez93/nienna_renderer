@@ -6,14 +6,14 @@
 
 #include <glm/ext/vector_float4.hpp>
 
-#include <array>
 #include <cstdint>
 
 struct PushConstantBlock {
-    uint32_t                transformIndex;
-    int32_t                 textureIndex;
-    std::array<uint32_t, 2> padding{};
-    glm::vec4               baseColorFactor;
+    uint32_t  transformIndex;
+    int32_t   textureIndex;
+    uint32_t  debugView;
+    uint32_t  padding;
+    glm::vec4 baseColorFactor;
 };
 
 vk::raii::PipelineLayout createPipelineLayout(
