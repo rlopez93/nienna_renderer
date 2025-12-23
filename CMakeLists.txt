@@ -40,7 +40,7 @@ target_sources(nienna PRIVATE
     src/Utility.cpp
     src/Window.cpp
     src/gltfLoader.cpp
-    src/main2.cpp
+    src/main.cpp
     src/spirv_reflect.c
     src/stb_image.cpp
     src/vma.cpp
