@@ -1,21 +1,75 @@
-
-#include <vulkan/vulkan_raii.hpp>
-
-#include "Command.hpp"
+#include "RenderContext.hpp"
 #include "Renderer.hpp"
+#include "Scene.hpp"
+#include "SceneRenderData.hpp"
+#include "Utility.hpp"
+#include "Window.hpp"
 #include "gltfLoader.hpp"
+#include <ranges>
 
-#include <SDL3/SDL_events.h>
-#include <fmt/base.h>
+// TODO: add SDL event polling
+void processEvents(bool &running)
+{
+}
 
-#include <filesystem>
+auto chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats)
+    -> vk::SurfaceFormatKHR
+{
+    constexpr auto preferredSurfaceFormats = std::array{
+        vk::Format::eR8G8B8A8Srgb,
+        vk::Format::eB8G8R8A8Unorm,
+        vk::Format::eR8G8B8A8Snorm};
+
+    constexpr auto preferredColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
+
+    for (auto preferredSurfaceFormat : preferredSurfaceFormats) {
+        for (auto format : availableFormats) {
+            if (format.format == preferredSurfaceFormat
+                && format.colorSpace == preferredColorSpace) {
+                return format;
+            }
+        }
+    }
+
+    return availableFormats.front();
+}
+
+void updatePerFrameUniformBuffers(
+    const Allocator &allocator,
+    Buffer          &transformUBO,
+    Buffer          &lightUBO,
+    const Scene     &scene)
+{
+    // update uniform buffers
+    for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
+        auto transform = Transform{
+            .modelMatrix          = mesh.modelMatrix,
+            .viewProjectionMatrix = scene.getCamera().getProjectionMatrix()
+                                  * scene.getCamera().getViewMatrix()};
+        // transform.viewProjectionMatrix[1][1] *= -1;
+
+        VK_CHECK(vmaCopyMemoryToAllocation(
+            allocator.allocator,
+            &transform,
+            transformUBO.allocation,
+            sizeof(Transform) * meshIndex,
+            sizeof(Transform)));
+    }
+    auto light = Light{};
+
+    VK_CHECK(vmaCopyMemoryToAllocation(
+        allocator.allocator,
+        &light,
+        lightUBO.allocation,
+        0,
+        sizeof(light)));
+}
 
 auto main(
-    int    argc,
-    char **argv) -> int
+    int   argc,
+    char *argv[]) -> int
 {
-    // VULKAN_HPP_DEFAULT_DISPATCHER.init();
-    auto filePath = [&] -> std::filesystem::path {
+    auto gltfPath = [&] -> std::filesystem::path {
         if (argc < 2) {
             return "third_party/glTF-Sample-Assets/Models/Duck/glTF/Duck.gltf";
         } else {
@@ -23,10 +77,8 @@ auto main(
         }
     }();
 
-    auto gltfDirectory = filePath.parent_path();
-    auto gltfFilename  = filePath.filename();
-
-    auto shaderPath = [&] -> std::filesystem::path {
+    auto gltfDirectory = gltfPath.parent_path();
+    auto shaderPath    = [&] -> std::filesystem::path {
         if (argc < 3) {
             return "build/_autogen/mesh-refactor.slang.spv";
         } else {
@@ -34,146 +86,116 @@ auto main(
         }
     }();
 
-    // instantiate our renderer
-    // this constructor does A LOT
-    Renderer r;
+    auto window             = createWindow(800, 600);
+    auto requiredExtensions = std::vector{
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
+        VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
+        VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
+        VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME,
+        VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
+        VK_EXT_IMAGE_ROBUSTNESS_EXTENSION_NAME,
+        VK_EXT_ROBUSTNESS_2_EXTENSION_NAME,
+        VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME,
+        VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME,
+        VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME,
+        VK_EXT_MEMORY_BUDGET_EXTENSION_NAME,
+        VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME};
 
-    // create transient command pool for single-time commands
-    auto transient = Command{
-        r.device,
-        vk::CommandPoolCreateFlagBits::eTransient
-            | vk::CommandPoolCreateFlagBits::eResetCommandBuffer};
+    auto context = RenderContext{window, requiredExtensions};
 
-    auto asset = getGltfAsset(gltfDirectory / gltfFilename);
+    auto asset = getGltfAsset(gltfPath);
     auto scene = getSceneData(asset, gltfDirectory);
 
-    // TODO: get sampler from glTF asset
-    auto sampler = vk::raii::Sampler{r.device.handle, vk::SamplerCreateInfo{}};
+    const auto formats =
+        context.physicalDevice.handle.getSurfaceFormatsKHR(context.surface.handle);
 
-    scene.createBuffersOnDevice(
-        r.device,
-        transient,
-        r.allocator,
-        r.swapchain.frame.maxFramesInFlight);
+    const auto surfaceFormat = chooseSurfaceFormat(formats);
+    const auto depthFormat   = findDepthFormat(context.physicalDevice.handle);
 
-    uint32_t textureCount = scene.textureBuffers.image.size();
-    uint32_t meshCount    = scene.meshes.size();
-    // fmt::println(stderr, "textures.size(): {}", textureCount);
-    // fmt::println(stderr, "meshes.size(): {}", meshCount);
+    context.depth.format = depthFormat;
 
-    auto descriptors = Descriptors{
-        r.device.handle,
-        meshCount,
-        textureCount,
-        r.swapchain.frame.maxFramesInFlight};
+    Command uploadCmd{context.device, vk::CommandPoolCreateFlagBits::eTransient};
 
-    updateDescriptorSets(
-        r.device.handle,
-        descriptors,
-        scene.buffers.uniform,
-        scene.buffers.light,
-        meshCount,
-        scene.textureBuffers.imageView,
-        sampler);
+    context.depth.recreate(
+        context.device,
+        context.allocator,
+        uploadCmd,
+        context.swapchain.extent());
 
-    auto graphicsPipeline = createPipeline(
-        r.device.handle,
-        shaderPath,
-        r.swapchain.imageFormat,
-        r.depthFormat,
-        descriptors.pipelineLayout);
+    RendererConfig rendererConfig{
+        .shaderInterfaceDescription =
+            ShaderInterfaceDescription{
+                {// binding 0: Transform[] UBO
+                 {0,
+                  vk::DescriptorType::eUniformBuffer,
+                  static_cast<uint32_t>(scene.meshes.size()),
+                  vk::ShaderStageFlagBits::eVertex},
 
-    int  joystickIDsCount;
-    auto sdlJoystickIDs = SDL_GetGamepads(&joystickIDsCount);
-    auto joystickIDs = std::vector(sdlJoystickIDs, sdlJoystickIDs + joystickIDsCount);
-    std::vector<SDL_Gamepad *> gamepads;
+                 // binding 1: Texture[] sampler
+                 {1,
+                  vk::DescriptorType::eCombinedImageSampler,
+                  static_cast<uint32_t>(scene.textures.size()),
+                  vk::ShaderStageFlagBits::eFragment},
 
-    for (auto joystickID : joystickIDs) {
-        gamepads.push_back(SDL_OpenGamepad(joystickID));
-    }
+                 // binding 2: Light UBO
+                 {2,
+                  vk::DescriptorType::eUniformBuffer,
+                  1,
+                  vk::ShaderStageFlagBits::eFragment}}},
+        .shaderPath        = shaderPath,
+        .colorFormat       = surfaceFormat.format,
+        .depthFormat       = depthFormat,
+        .maxFramesInFlight = 2};
 
-    // auto gamepad = SDL_OpenGamepad(SDL_JoystickID instance_id)
+    auto renderer = Renderer{context, rendererConfig};
 
-    uint32_t totalFrames = 0;
+    auto sceneRenderData = SceneRenderData{};
+    sceneRenderData.create(scene, context.device, uploadCmd, context.allocator);
+    // TODO: parse sampler from .gltf
+    auto sampler = vk::raii::Sampler{context.device.handle, vk::SamplerCreateInfo{}};
 
-    using namespace std::literals;
+    renderer.initializePerFrameUniforms(context.allocator, scene.meshes.size());
 
-    auto           start        = std::chrono::high_resolution_clock::now();
-    auto           previousTime = start;
-    auto           currentTime  = start;
-    auto           runningTime  = 0.0s;
-    bool           running      = true;
-    constexpr auto period       = 1.0s;
+    auto running      = true;
+    auto previousTime = std::chrono::high_resolution_clock::now();
 
     SDL_Event e;
-    bool      framebufferResized = false;
     while (running) {
-        // fmt::println(stdout, "Frame {}", totalFrames);
-        currentTime    = std::chrono::high_resolution_clock::now();
-        auto deltaTime = currentTime - previousTime;
-        runningTime += deltaTime;
-
-        // if (runningTime > period) {
-        //     auto fps =
-        //         totalFrames
-        //         / std::chrono::duration_cast<std::chrono::seconds>(currentTime -
-        //         start)
-        //               .count();
-        //     fmt::println(stderr, "{} fps", fps);
-        //     runningTime -= period;
-        // }
-
-        previousTime = currentTime;
-
-        framebufferResized = false;
-
-        // TODO: move into Input.hpp or something
         while (SDL_PollEvent(&e)) {
-
-            // ImGui_ImplSDL3_ProcessEvent(&e);
-
             if (e.type == SDL_EVENT_QUIT) {
                 running = false;
             }
-
-            else if (e.type == SDL_EVENT_WINDOW_RESIZED) {
-                framebufferResized = true;
-                // fmt::println(stderr, "Window resized!");
-            }
-
-            else if (e.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
-                framebufferResized = true;
-                // fmt::println(stderr, "Window pixel size changed!");
-
-            } else if (e.type == SDL_EVENT_WINDOW_MINIMIZED) {
-                // rendering will pause automatically
-                // fmt::println(stderr, "Window minimized!");
-
-            } else if (e.type == SDL_EVENT_WINDOW_RESTORED) {
-                framebufferResized = true;
-                // fmt::println(stderr, "Window restored!");
-            }
-
-            else if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
-                fmt::println(stderr, "Gamepad button down!");
-            }
-
-            else if (e.type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
-                fmt::println(stderr, "Gamepad button up!");
-            }
-
             scene.processInput(e);
         }
 
-        r.drawFrame(
-            scene,
-            deltaTime,
-            graphicsPipeline,
-            descriptors,
-            framebufferResized);
+        if (!renderer.beginFrame()) {
+            continue;
+        }
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        auto dt          = currentTime - previousTime;
+        previousTime     = currentTime;
+
+        scene.update(dt);
+
+        updatePerFrameUniformBuffers(
+            context.allocator,
+            renderer.currentTransformUBO(),
+            renderer.currentLightUBO(),
+            scene);
+
+        sceneRenderData.updateDescriptorSet(
+            context.device,
+            renderer.currentDescriptorSet(),
+            renderer.currentTransformUBO(),
+            renderer.currentLightUBO(),
+            sampler);
+
+        renderer.render(sceneRenderData);
+
+        renderer.endFrame();
     }
 
-    r.device.handle.waitIdle();
-
-    return 0;
+    context.device.graphicsQueue.waitIdle();
 }

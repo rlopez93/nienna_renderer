@@ -16,6 +16,8 @@ find_package(glm REQUIRED)
 
 add_executable(nienna)
 
+target_compile_definitions(nienna PRIVATE VULKAN_HPP_HANDLE_ERROR_OUT_OF_DATE_AS_SUCCESS)
+
 target_sources(nienna PRIVATE
     src/Allocator.cpp
     src/Camera.cpp
