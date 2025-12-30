@@ -341,6 +341,8 @@ auto getSceneData(
 
     // add a final "default" camera
     scene.cameras.emplace_back();
+    // add dummy texture
+    scene.textures.emplace_back();
 
     return scene;
 }

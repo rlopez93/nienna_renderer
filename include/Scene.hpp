@@ -32,16 +32,17 @@ struct Transform {
 };
 
 struct Texture {
-    std::filesystem::path      name;
-    std::vector<unsigned char> data;
-    vk::Extent2D               extent;
+    std::filesystem::path      name = "";
+    std::vector<unsigned char> data = {
+        255, 255, 255, 255}; // Default (1.0, 1.0, 1.0, 1.0)
+    vk::Extent2D extent = vk::Extent2D{1u, 1u};
 };
 
 struct Primitive {
     glm::vec3 position;
-    glm::vec3 normal;
+    glm::vec3 normal{0, 0, 0};
     // std::array<glm::vec2, 2> uv;
-    glm::vec2 uv;
+    glm::vec2 uv{0, 0};
     glm::vec4 color{1.0f, 1.0f, 1.0f, 1.0f};
 };
 
@@ -60,11 +61,11 @@ struct Material {
 };
 
 struct Mesh {
-    std::vector<Primitive>  primitives;
-    std::vector<uint16_t>   indices;
-    glm::vec4               color{1.0f, 1.0f, 1.0f, 1.0f};
-    glm::mat4               modelMatrix = glm::identity<glm::mat4>();
-    std::optional<uint32_t> textureIndex;
+    std::vector<Primitive> primitives;
+    std::vector<uint16_t>  indices;
+    glm::vec4              color{1.0f, 1.0f, 1.0f, 1.0f};
+    glm::mat4              modelMatrix  = glm::identity<glm::mat4>();
+    uint32_t               textureIndex = 0u;
 };
 
 struct Scene {

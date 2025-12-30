@@ -77,7 +77,13 @@ FragmentOutput fragmentMain(FragmentPrimitive input) : SV_TARGET
 {
 	FragmentOutput output;
 
+
     float3 N = normalize(input.normal);
+
+    if (dot(N, N) < 1e-5f) {
+            output.color = input.color;
+            return output;
+    }
 
     // Debug view override
     if (pushConstant.debugView == 1) {
@@ -91,11 +97,7 @@ FragmentOutput fragmentMain(FragmentPrimitive input) : SV_TARGET
 
     float4 baseColor;
 
-    if (pushConstant.textureIndex < 0) {
-            baseColor = input.color;
-    } else {
-            baseColor = texture[pushConstant.textureIndex].Sample(input.uv) * pushConstant.baseColorFactor;
-    }
+    baseColor = input.color * texture[pushConstant.textureIndex].Sample(input.uv) * pushConstant.baseColorFactor;
 
     output.color = 
         float4(

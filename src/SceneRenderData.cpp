@@ -90,9 +90,7 @@ auto SceneRenderData::create(
             draw.vertexOffset = 0,
             // Shader-facing indices
             draw.transformIndex = meshIndex,
-            draw.textureIndex   = mesh.textureIndex.has_value()
-                                    ? static_cast<int32_t>(*mesh.textureIndex)
-                                    : -1};
+            draw.textureIndex   = mesh.textureIndex};
 
         draw.baseColor = mesh.color;
 
