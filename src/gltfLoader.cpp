@@ -26,13 +26,11 @@ auto getGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset
 
     fastgltf::Parser parser(supportedExtensions);
 
-    constexpr auto gltfOptions =
-        fastgltf::Options::DontRequireValidAssetMember | fastgltf::Options::AllowDouble
-        | fastgltf::Options::
-            LoadExternalBuffers //|
-                                // fastgltf::Options::LoadExternalImages
-        | fastgltf::Options::DecomposeNodeMatrices
-        | fastgltf::Options::GenerateMeshIndices;
+    constexpr auto gltfOptions = fastgltf::Options::DontRequireValidAssetMember
+                               | fastgltf::Options::LoadExternalBuffers
+                               // | fastgltf::Options::LoadExternalImages
+                               | fastgltf::Options::DecomposeNodeMatrices
+                               | fastgltf::Options::GenerateMeshIndices;
 
     auto gltfFile = fastgltf::GltfDataBuffer::FromPath(gltfPath);
     if (!bool(gltfFile)) {
@@ -306,6 +304,10 @@ auto getSceneData(
 
     auto scene = Scene();
 
+    if (asset.scenes.size() > 1) {
+        fmt::println(stdout, "asset.scenes.size(): {}", asset.scenes.size());
+    }
+
     fastgltf::iterateSceneNodes(
         asset,
         0,
@@ -322,7 +324,14 @@ auto getSceneData(
                 auto &mesh       = scene.meshes.emplace_back();
                 mesh.modelMatrix = toGLM(matrix);
 
-                // fmt::println(stderr, "Mesh: {}\n", assetMesh.name);
+                if (assetMesh.primitives.size() > 1) {
+                    fmt::println(
+                        stdout,
+                        "Mesh: <{}>, primitives.size(): {}\n",
+                        assetMesh.name,
+                        assetMesh.primitives.size());
+                }
+
                 for (auto &primitive : assetMesh.primitives) {
                     // fmt::println(stderr, "Primitive");
 
