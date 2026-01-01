@@ -1,48 +1,38 @@
 #pragma once
-#include <SDL3/SDL_events.h>
 
-#include <glm/mat4x4.hpp>
-#include <glm/vec3.hpp>
-
-#include <glm/ext/quaternion_float.hpp>
-
-#include <chrono>
-#include <numbers>
 #include <optional>
+#include <variant>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 struct PerspectiveCamera {
+    float yfov = 0.0f;
 
-    enum class Movement { None, Forward, Backward } moveX, moveY, moveZ;
-    enum class Rotation { None, CW, CCW } rotateX, rotateY;
+    std::optional<float> aspectRatio;
+
+    float                znear = 0.0f;
+    std::optional<float> zfar;
+};
+
+struct OrthographicCamera {
+    float xmag = 0.0f;
+    float ymag = 0.0f;
+
+    float znear = 0.0f;
+    float zfar  = 0.0f;
+};
+
+using CameraModel = std::variant<PerspectiveCamera, OrthographicCamera>;
+
+struct Camera {
+    CameraModel model;
 
     [[nodiscard]]
-    auto getViewMatrix() const -> glm::mat4;
+    auto getViewMatrix(
+        const glm::vec3 &translation,
+        const glm::quat &rotation) const -> glm::mat4;
 
     [[nodiscard]]
-    auto getProjectionMatrix() const -> glm::mat4;
-
-    auto getRotationAxis(
-        const Rotation   rotation,
-        glm::vec3       &axis,
-        const glm::vec3 &currentAxis) const -> void;
-
-    auto translate(const glm::vec3 &t) -> void;
-
-    auto rotate(
-        const float      angle,
-        const glm::vec3 &axis) -> void;
-
-    auto update(const std::chrono::duration<float> &dt) -> void;
-
-    auto processInput(SDL_Event &e) -> void;
-
-    glm::vec3            translation{0.0f, 0.0f, 1.0f};
-    glm::quat            rotation;
-    float                yfov        = 0.66f;
-    float                aspectRatio = 1.5f;
-    float                znear       = 1.0f;
-    std::optional<float> zfar        = 1000.0f;
-
-    float movementSpeed = 1.5f;                             // meters per second
-    float rotationSpeed = std::numbers::pi_v<float> / 4.0f; // seconds
+    auto getProjectionMatrix(float viewportAspect) const -> glm::mat4;
 };

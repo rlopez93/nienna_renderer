@@ -8,3 +8,6 @@
 	path = third_party/imgui
 	url = https://github.com/ocornut/imgui.git
 	branch = docking
+[submodule "third_party/MikkTSpace"]
+	path = third_party/MikkTSpace
+	url = https://github.com/mmikk/MikkTSpace
