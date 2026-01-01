@@ -5,9 +5,13 @@
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
 
-inline constexpr std::uint32_t kTexWhiteSrgb = 0u;
-inline constexpr std::uint32_t kTexWhiteLin  = 1u;
-inline constexpr std::uint32_t kTexFlatNorm  = 2u;
+enum DefaultTextureIndex : std::uint32_t {
+    kTexWhiteSrgb = 0u,
+    kTexWhiteLin  = 1u,
+    kTexFlatNorm  = 2u,
+
+    kDefaultTextureCount = 3u,
+};
 
 struct UVTransform2D {
     glm::vec2 offset{0.0f};
