@@ -9,11 +9,10 @@
 #include <cstdint>
 
 struct PushConstantBlock {
-    uint32_t  transformIndex;
-    int32_t   textureIndex;
-    uint32_t  debugView;
-    uint32_t  padding;
-    glm::vec4 baseColorFactor;
+    uint32_t objectIndex   = 0u;
+    uint32_t materialIndex = 0u;
+    uint32_t debugView     = 0u;
+    uint32_t _pad0         = 0u;
 };
 
 vk::raii::PipelineLayout createPipelineLayout(

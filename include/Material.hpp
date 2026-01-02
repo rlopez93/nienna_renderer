@@ -6,9 +6,9 @@
 #include <vulkan/vulkan.hpp>
 
 enum DefaultTextureIndex : std::uint32_t {
-    kTexWhiteSrgb = 0u,
-    kTexWhiteLin  = 1u,
-    kTexFlatNorm  = 2u,
+    kTexWhiteSrgb   = 0u,
+    kTexWhiteLinear = 1u,
+    kTexFlatNormals = 2u,
 
     kDefaultTextureCount = 3u,
 };
@@ -23,7 +23,7 @@ struct UVTransform2D {
 };
 
 struct TextureRef {
-    std::uint32_t textureIndex = kTexWhiteLin;
+    std::uint32_t textureIndex = kTexWhiteLinear;
     std::uint32_t texCoord     = 0u;
 
     UVTransform2D uvTransform{};
@@ -37,13 +37,13 @@ struct MaterialCore {
 
     TextureRef baseColorTexture{.textureIndex = kTexWhiteSrgb};
 
-    TextureRef metallicRoughnessTexture{.textureIndex = kTexWhiteLin};
+    TextureRef metallicRoughnessTexture{.textureIndex = kTexWhiteLinear};
 
-    TextureRef normalTexture{.textureIndex = kTexFlatNorm};
+    TextureRef normalTexture{.textureIndex = kTexFlatNormals};
 
     float normalScale = 1.0f;
 
-    TextureRef occlusionTexture{.textureIndex = kTexWhiteLin};
+    TextureRef occlusionTexture{.textureIndex = kTexWhiteLinear};
 
     float occlusionStrength = 1.0f;
 
@@ -53,30 +53,30 @@ struct MaterialCore {
 
     float alphaCutoff = 0.5f;
 
-    vk::Bool32 alphaMaskEnable  = VK_FALSE;
-    vk::Bool32 alphaBlendEnable = VK_FALSE;
+    vk::Bool32 alphaMaskEnable  = vk::False;
+    vk::Bool32 alphaBlendEnable = vk::False;
 
-    vk::Bool32 doubleSided = VK_FALSE;
+    vk::Bool32 doubleSided = vk::False;
 
     vk::CullModeFlags cullMode = vk::CullModeFlagBits::eBack;
 };
 
 struct MaterialExtUnlit {
-    vk::Bool32 enabled = VK_FALSE;
+    vk::Bool32 enabled = vk::False;
 };
 
 struct MaterialExtIor {
-    vk::Bool32 enabled = VK_FALSE;
+    vk::Bool32 enabled = vk::False;
     float      ior     = 1.5f;
 };
 
 struct MaterialExtSpecular {
-    vk::Bool32 enabled = VK_FALSE;
+    vk::Bool32 enabled = vk::False;
 
     float     specularFactor = 1.0f;
     glm::vec3 specularColorFactor{1.0f};
 
-    TextureRef specularTexture{.textureIndex = kTexWhiteLin};
+    TextureRef specularTexture{.textureIndex = kTexWhiteLinear};
 
     TextureRef specularColorTexture{.textureIndex = kTexWhiteSrgb};
 };
@@ -86,13 +86,13 @@ struct MaterialExtClearcoat {
 
     float clearcoatFactor = 0.0f;
 
-    TextureRef clearcoatTexture{.textureIndex = kTexWhiteLin};
+    TextureRef clearcoatTexture{.textureIndex = kTexWhiteLinear};
 
     float clearcoatRoughnessFactor = 0.0f;
 
-    TextureRef clearcoatRoughnessTexture{.textureIndex = kTexWhiteLin};
+    TextureRef clearcoatRoughnessTexture{.textureIndex = kTexWhiteLinear};
 
-    TextureRef clearcoatNormalTexture{.textureIndex = kTexFlatNorm};
+    TextureRef clearcoatNormalTexture{.textureIndex = kTexFlatNormals};
 };
 
 struct Material {

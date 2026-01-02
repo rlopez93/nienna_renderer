@@ -1,11 +1,10 @@
+#include "GltfLoader.hpp"
 #include "RenderContext.hpp"
 #include "Renderer.hpp"
-#include "Scene.hpp"
 #include "SceneRenderData.hpp"
+#include "ShaderInterfaceTypes.hpp"
 #include "Utility.hpp"
 #include "Window.hpp"
-#include "gltfLoader.hpp"
-#include <ranges>
 
 #include <SDL3/SDL_events.h>
 
@@ -36,35 +35,33 @@ auto chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableForma
     return availableFormats.front();
 }
 
-void updatePerFrameUniformBuffers(
-    const Allocator &allocator,
-    Buffer          &transformUBO,
-    Buffer          &lightUBO,
-    const Scene     &scene)
+auto updatePerFrameBuffers(
+    const Allocator               &allocator,
+    Buffer                        &frameUbo,
+    Buffer                        &objectsSsbo,
+    const FrameUniforms           &frame,
+    const std::vector<ObjectData> &objects) -> void
 {
-    // update uniform buffers
-    for (const auto &[meshIndex, mesh] : std::views::enumerate(scene.meshes)) {
-        auto transform = Transform{
-            .modelMatrix          = mesh.modelMatrix,
-            .viewProjectionMatrix = scene.getCamera().getProjectionMatrix()
-                                  * scene.getCamera().getViewMatrix()};
-        // transform.viewProjectionMatrix[1][1] *= -1;
+    VK_CHECK(vmaCopyMemoryToAllocation(
+        allocator.allocator,
+        &frame,
+        frameUbo.allocation,
+        0,
+        sizeof(FrameUniforms)));
 
-        VK_CHECK(vmaCopyMemoryToAllocation(
-            allocator.allocator,
-            &transform,
-            transformUBO.allocation,
-            sizeof(Transform) * meshIndex,
-            sizeof(Transform)));
+    if (objects.empty()) {
+        return;
     }
-    auto light = Light{};
+
+    const auto bytes = static_cast<vk::DeviceSize>(sizeof(ObjectData))
+                     * static_cast<vk::DeviceSize>(objects.size());
 
     VK_CHECK(vmaCopyMemoryToAllocation(
         allocator.allocator,
-        &light,
-        lightUBO.allocation,
+        objects.data(),
+        objectsSsbo.allocation,
         0,
-        sizeof(light)));
+        bytes));
 }
 
 auto main(
@@ -92,7 +89,7 @@ auto main(
     auto requiredExtensions = std::vector{
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
-        VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
+        // VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
         VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
         VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME,
         VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
@@ -106,8 +103,7 @@ auto main(
 
     auto context = RenderContext{window, requiredExtensions};
 
-    auto asset = getGltfAsset(gltfPath);
-    auto scene = getSceneData(asset, gltfDirectory);
+    auto asset = getAsset(gltfPath);
 
     const auto formats =
         context.physicalDevice.handle.getSurfaceFormatsKHR(context.surface.handle);
@@ -125,31 +121,45 @@ auto main(
         uploadCmd,
         context.swapchain.extent());
 
+    auto textureCount = static_cast<uint32_t>(asset.textures.size());
+
     RendererConfig rendererConfig{
-        .shaderInterfaceDescription =
-            ShaderInterfaceDescription{
-                {// binding 0: Transform[] UBO
-                 {0,
-                  vk::DescriptorType::eUniformBuffer,
-                  static_cast<uint32_t>(scene.meshes.size()),
-                  vk::ShaderStageFlagBits::eVertex},
+        .shaderInterfaceDescription = ShaderInterfaceDescription{{
+            {0,
+             vk::DescriptorType::eUniformBuffer,
+             1,
+             vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
 
-                 // binding 1: Texture[] sampler
-                 {1,
-                  vk::DescriptorType::eCombinedImageSampler,
-                  static_cast<uint32_t>(scene.textures.size()),
-                  vk::ShaderStageFlagBits::eFragment},
+            {1,
+             vk::DescriptorType::eStorageBuffer,
+             1,
+             vk::ShaderStageFlagBits::eVertex},
 
-                 // binding 2: Light UBO
-                 {2,
-                  vk::DescriptorType::eUniformBuffer,
-                  1,
-                  vk::ShaderStageFlagBits::eFragment}}},
-        .shaderPath        = shaderPath,
-        .colorFormat       = surfaceFormat.format,
-        .depthFormat       = depthFormat,
-        .maxFramesInFlight = 2};
+            {2,
+             vk::DescriptorType::eStorageBuffer,
+             1,
+             vk::ShaderStageFlagBits::eFragment},
 
+            {3,
+             vk::DescriptorType::eSampledImage,
+             textureCount,
+             vk::ShaderStageFlagBits::eFragment},
+
+            {4,
+             vk::DescriptorType::eSampledImage,
+             textureCount,
+             vk::ShaderStageFlagBits::eFragment},
+
+            {5,
+             vk::DescriptorType::eSampler,
+             textureCount,
+             vk::ShaderStageFlagBits::eFragment},
+        }},
+        .shaderPath                 = shaderPath,
+        .colorFormat                = surfaceFormat.format,
+        .depthFormat                = depthFormat,
+        .maxFramesInFlight          = 2,
+    };
     auto renderer = Renderer{context, rendererConfig};
 
     auto sceneRenderData = SceneRenderData{};

@@ -211,27 +211,21 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
         {});
 
     for (const auto &draw : sceneRenderData.draws) {
-        // fmt::println("I am here on frame {}.", frames.current());
-        // Current upload path is one vertex+index buffer per mesh => buffer index
-        // equals draw item index. If you later batch/merge buffers, replace these
-        // indices with draw.vertexBufferIndex / draw.indexBufferIndex.
-        const uint32_t bufferIndex = draw.transformIndex;
 
         frames.cmd().bindVertexBuffers(
             0,
-            sceneRenderData.vertexBuffers[bufferIndex].buffer,
+            sceneRenderData.vertexBuffers[draw.geometryIndex].buffer,
             {0});
 
         frames.cmd().bindIndexBuffer(
-            sceneRenderData.indexBuffers[bufferIndex].buffer,
+            sceneRenderData.indexBuffers[draw.geometryIndex].buffer,
             0,
             vk::IndexType::eUint16);
 
         auto pushConstant = PushConstantBlock{
-            .transformIndex  = draw.transformIndex,
-            .textureIndex    = draw.textureIndex,
-            .debugView       = static_cast<uint32_t>(debugView),
-            .baseColorFactor = draw.baseColor};
+            .objectIndex   = draw.objectIndex,
+            .materialIndex = draw.materialIndex,
+            .debugView     = static_cast<uint32_t>(debugView)};
 
         frames.cmd().pushConstants2(
             vk::PushConstantsInfo{

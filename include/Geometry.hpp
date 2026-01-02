@@ -18,9 +18,9 @@ struct Vertex {
     glm::vec4 color{1.0f};
 };
 
-struct Submesh {
+struct Primitive {
     std::vector<Vertex>        vertices;
-    std::vector<std::uint32_t> indices;
+    std::vector<std::uint16_t> indices;
 
     std::uint32_t materialIndex = 0u;
 
@@ -29,6 +29,6 @@ struct Submesh {
     bool tangentsValid = false;
 };
 
-struct MeshAsset {
-    std::vector<Submesh> submeshes;
+struct Mesh {
+    std::vector<Primitive> primitives;
 };

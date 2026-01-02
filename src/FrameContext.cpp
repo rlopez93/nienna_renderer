@@ -1,5 +1,5 @@
 #include "FrameContext.hpp"
-#include "Scene.hpp"
+#include "ShaderInterfaceTypes.hpp"
 
 #include <numeric>
 
@@ -99,21 +99,24 @@ auto FrameContext::setDescriptorSets(std::vector<vk::raii::DescriptorSet> &&sets
 
 auto FrameContext::createPerFrameUniformBuffers(
     Allocator &allocator,
-    uint32_t   meshCount) -> void
+    uint32_t   objectCount) -> void
 {
-    // Recreate-safe: clear and rebuild
-    transformUBO.clear();
-    lightUBO.clear();
+    frameUBO.clear();
+    objectsSSBO.clear();
 
-    transformUBO.reserve(maxFramesInFlight);
-    lightUBO.reserve(maxFramesInFlight);
+    frameUBO.reserve(maxFramesInFlight);
+    objectsSSBO.reserve(maxFramesInFlight);
 
-    const vk::DeviceSize transformBytes = static_cast<vk::DeviceSize>(sizeof(Transform))
-                                        * static_cast<vk::DeviceSize>(meshCount);
+    const uint32_t elemCount = (objectCount == 0u) ? 1u : objectCount;
 
-    for (uint32_t i = 0; i < maxFramesInFlight; ++i) {
-        transformUBO.emplace_back(allocator.createBuffer(
-            transformBytes,
+    const auto frameBytes = static_cast<vk::DeviceSize>(sizeof(FrameUniforms));
+
+    const auto objectBytes = static_cast<vk::DeviceSize>(sizeof(ObjectData))
+                           * static_cast<vk::DeviceSize>(elemCount);
+
+    for (uint32_t i = 0u; i < maxFramesInFlight; ++i) {
+        frameUBO.emplace_back(allocator.createBuffer(
+            frameBytes,
             vk::BufferUsageFlagBits2::eUniformBuffer
                 | vk::BufferUsageFlagBits2::eTransferDst,
             false,
@@ -121,8 +124,8 @@ auto FrameContext::createPerFrameUniformBuffers(
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
                 | VMA_ALLOCATION_CREATE_MAPPED_BIT));
 
-        lightUBO.emplace_back(allocator.createBuffer(
-            sizeof(Light),
+        objectsSSBO.emplace_back(allocator.createBuffer(
+            objectBytes,
             vk::BufferUsageFlagBits2::eUniformBuffer
                 | vk::BufferUsageFlagBits2::eTransferDst,
             false,
