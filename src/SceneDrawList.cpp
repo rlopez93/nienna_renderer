@@ -1,72 +1,183 @@
+// SceneDrawList.cpp
 #include "SceneDrawList.hpp"
 
-#include <cstdint>
+#include <optional>
 #include <ranges>
+#include <stdexcept>
+
+#include <fmt/format.h>
 
 #include "Asset.hpp"
 
 namespace
 {
 
-struct TRS {
-    glm::vec3 translation{0.0f};
-    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
-    glm::vec3 scale{1.0f};
+// TODO: Stub. Will compute world-space AABB of the active scene.
+struct SceneBounds {
+    glm::vec3 min{0.0f};
+    glm::vec3 max{0.0f};
 };
 
-auto composeTRS(
-    const TRS &parent,
-    const TRS &local) -> TRS
+auto computeSceneBounds(
+    const Asset         &asset,
+    const SceneDrawList &sceneDrawList) -> SceneBounds
 {
-    return TRS{
-        .translation =
-            parent.translation + (parent.rotation * (parent.scale * local.translation)),
-        .rotation = parent.rotation * local.rotation,
-        .scale    = parent.scale * local.scale,
+    (void)asset;
+    (void)sceneDrawList;
+    return {};
+}
+
+// TODO: Stub. Will create a fallback camera from scene bounds.
+auto createDefaultCamera(
+    const Asset       &asset,
+    const SceneBounds &sceneBounds) -> CameraInstance
+{
+    (void)asset;
+    (void)sceneBounds;
+    return {};
+}
+
+// Build a local TRS matrix in glTF order: M = T * R * S.
+auto makeLocalMatrix(const Node &node) -> glm::mat4
+{
+    const auto t = glm::translate(glm::mat4{1.0f}, node.translation);
+    const auto r = glm::mat4_cast(node.rotation);
+    const auto s = glm::scale(glm::mat4{1.0f}, node.scale);
+
+    return t * r * s;
+}
+
+// Remove the component of a along b (Gram-Schmidt "reject").
+// Assumes b is normalized.
+auto reject(
+    const glm::vec3 &a,
+    const glm::vec3 &b) -> glm::vec3
+{
+    return a - b * glm::dot(a, b);
+}
+
+// Normalize v if its length is >= eps.
+// Returns nullopt if v is too small to normalize safely.
+auto safeNormalize(
+    const glm::vec3 &v,
+    const float      eps) -> std::optional<glm::vec3>
+{
+    const auto length_v = glm::length(v);
+    if (length_v < eps) {
+        return std::nullopt;
+    }
+
+    return v / length_v;
+}
+
+// Extract the (possibly scaled/sheared) basis from a mat4.
+// GLM is column-major: m[0], m[1], m[2] are basis columns.
+auto extractBasisXY(const glm::mat4 &m) -> glm::mat3
+{
+    return glm::mat3{
+        glm::vec3{m[0]},
+        glm::vec3{m[1]},
+        glm::vec3{m[2]},
+    };
+}
+
+// Construct a right-handed orthonormal basis given orthonormal x,y.
+auto makeRightHanded(
+    const glm::vec3 &x,
+    const glm::vec3 &y) -> glm::mat3
+{
+    const auto z = glm::cross(x, y);
+    return glm::mat3{x, y, z};
+}
+
+// Orthonormalize x and y and return a right-handed rotation basis.
+// This is used to "ignore scale" for camera transforms by turning the
+// matrix's upper-left 3x3 into a pure rotation.
+auto orthonormalizeXY(
+    glm::vec3 x,
+    glm::vec3 y) -> glm::mat3
+{
+    constexpr auto eps = 1e-8f;
+
+    const auto xOpt = safeNormalize(x, eps);
+    if (!xOpt.has_value()) {
+        throw std::runtime_error{fmt::format("camera basis degenerate (x)")};
+    }
+
+    x = xOpt.value();
+
+    y = reject(y, x);
+
+    const auto yOpt = safeNormalize(y, eps);
+    if (!yOpt.has_value()) {
+        throw std::runtime_error{fmt::format("camera basis degenerate (y)")};
+    }
+
+    y = yOpt.value();
+
+    return makeRightHanded(x, y);
+}
+
+struct CameraTR {
+    glm::vec3 translation{0.0f};
+    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
+};
+
+// Extract camera translation and rotation from a world matrix while
+// explicitly ignoring scale (and shear) in the rotation.
+auto extractCameraTranslationRotation(const glm::mat4 &world) -> CameraTR
+{
+    const auto translation = glm::vec3{world[3]};
+
+    const auto basis = extractBasisXY(world);
+    const auto rotM  = orthonormalizeXY(basis[0], basis[1]);
+    const auto rotQ  = glm::normalize(glm::quat_cast(rotM));
+
+    return CameraTR{
+        .translation = translation,
+        .rotation    = rotQ,
     };
 }
 
 auto visitNode(
-    SceneDrawList &sceneDrawList,
-    const Asset   &asset,
-    std::uint32_t  nodeIndex,
-    const TRS     &parentWorld) -> void
+    SceneDrawList   &sceneDrawList,
+    const Asset     &asset,
+    std::uint32_t    nodeIndex,
+    const glm::mat4 &parentWorld) -> void
 {
     const auto &node = asset.nodes[nodeIndex];
 
-    const auto local = TRS{
-        .translation = node.translation,
-        .rotation    = node.rotation,
-        .scale       = node.scale,
-    };
-
-    const auto world = composeTRS(parentWorld, local);
+    const auto local = makeLocalMatrix(node);
+    const auto world = parentWorld * local;
 
     if (node.cameraIndex.has_value()) {
 
+        const auto cameraTR = extractCameraTranslationRotation(world);
+
         sceneDrawList.cameraInstances.push_back(
             CameraInstance{
-                .translation = world.translation,
-                .rotation    = world.rotation,
+                .translation = cameraTR.translation,
+                .rotation    = cameraTR.rotation,
                 .nodeIndex   = nodeIndex,
                 .cameraIndex = static_cast<std::uint32_t>(*node.cameraIndex),
             });
     }
 
     if (node.meshIndex.has_value()) {
+
         const auto meshIndex = node.meshIndex.value();
+
         const auto nodeInstanceIndex =
             static_cast<std::uint32_t>(sceneDrawList.nodeInstances.size());
 
         sceneDrawList.nodeInstances.push_back(
             NodeInstance{
-                .translation = world.translation,
-                .rotation    = world.rotation,
-                .scale       = world.scale,
+                .modelMatrix = world,
                 .nodeIndex   = nodeIndex,
             });
 
         const auto &mesh = asset.meshes[meshIndex];
+
         for (const auto &[primitiveIndex, primitive] :
              std::views::enumerate(mesh.primitives)) {
 
@@ -84,33 +195,31 @@ auto visitNode(
         }
     }
 
-    for (auto childIndex : node.children) {
+    for (const auto childIndex : node.children) {
         visitNode(sceneDrawList, asset, childIndex, world);
     }
 }
-
 } // namespace
 
 auto buildSceneDrawList(const Asset &asset) -> SceneDrawList
 {
-    SceneDrawList runtimeScene{
+    auto sceneDrawList = SceneDrawList{
         .sceneIndex = asset.activeScene,
     };
 
-    if (asset.scenes.empty()) {
-        return runtimeScene;
+    if (!asset.scenes.empty()) {
+        const auto &scene = asset.scenes[sceneDrawList.sceneIndex];
+
+        for (const auto rootIndex : scene.rootNodes) {
+            visitNode(sceneDrawList, asset, rootIndex, glm::mat4{1.0f});
+        }
     }
 
-    const auto &scene = asset.scenes[runtimeScene.sceneIndex];
+    if (sceneDrawList.cameraInstances.empty()) {
+        const auto bounds = computeSceneBounds(asset, sceneDrawList);
 
-    const auto identity = TRS{};
-
-    for (auto rootIndex : scene.rootNodes) {
-        visitNode(runtimeScene, asset, rootIndex, identity);
+        sceneDrawList.cameraInstances.push_back(createDefaultCamera(asset, bounds));
     }
 
-    // TODO (camera B):
-    // If out.activeCamera is empty, use a fallback camera.
-
-    return runtimeScene;
+    return sceneDrawList;
 }
