@@ -1,5 +1,6 @@
 #pragma once
 
+#include <numbers>
 #include <optional>
 #include <variant>
 
@@ -7,11 +8,11 @@
 #include <glm/gtc/quaternion.hpp>
 
 struct PerspectiveCamera {
-    float yfov = 0.0f;
+    float yfov = std::numbers::pi_v<float> / 3.0f;
 
     std::optional<float> aspectRatio;
 
-    float                znear = 0.0f;
+    float                znear = 0.1f;
     std::optional<float> zfar;
 };
 

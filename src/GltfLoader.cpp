@@ -707,36 +707,37 @@ auto loadCameras(
     asset.cameras.clear();
     asset.cameras.resize(gltfAsset.cameras.size());
 
+    const auto cameraVisitor = overloads{
+        [&](const fastgltf::Camera::Perspective &p) -> CameraModel {
+            PerspectiveCamera perspectiveCamera{};
+            perspectiveCamera.yfov        = p.yfov;
+            perspectiveCamera.aspectRatio = p.aspectRatio;
+            perspectiveCamera.znear       = p.znear;
+            perspectiveCamera.zfar        = p.zfar;
+
+            return perspectiveCamera;
+        },
+        [&](const fastgltf::Camera::Orthographic &o) -> CameraModel {
+            OrthographicCamera orthographicCamera{};
+            orthographicCamera.xmag  = o.xmag;
+            orthographicCamera.ymag  = o.ymag;
+            orthographicCamera.znear = o.znear;
+            orthographicCamera.zfar  = o.zfar;
+            return orthographicCamera;
+        },
+    };
+
     for (std::size_t cameraIndex = 0u; cameraIndex < gltfAsset.cameras.size();
          ++cameraIndex) {
 
         const fastgltf::Camera &gltfCamera = gltfAsset.cameras[cameraIndex];
 
-        const auto visitor = overloads{
-            [&](const fastgltf::Camera::Perspective &p) -> CameraModel {
-                PerspectiveCamera perspectiveCamera{};
-                perspectiveCamera.yfov        = p.yfov;
-                perspectiveCamera.aspectRatio = p.aspectRatio;
-                perspectiveCamera.znear       = p.znear;
-                perspectiveCamera.zfar        = p.zfar;
-
-                return perspectiveCamera;
-            },
-            [&](const fastgltf::Camera::Orthographic &o) -> CameraModel {
-                OrthographicCamera orthographicCamera{};
-                orthographicCamera.xmag  = o.xmag;
-                orthographicCamera.ymag  = o.ymag;
-                orthographicCamera.znear = o.znear;
-                orthographicCamera.zfar  = o.zfar;
-                return orthographicCamera;
-            },
-        };
-
-        Camera camera{};
-        camera.model = gltfCamera.camera.visit(visitor);
-
-        asset.cameras[cameraIndex] = std::move(camera);
+        asset.cameras[cameraIndex] =
+            Camera{.model = gltfCamera.camera.visit(cameraVisitor)};
     }
+
+    // final default camera
+    asset.cameras.push_back(Camera{.model = PerspectiveCamera{}});
 }
 
 auto loadNodes(

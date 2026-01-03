@@ -12,14 +12,26 @@
 namespace
 {
 
-// TODO: Stub. Will create a fallback camera from scene bounds.
 auto createDefaultCamera(
     const Asset &asset,
     const AABB  &sceneAABB) -> CameraInstance
 {
-    (void)asset;
-    (void)sceneAABB;
-    return {};
+    const auto center = (sceneAABB.min + sceneAABB.max) * 0.5f;
+
+    const auto extent = sceneAABB.max - sceneAABB.min;
+
+    const auto radius = 0.5f * glm::length(extent);
+
+    glm::vec3 translation{0.0f};
+
+    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
+
+    return CameraInstance{
+        .translation = translation,
+        .rotation    = rotation,
+        .nodeIndex   = std::numeric_limits<std::uint32_t>::max(),
+        .cameraIndex = static_cast<std::uint32_t>(asset.cameras.size() - 1),
+    };
 }
 
 // Build a local TRS matrix in glTF order: M = T * R * S.
