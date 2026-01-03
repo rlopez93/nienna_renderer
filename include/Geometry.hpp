@@ -20,7 +20,7 @@ struct Vertex {
 
 struct Primitive {
     std::vector<Vertex>        vertices;
-    std::vector<std::uint16_t> indices;
+    std::vector<std::uint32_t> indices;
 
     std::uint32_t materialIndex = 0u;
 

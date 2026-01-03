@@ -25,13 +25,14 @@ target_sources(nienna PRIVATE
     src/DepthTarget.cpp
     src/Device.cpp
     src/FrameContext.cpp
+    src/GltfLoader.cpp
     src/Instance.cpp
+    src/MaterialPacking.cpp
     src/PhysicalDevice.cpp
     src/Pipeline.cpp
     src/PipelineLayout.cpp
     src/RenderContext.cpp
     src/Renderer.cpp
-    src/Scene.cpp
     src/SceneRenderData.cpp
     src/Shader.cpp
     src/ShaderInterface.cpp
@@ -39,7 +40,6 @@ target_sources(nienna PRIVATE
     src/Swapchain.cpp
     src/Utility.cpp
     src/Window.cpp
-    src/gltfLoader.cpp
     src/main.cpp
     src/spirv_reflect.c
     src/stb_image.cpp

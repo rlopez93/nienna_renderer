@@ -19,7 +19,7 @@ struct UVTransform2D {
 
     float rotation = 0.0f;
 
-    vk::Bool32 enabled = VK_FALSE;
+    vk::Bool32 enabled = vk::False;
 };
 
 struct TextureRef {
@@ -82,7 +82,7 @@ struct MaterialExtSpecular {
 };
 
 struct MaterialExtClearcoat {
-    vk::Bool32 enabled = VK_FALSE;
+    vk::Bool32 enabled = vk::False;
 
     float clearcoatFactor = 0.0f;
 

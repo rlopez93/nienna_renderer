@@ -3,9 +3,6 @@
 #include <cstdint>
 #include <ranges>
 
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/quaternion.hpp>
-
 #include "Asset.hpp"
 
 namespace

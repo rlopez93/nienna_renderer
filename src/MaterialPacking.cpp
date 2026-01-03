@@ -1,8 +1,6 @@
 #include "MaterialPacking.hpp"
 #include "Material.hpp"
 
-#include <vulkan/vulkan.hpp>
-
 namespace
 {
 

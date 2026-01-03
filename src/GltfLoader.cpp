@@ -97,10 +97,10 @@ auto makeDefaultSamplerInfo() -> vk::SamplerCreateInfo
 
     samplerInfo.mipLodBias = 0.0f;
 
-    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.anisotropyEnable = vk::False;
     samplerInfo.maxAnisotropy    = 1.0f;
 
-    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareEnable = vk::False;
     samplerInfo.compareOp     = vk::CompareOp::eNever;
 
     samplerInfo.minLod = 0.0f;
@@ -108,7 +108,7 @@ auto makeDefaultSamplerInfo() -> vk::SamplerCreateInfo
 
     samplerInfo.borderColor = vk::BorderColor::eFloatTransparentBlack;
 
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.unnormalizedCoordinates = vk::False;
 
     return samplerInfo;
 }
@@ -447,7 +447,7 @@ auto makeTextureRef(
     textureRef.texCoord = static_cast<std::uint32_t>(textureInfo.texCoordIndex);
 
     // TODO: KHR_texture_transform (deferred).
-    textureRef.uvTransform.enabled = VK_FALSE;
+    textureRef.uvTransform.enabled = vk::False;
 
     return textureRef;
 }
@@ -551,27 +551,27 @@ auto loadMaterials(
         material.core.emissiveFactor = toGlm(gltfMaterial.emissiveFactor);
         switch (gltfMaterial.alphaMode) {
         case fastgltf::AlphaMode::Opaque:
-            material.core.alphaMaskEnable  = VK_FALSE;
-            material.core.alphaBlendEnable = VK_FALSE;
+            material.core.alphaMaskEnable  = vk::False;
+            material.core.alphaBlendEnable = vk::False;
             break;
         case fastgltf::AlphaMode::Mask:
-            material.core.alphaMaskEnable  = VK_TRUE;
-            material.core.alphaBlendEnable = VK_FALSE;
+            material.core.alphaMaskEnable  = vk::True;
+            material.core.alphaBlendEnable = vk::False;
             material.core.alphaCutoff      = gltfMaterial.alphaCutoff;
             break;
         case fastgltf::AlphaMode::Blend:
-            material.core.alphaMaskEnable  = VK_FALSE;
-            material.core.alphaBlendEnable = VK_TRUE;
+            material.core.alphaMaskEnable  = vk::False;
+            material.core.alphaBlendEnable = vk::True;
             break;
         }
 
-        material.core.doubleSided = gltfMaterial.doubleSided ? VK_TRUE : VK_FALSE;
+        material.core.doubleSided = gltfMaterial.doubleSided ? vk::True : vk::False;
 
         material.core.cullMode = gltfMaterial.doubleSided ? vk::CullModeFlagBits::eNone
                                                           : vk::CullModeFlagBits::eBack;
 
         // TODO: Extension extraction (deferred).
-        material.unlit.enabled = gltfMaterial.unlit ? VK_TRUE : VK_FALSE;
+        material.unlit.enabled = gltfMaterial.unlit ? vk::True : vk::False;
 
         matRemap[materialIndex] = static_cast<std::uint32_t>(asset.materials.size());
 
@@ -625,10 +625,10 @@ auto loadMeshes(
                 gltfAsset.accessors[gltfPrimitive.indicesAccessor.value()];
             primitive.indices.resize(indexAccessor.count);
 
-            fastgltf::iterateAccessorWithIndex<std::uint16_t>(
+            fastgltf::iterateAccessorWithIndex<std::uint32_t>(
                 gltfAsset,
                 indexAccessor,
-                [&](std::uint16_t index, std::size_t idx) {
+                [&](std::uint32_t index, std::size_t idx) {
                     primitive.indices[idx] = index;
                 });
 
