@@ -1,3 +1,5 @@
+#include "AABB.hpp"
+#include "Camera.hpp"
 #include "GltfLoader.hpp"
 #include "RenderContext.hpp"
 #include "Renderer.hpp"
@@ -8,6 +10,11 @@
 #include "Window.hpp"
 
 #include <SDL3/SDL_events.h>
+
+#include <algorithm>
+#include <cmath>
+#include <fmt/format.h>
+#include <limits>
 
 // TODO: add SDL event polling
 void processEvents(bool &running)
@@ -65,6 +72,81 @@ auto updatePerFrameUniformBuffers(
         bytes));
 }
 
+namespace
+{
+
+auto computePerspectiveCameraDistanceToFitSceneHalfExtents(
+    float            yfov,
+    float            znear,
+    float            viewportAspect,
+    const glm::vec3 &sceneHalfExtents) -> float
+{
+    const float halfYfov = 0.5f * yfov;
+
+    const float halfXfov = std::atan(std::tan(halfYfov) * viewportAspect);
+
+    const float distanceToFitVertical = sceneHalfExtents.y / std::tan(halfYfov);
+
+    const float distanceToFitHorizontal = sceneHalfExtents.x / std::tan(halfXfov);
+
+    const float distanceToFit =
+        std::max(distanceToFitVertical, distanceToFitHorizontal);
+
+    const float distanceToAvoidNearClip = sceneHalfExtents.z + znear;
+
+    return distanceToFit + distanceToAvoidNearClip;
+}
+
+auto upsertDefaultCameraInstance(
+    const Asset   &asset,
+    SceneDrawList &sceneDrawList,
+    float          viewportAspect) -> void
+{
+    if (asset.cameras.empty()) {
+        throw std::runtime_error{fmt::format("asset.cameras is empty")};
+    }
+
+    const auto defaultCameraIndex =
+        static_cast<std::uint32_t>(asset.cameras.size() - 1u);
+
+    const auto sceneAABB = computeSceneAABB(asset, sceneDrawList);
+
+    const auto sceneCenter = 0.5f * (sceneAABB.min + sceneAABB.max);
+
+    const auto sceneHalfExtents = 0.5f * (sceneAABB.max - sceneAABB.min);
+
+    const auto &defaultCamera = asset.cameras[defaultCameraIndex];
+
+    const auto &defaultPerspectiveCamera =
+        std::get<PerspectiveCamera>(defaultCamera.model);
+
+    const float distance = computePerspectiveCameraDistanceToFitSceneHalfExtents(
+        defaultPerspectiveCamera.yfov,
+        defaultPerspectiveCamera.znear,
+        viewportAspect,
+        sceneHalfExtents);
+
+    const auto defaultCameraTranslation = sceneCenter + glm::vec3{0.0f, 0.0f, distance};
+
+    const auto defaultCameraRotation = glm::quat{1.0f, 0.0f, 0.0f, 0.0f};
+
+    const std::uint32_t invalidNodeIndex = std::numeric_limits<std::uint32_t>::max();
+
+    sceneDrawList.cameraInstances.push_back(
+        CameraInstance{
+            .translation = defaultCameraTranslation,
+            .rotation    = defaultCameraRotation,
+            .nodeIndex   = invalidNodeIndex,
+            .cameraIndex = defaultCameraIndex,
+        });
+
+    // If no cameras existed, make the inserted one active.
+    if (sceneDrawList.cameraInstances.size() == 1u) {
+        sceneDrawList.activeCameraInstanceIndex = 0u;
+    }
+}
+
+} // namespace
 auto main(
     int   argc,
     char *argv[]) -> int
@@ -120,7 +202,9 @@ auto main(
         uploadCmd,
         context.swapchain.extent());
 
-    auto asset        = getAsset(gltfPath);
+    auto asset         = getAsset(gltfPath);
+    auto sceneDrawList = buildSceneDrawList(asset);
+
     auto textureCount = static_cast<uint32_t>(asset.textures.size());
 
     RendererConfig rendererConfig{
@@ -162,12 +246,27 @@ auto main(
     };
     auto renderer = Renderer{context, rendererConfig};
 
-    auto sceneDrawList   = buildSceneDrawList(asset);
+    const auto  initialExtent         = context.extent();
+    const float initialViewportAspect = static_cast<float>(initialExtent.width)
+                                      / static_cast<float>(initialExtent.height);
+
+    upsertDefaultCameraInstance(asset, sceneDrawList, initialViewportAspect);
     auto sceneRenderData = SceneRenderData{};
     sceneRenderData
         .create(asset, sceneDrawList, context.device, uploadCmd, context.allocator);
 
-    renderer.initializePerFrameUniforms(context.allocator, scene.meshes.size());
+    auto nodeInstancesData = std::vector<NodeInstanceData>{};
+    nodeInstancesData.reserve(sceneDrawList.nodeInstances.size());
+
+    for (const auto &nodeInstance : sceneDrawList.nodeInstances) {
+        nodeInstancesData.push_back(
+            NodeInstanceData{
+                .modelMatrix = nodeInstance.modelMatrix,
+            });
+    }
+
+    const uint32_t nodeInstanceCount = static_cast<uint32_t>(nodeInstancesData.size());
+    renderer.initializePerFrameUniformBuffers(context.allocator, nodeInstanceCount);
 
     auto     running        = true;
     auto     previousTime   = std::chrono::high_resolution_clock::now();
@@ -207,18 +306,35 @@ auto main(
             frameCount = 0;
         }
 
+        const auto extent = context.extent();
+        const auto viewportAspect =
+            static_cast<float>(extent.width) / static_cast<float>(extent.height);
+
+        const auto &activeCameraInstance = sceneDrawList.activeCameraInstance();
+
+        const auto &activeCamera = asset.cameras[activeCameraInstance.cameraIndex];
+
+        auto frameUniforms = FrameUniforms{
+            .viewProjectionMatrix = activeCamera.getProjectionMatrix(viewportAspect)
+                                  * activeCamera.getViewMatrix(
+                                      activeCameraInstance.translation,
+                                      activeCameraInstance.rotation),
+            .directionalLight = DirectionalLight{},
+            .pointLight       = PointLight{},
+        };
+
         updatePerFrameUniformBuffers(
             context.allocator,
-            renderer.currentTransformUBO(),
-            renderer.currentLightUBO(),
-            scene);
+            renderer.currentFrameUBO(),
+            renderer.currentNodeInstancesSSBO(),
+            frameUniforms,
+            nodeInstancesData);
 
         sceneRenderData.updateDescriptorSet(
             context.device,
             renderer.currentDescriptorSet(),
-            renderer.currentTransformUBO(),
-            renderer.currentLightUBO(),
-            sampler);
+            renderer.currentFrameUBO(),
+            renderer.currentNodeInstancesSSBO());
 
         renderer.render(sceneRenderData);
 

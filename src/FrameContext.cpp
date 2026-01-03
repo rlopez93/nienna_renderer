@@ -97,7 +97,7 @@ auto FrameContext::setDescriptorSets(std::vector<vk::raii::DescriptorSet> &&sets
     descriptorSets = std::move(sets);
 }
 
-auto FrameContext::createPerFrameUniformBuffers(
+auto FrameContext::initializePerFrameUniformBuffers(
     Allocator &allocator,
     uint32_t   nodeInstanceCount) -> void
 {
@@ -126,7 +126,7 @@ auto FrameContext::createPerFrameUniformBuffers(
 
         nodeInstancesSSBO.emplace_back(allocator.createBuffer(
             nodeInstanceBytes,
-            vk::BufferUsageFlagBits2::eUniformBuffer
+            vk::BufferUsageFlagBits2::eStorageBuffer
                 | vk::BufferUsageFlagBits2::eTransferDst,
             false,
             VMA_MEMORY_USAGE_AUTO,

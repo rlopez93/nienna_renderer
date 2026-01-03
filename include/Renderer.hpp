@@ -28,13 +28,12 @@ struct Renderer {
 
     // Frame-relative resource access (read/write by application)
     vk::DescriptorSet currentDescriptorSet() const;
-    Buffer           &currentTransformUBO();
-    Buffer           &currentLightUBO();
+    Buffer           &currentFrameUBO();
+    Buffer           &currentNodeInstancesSSBO();
 
-    // Call once after scene load when meshCount is known.
-    auto initializePerFrameUniforms(
+    auto initializePerFrameUniformBuffers(
         Allocator &allocator,
-        uint32_t   meshCount) -> void;
+        uint32_t   nodeInstancesCount) -> void;
 
     void cycleDebugView();
 

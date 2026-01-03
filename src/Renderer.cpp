@@ -46,12 +46,13 @@ auto Renderer::allocateFrameDescriptorSets() -> void
     }
 }
 
-auto Renderer::initializePerFrameUniforms(
+auto Renderer::initializePerFrameUniformBuffers(
     Allocator &allocator,
-    uint32_t   meshCount) -> void
+    uint32_t   nodeInstancesCount) -> void
 {
-    frames.createPerFrameUniformBuffers(allocator, meshCount);
+    frames.initializePerFrameUniformBuffers(allocator, nodeInstancesCount);
 }
+
 Renderer::Renderer(
     RenderContext        &context_,
     const RendererConfig &config)
@@ -335,14 +336,14 @@ vk::DescriptorSet Renderer::currentDescriptorSet() const
     return frames.currentDescriptorSet();
 }
 
-Buffer &Renderer::currentTransformUBO()
+Buffer &Renderer::currentFrameUBO()
 {
-    return frames.transformUBO[frames.current()];
+    return frames.frameUBO[frames.current()];
 }
 
-Buffer &Renderer::currentLightUBO()
+Buffer &Renderer::currentNodeInstancesSSBO()
 {
-    return frames.lightUBO[frames.current()];
+    return frames.nodeInstancesSSBO[frames.current()];
 }
 
 void Renderer::cycleDebugView()

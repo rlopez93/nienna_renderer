@@ -19,6 +19,7 @@ add_executable(nienna)
 target_compile_definitions(nienna PRIVATE VULKAN_HPP_HANDLE_ERROR_OUT_OF_DATE_AS_SUCCESS)
 
 target_sources(nienna PRIVATE
+    src/AABB.cpp
     src/Allocator.cpp
     src/Camera.cpp
     src/Command.cpp
@@ -33,6 +34,7 @@ target_sources(nienna PRIVATE
     src/PipelineLayout.cpp
     src/RenderContext.cpp
     src/Renderer.cpp
+    src/SceneDrawList.cpp
     src/SceneRenderData.cpp
     src/Shader.cpp
     src/ShaderInterface.cpp
@@ -104,7 +106,7 @@ if(Vulkan_SLANGC_EXECUTABLE)
         string(REPLACE "." "_" VN_SHADER_NAME ${SHADER_NAME})
         set(OUTPUT_FILE "${CMAKE_BINARY_DIR}/_autogen/${SHADER_NAME}.spv")
         set(_COMMAND ${Vulkan_SLANGC_EXECUTABLE}
-        ${SLANG_FLAGS}
+        ${_SLANG_FLAGS}
         -source-embed-name ${VN_SHADER_NAME}
         -o ${OUTPUT_FILE} ${SHADER})
 

@@ -49,7 +49,7 @@ class FrameContext
     // Per-frame descriptor sets
     std::vector<vk::raii::DescriptorSet> descriptorSets;
 
-    auto createPerFrameUniformBuffers(
+    auto initializePerFrameUniformBuffers(
         Allocator &allocator,
         uint32_t   nodeInstanceCount) -> void;
 
