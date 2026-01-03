@@ -1,6 +1,6 @@
 # Nienna
 
-WIP C++26 real-time 3D graphics renderer targeting Vulkan 1.4
+WIP C++26 real-time 3D renderer and glTF 2.0 viewer targeting Vulkan 1.4
 
 ## Current features
 
@@ -10,27 +10,31 @@ WIP C++26 real-time 3D graphics renderer targeting Vulkan 1.4
   * baseColorFactor/baseColorTexture
   * cameras
 * camera movement (currently buggy)
-* Lambert diffuse lighting
-* timeline semaphores
-* puts triangle on screen
+* Lambert diffuse directional light
+* simple debug views (normals, wireframe)
+* puts triangles on screen
   * many of them, in fact
 
 ## Planned features
 
-* basic lighting and shading improvements
-* simple material support
+* support for multi-scene glTF files
+* support for multi-primitive meshes
+* core glTF PBR support + KHR extensions
 * ImGui integration for on-screen debug UI
 
 ## Rendered with Nienna
 Assets from KhronosGroup/glTF-Sample-Assets:
-<img width="800" height="600" alt="image" src="https://github.com/user-attachments/assets/586d1a77-b2ab-4986-ab08-58120d3732fc" />
-<img width="800" height="600" alt="Screenshot_20251215_080705" src="https://github.com/user-attachments/assets/4630ae7f-69b9-4e2a-b173-d9c721690679" />
-<img width="800" height="600" alt="Screenshot_20251215_080919" src="https://github.com/user-attachments/assets/42f52c53-6747-4dfe-85a7-9b6b73124502" />
+<img width="800" height="600" alt="Screenshot_20260101_225749" src="https://github.com/user-attachments/assets/0e41b681-5c1a-4bb2-9c79-e725db569e1b" />
+<img width="800" height="600" alt="Screenshot_20260101_225753" src="https://github.com/user-attachments/assets/89a1ab9e-9f4d-4e9b-846e-0739a2c739c3" />
+<img width="800" height="600" alt="Screenshot_20260101_225755" src="https://github.com/user-attachments/assets/45b83710-2193-49a0-9844-fcd5dca7af97" />
+<img width="800" height="600" alt="Screenshot_20251215_080705" src="https://github.com/user-attachments/assets/c2d69337-369f-4f4c-ac1d-8b3e4c632654" />
+<img width="800" height="600" alt="Screenshot_20251215_080919" src="https://github.com/user-attachments/assets/2921ce85-a9f4-4ace-a872-bd0c2457ea40" />
 
 ## Tools & Libraries
 
-* Vulkan 1.4
 * C++26
+* Vulkan 1.4
+* VulkanSDK 1.4.335
 * Vulkan-Hpp RAII bindings
 * shaders written in Slang
 * SDL3 windowing and event handling
