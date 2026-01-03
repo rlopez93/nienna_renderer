@@ -1,4 +1,3 @@
-// SceneDrawList.cpp
 #include "SceneDrawList.hpp"
 
 #include <optional>
@@ -7,38 +6,24 @@
 
 #include <fmt/format.h>
 
+#include "AABB.hpp"
 #include "Asset.hpp"
 
 namespace
 {
 
-// TODO: Stub. Will compute world-space AABB of the active scene.
-struct SceneBounds {
-    glm::vec3 min{0.0f};
-    glm::vec3 max{0.0f};
-};
-
-auto computeSceneBounds(
-    const Asset         &asset,
-    const SceneDrawList &sceneDrawList) -> SceneBounds
-{
-    (void)asset;
-    (void)sceneDrawList;
-    return {};
-}
-
 // TODO: Stub. Will create a fallback camera from scene bounds.
 auto createDefaultCamera(
-    const Asset       &asset,
-    const SceneBounds &sceneBounds) -> CameraInstance
+    const Asset &asset,
+    const AABB  &sceneAABB) -> CameraInstance
 {
     (void)asset;
-    (void)sceneBounds;
+    (void)sceneAABB;
     return {};
 }
 
 // Build a local TRS matrix in glTF order: M = T * R * S.
-auto makeLocalMatrix(const Node &node) -> glm::mat4
+auto makeLocalTransform(const Node &node) -> glm::mat4
 {
     const auto t = glm::translate(glm::mat4{1.0f}, node.translation);
     const auto r = glm::mat4_cast(node.rotation);
@@ -125,11 +110,11 @@ struct CameraTR {
 
 // Extract camera translation and rotation from a world matrix while
 // explicitly ignoring scale (and shear) in the rotation.
-auto extractCameraTranslationRotation(const glm::mat4 &world) -> CameraTR
+auto extractCameraTranslationRotation(const glm::mat4 &worldTransform) -> CameraTR
 {
-    const auto translation = glm::vec3{world[3]};
+    const auto translation = glm::vec3{worldTransform[3]};
 
-    const auto basis = extractBasisXY(world);
+    const auto basis = extractBasisXY(worldTransform);
     const auto rotM  = orthonormalizeXY(basis[0], basis[1]);
     const auto rotQ  = glm::normalize(glm::quat_cast(rotM));
 
@@ -143,16 +128,16 @@ auto visitNode(
     SceneDrawList   &sceneDrawList,
     const Asset     &asset,
     std::uint32_t    nodeIndex,
-    const glm::mat4 &parentWorld) -> void
+    const glm::mat4 &parentWorldTransform) -> void
 {
     const auto &node = asset.nodes[nodeIndex];
 
-    const auto local = makeLocalMatrix(node);
-    const auto world = parentWorld * local;
+    const auto localTransform = makeLocalTransform(node);
+    const auto worldTransform = parentWorldTransform * localTransform;
 
     if (node.cameraIndex.has_value()) {
 
-        const auto cameraTR = extractCameraTranslationRotation(world);
+        const auto cameraTR = extractCameraTranslationRotation(worldTransform);
 
         sceneDrawList.cameraInstances.push_back(
             CameraInstance{
@@ -172,7 +157,7 @@ auto visitNode(
 
         sceneDrawList.nodeInstances.push_back(
             NodeInstance{
-                .modelMatrix = world,
+                .modelMatrix = worldTransform,
                 .nodeIndex   = nodeIndex,
             });
 
@@ -196,7 +181,7 @@ auto visitNode(
     }
 
     for (const auto childIndex : node.children) {
-        visitNode(sceneDrawList, asset, childIndex, world);
+        visitNode(sceneDrawList, asset, childIndex, worldTransform);
     }
 }
 } // namespace
@@ -215,11 +200,8 @@ auto buildSceneDrawList(const Asset &asset) -> SceneDrawList
         }
     }
 
-    if (sceneDrawList.cameraInstances.empty()) {
-        const auto bounds = computeSceneBounds(asset, sceneDrawList);
-
-        sceneDrawList.cameraInstances.push_back(createDefaultCamera(asset, bounds));
-    }
+    const auto sceneAABB = computeSceneAABB(asset, sceneDrawList);
+    sceneDrawList.cameraInstances.push_back(createDefaultCamera(asset, sceneAABB));
 
     return sceneDrawList;
 }
