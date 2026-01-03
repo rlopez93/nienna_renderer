@@ -1,38 +1,20 @@
 #include "SceneDrawList.hpp"
 
+#include <cstdint>
 #include <optional>
 #include <ranges>
 #include <stdexcept>
 
 #include <fmt/format.h>
 
-#include "AABB.hpp"
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/geometric.hpp>
+#include <glm/gtc/quaternion.hpp>
+
 #include "Asset.hpp"
 
 namespace
 {
-
-auto createDefaultCamera(
-    const Asset &asset,
-    const AABB  &sceneAABB) -> CameraInstance
-{
-    const auto center = (sceneAABB.min + sceneAABB.max) * 0.5f;
-
-    const auto extent = sceneAABB.max - sceneAABB.min;
-
-    const auto radius = 0.5f * glm::length(extent);
-
-    glm::vec3 translation{0.0f};
-
-    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
-
-    return CameraInstance{
-        .translation = translation,
-        .rotation    = rotation,
-        .nodeIndex   = std::numeric_limits<std::uint32_t>::max(),
-        .cameraIndex = static_cast<std::uint32_t>(asset.cameras.size() - 1),
-    };
-}
 
 // Build a local TRS matrix in glTF order: M = T * R * S.
 auto makeLocalTransform(const Node &node) -> glm::mat4
@@ -69,7 +51,7 @@ auto safeNormalize(
 
 // Extract the (possibly scaled/sheared) basis from a mat4.
 // GLM is column-major: m[0], m[1], m[2] are basis columns.
-auto extractBasisXY(const glm::mat4 &m) -> glm::mat3
+auto extractBasisColumns(const glm::mat4 &m) -> glm::mat3
 {
     return glm::mat3{
         glm::vec3{m[0]},
@@ -90,7 +72,7 @@ auto makeRightHanded(
 // Orthonormalize x and y and return a right-handed rotation basis.
 // This is used to "ignore scale" for camera transforms by turning the
 // matrix's upper-left 3x3 into a pure rotation.
-auto orthonormalizeXY(
+auto orthonormalize(
     glm::vec3 x,
     glm::vec3 y) -> glm::mat3
 {
@@ -126,8 +108,8 @@ auto extractCameraTranslationRotation(const glm::mat4 &worldTransform) -> Camera
 {
     const auto translation = glm::vec3{worldTransform[3]};
 
-    const auto basis = extractBasisXY(worldTransform);
-    const auto rotM  = orthonormalizeXY(basis[0], basis[1]);
+    const auto basis = extractBasisColumns(worldTransform);
+    const auto rotM  = orthonormalize(basis[0], basis[1]);
     const auto rotQ  = glm::normalize(glm::quat_cast(rotM));
 
     return CameraTR{
@@ -145,6 +127,7 @@ auto visitNode(
     const auto &node = asset.nodes[nodeIndex];
 
     const auto localTransform = makeLocalTransform(node);
+
     const auto worldTransform = parentWorldTransform * localTransform;
 
     if (node.cameraIndex.has_value()) {
@@ -204,16 +187,15 @@ auto buildSceneDrawList(const Asset &asset) -> SceneDrawList
         .sceneIndex = asset.activeScene,
     };
 
-    if (!asset.scenes.empty()) {
-        const auto &scene = asset.scenes[sceneDrawList.sceneIndex];
-
-        for (const auto rootIndex : scene.rootNodes) {
-            visitNode(sceneDrawList, asset, rootIndex, glm::mat4{1.0f});
-        }
+    if (asset.scenes.empty()) {
+        return sceneDrawList;
     }
 
-    const auto sceneAABB = computeSceneAABB(asset, sceneDrawList);
-    sceneDrawList.cameraInstances.push_back(createDefaultCamera(asset, sceneAABB));
+    const auto &scene = asset.scenes[sceneDrawList.sceneIndex];
+
+    for (const auto rootIndex : scene.rootNodes) {
+        visitNode(sceneDrawList, asset, rootIndex, glm::mat4{1.0f});
+    }
 
     return sceneDrawList;
 }
