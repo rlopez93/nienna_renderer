@@ -85,8 +85,8 @@ endif()
 if(Vulkan_SLANGC_EXECUTABLE)
 
     set(SLANG_FLAGS
+        -I ${CMAKE_SOURCE_DIR}/include
         -profile sm_6_6+spirv_1_6
-        -capability spvInt64Atomics+spvShaderInvocationReorderNV+spvShaderClockKHR+spvRayTracingMotionBlurNV
         -target spirv
         -emit-spirv-directly
         -force-glsl-scalar-layout
@@ -104,7 +104,7 @@ if(Vulkan_SLANGC_EXECUTABLE)
         string(REPLACE "." "_" VN_SHADER_NAME ${SHADER_NAME})
         set(OUTPUT_FILE "${CMAKE_BINARY_DIR}/_autogen/${SHADER_NAME}.spv")
         set(_COMMAND ${Vulkan_SLANGC_EXECUTABLE}
-        ${_SLANG_FLAGS}
+        ${SLANG_FLAGS}
         -source-embed-name ${VN_SHADER_NAME}
         -o ${OUTPUT_FILE} ${SHADER})
 

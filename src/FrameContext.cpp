@@ -99,20 +99,20 @@ auto FrameContext::setDescriptorSets(std::vector<vk::raii::DescriptorSet> &&sets
 
 auto FrameContext::createPerFrameUniformBuffers(
     Allocator &allocator,
-    uint32_t   objectCount) -> void
+    uint32_t   nodeInstanceCount) -> void
 {
     frameUBO.clear();
-    objectsSSBO.clear();
+    nodeInstancesSSBO.clear();
 
     frameUBO.reserve(maxFramesInFlight);
-    objectsSSBO.reserve(maxFramesInFlight);
+    nodeInstancesSSBO.reserve(maxFramesInFlight);
 
-    const uint32_t elemCount = (objectCount == 0u) ? 1u : objectCount;
+    const uint32_t elemCount = (nodeInstanceCount == 0u) ? 1u : nodeInstanceCount;
 
     const auto frameBytes = static_cast<vk::DeviceSize>(sizeof(FrameUniforms));
 
-    const auto objectBytes = static_cast<vk::DeviceSize>(sizeof(ObjectData))
-                           * static_cast<vk::DeviceSize>(elemCount);
+    const auto nodeInstanceBytes = static_cast<vk::DeviceSize>(sizeof(NodeInstanceData))
+                                 * static_cast<vk::DeviceSize>(elemCount);
 
     for (uint32_t i = 0u; i < maxFramesInFlight; ++i) {
         frameUBO.emplace_back(allocator.createBuffer(
@@ -124,8 +124,8 @@ auto FrameContext::createPerFrameUniformBuffers(
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
                 | VMA_ALLOCATION_CREATE_MAPPED_BIT));
 
-        objectsSSBO.emplace_back(allocator.createBuffer(
-            objectBytes,
+        nodeInstancesSSBO.emplace_back(allocator.createBuffer(
+            nodeInstanceBytes,
             vk::BufferUsageFlagBits2::eUniformBuffer
                 | vk::BufferUsageFlagBits2::eTransferDst,
             false,

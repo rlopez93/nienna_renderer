@@ -1,6 +1,7 @@
 #include "GltfLoader.hpp"
 #include "RenderContext.hpp"
 #include "Renderer.hpp"
+#include "SceneDrawList.hpp"
 #include "SceneRenderData.hpp"
 #include "ShaderInterfaceTypes.hpp"
 #include "Utility.hpp"
@@ -35,31 +36,31 @@ auto chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableForma
     return availableFormats.front();
 }
 
-auto updatePerFrameBuffers(
-    const Allocator               &allocator,
-    Buffer                        &frameUbo,
-    Buffer                        &objectsSsbo,
-    const FrameUniforms           &frame,
-    const std::vector<ObjectData> &objects) -> void
+auto updatePerFrameUniformBuffers(
+    const Allocator                     &allocator,
+    Buffer                              &frameUBO,
+    Buffer                              &nodeInstancesSSBO,
+    const FrameUniforms                 &frame,
+    const std::vector<NodeInstanceData> &nodeInstances) -> void
 {
     VK_CHECK(vmaCopyMemoryToAllocation(
         allocator.allocator,
         &frame,
-        frameUbo.allocation,
+        frameUBO.allocation,
         0,
         sizeof(FrameUniforms)));
 
-    if (objects.empty()) {
+    if (nodeInstances.empty()) {
         return;
     }
 
-    const auto bytes = static_cast<vk::DeviceSize>(sizeof(ObjectData))
-                     * static_cast<vk::DeviceSize>(objects.size());
+    const auto bytes = static_cast<vk::DeviceSize>(sizeof(NodeInstanceData))
+                     * static_cast<vk::DeviceSize>(nodeInstances.size());
 
     VK_CHECK(vmaCopyMemoryToAllocation(
         allocator.allocator,
-        objects.data(),
-        objectsSsbo.allocation,
+        nodeInstances.data(),
+        nodeInstancesSSBO.allocation,
         0,
         bytes));
 }
@@ -79,7 +80,7 @@ auto main(
     auto gltfDirectory = gltfPath.parent_path();
     auto shaderPath    = [&] -> std::filesystem::path {
         if (argc < 3) {
-            return "build/_autogen/mesh-refactor.slang.spv";
+            return "build/_autogen/mesh_basepass.slang.spv";
         } else {
             return std::string{argv[2]};
         }
@@ -103,8 +104,6 @@ auto main(
 
     auto context = RenderContext{window, requiredExtensions};
 
-    auto asset = getAsset(gltfPath);
-
     const auto formats =
         context.physicalDevice.handle.getSurfaceFormatsKHR(context.surface.handle);
 
@@ -121,36 +120,37 @@ auto main(
         uploadCmd,
         context.swapchain.extent());
 
+    auto asset        = getAsset(gltfPath);
     auto textureCount = static_cast<uint32_t>(asset.textures.size());
 
     RendererConfig rendererConfig{
         .shaderInterfaceDescription = ShaderInterfaceDescription{{
-            {0,
+            {kBindingFrameUniforms,
              vk::DescriptorType::eUniformBuffer,
              1,
              vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
 
-            {1,
+            {kBindingNodeInstanceData,
              vk::DescriptorType::eStorageBuffer,
              1,
              vk::ShaderStageFlagBits::eVertex},
 
-            {2,
+            {kBindingMaterialData,
              vk::DescriptorType::eStorageBuffer,
              1,
              vk::ShaderStageFlagBits::eFragment},
 
-            {3,
+            {kBindingImagesSrgb,
              vk::DescriptorType::eSampledImage,
              textureCount,
              vk::ShaderStageFlagBits::eFragment},
 
-            {4,
+            {kBindingImagesLinear,
              vk::DescriptorType::eSampledImage,
              textureCount,
              vk::ShaderStageFlagBits::eFragment},
 
-            {5,
+            {kBindingSamplers,
              vk::DescriptorType::eSampler,
              textureCount,
              vk::ShaderStageFlagBits::eFragment},
@@ -162,10 +162,10 @@ auto main(
     };
     auto renderer = Renderer{context, rendererConfig};
 
+    auto sceneDrawList   = buildSceneDrawList(asset);
     auto sceneRenderData = SceneRenderData{};
-    sceneRenderData.create(scene, context.device, uploadCmd, context.allocator);
-    // TODO: parse sampler from .gltf
-    auto sampler = vk::raii::Sampler{context.device.handle, vk::SamplerCreateInfo{}};
+    sceneRenderData
+        .create(asset, sceneDrawList, context.device, uploadCmd, context.allocator);
 
     renderer.initializePerFrameUniforms(context.allocator, scene.meshes.size());
 
@@ -184,8 +184,6 @@ auto main(
             else if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_RIGHTBRACKET) {
                 renderer.cycleDebugView();
             }
-
-            scene.processInput(e);
         }
 
         if (!renderer.beginFrame()) {
@@ -208,8 +206,6 @@ auto main(
             cumulativeTime -= 3s;
             frameCount = 0;
         }
-
-        scene.update(dt);
 
         updatePerFrameUniformBuffers(
             context.allocator,

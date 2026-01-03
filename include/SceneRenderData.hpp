@@ -28,7 +28,7 @@ struct SceneRenderData {
         Device           &device,
         vk::DescriptorSet descriptorSet,
         const Buffer     &frameUBO,
-        const Buffer     &objectsSSBO) const;
+        const Buffer     &nodeInstancesSSBO) const;
 
     // draw list consumed by Renderer
     std::vector<DrawItem> draws;

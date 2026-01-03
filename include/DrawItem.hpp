@@ -17,6 +17,6 @@ struct DrawItem {
     uint32_t geometryIndex = 0u;
 
     // instance/material
-    uint32_t objectIndex   = 0u;
-    uint32_t materialIndex = 0u;
+    uint32_t nodeInstanceIndex = 0u;
+    uint32_t materialIndex     = 0u;
 };

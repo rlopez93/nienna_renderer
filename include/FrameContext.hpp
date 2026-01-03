@@ -44,14 +44,14 @@ class FrameContext
     auto setDescriptorSets(std::vector<vk::raii::DescriptorSet> &&sets);
 
     std::vector<Buffer> frameUBO;
-    std::vector<Buffer> objectsSSBO;
+    std::vector<Buffer> nodeInstancesSSBO;
 
     // Per-frame descriptor sets
     std::vector<vk::raii::DescriptorSet> descriptorSets;
 
     auto createPerFrameUniformBuffers(
         Allocator &allocator,
-        uint32_t   objectCount) -> void;
+        uint32_t   nodeInstanceCount) -> void;
 
   private:
     static auto createTimelineSemaphore(

@@ -3,6 +3,7 @@
 #include "Asset.hpp"
 #include "MaterialPacking.hpp"
 #include "SceneDrawList.hpp"
+#include "ShaderInterfaceTypes.hpp"
 
 #include <cstdint>
 #include <numeric>
@@ -117,6 +118,7 @@ auto SceneRenderData::create(
 
     command.beginSingleTime();
 
+    // TODO: create large geometry buffers to "flatten out" vertex/indexBuffers
     for (const auto &mesh : asset.meshes) {
         for (const auto &primitive : mesh.primitives) {
 
@@ -220,7 +222,7 @@ void SceneRenderData::updateDescriptorSet(
     Device           &device,
     vk::DescriptorSet descriptorSet,
     const Buffer     &frameUBO,
-    const Buffer     &objectsSSBO) const
+    const Buffer     &nodeInstancesSSBO) const
 {
     auto descriptorWrites = std::vector<vk::WriteDescriptorSet>{};
 
@@ -235,8 +237,8 @@ void SceneRenderData::updateDescriptorSet(
             vk::DescriptorType::eUniformBuffer,
             {},
             frameBufferInfo});
-    const auto objectsBufferInfo = vk::DescriptorBufferInfo{
-        objectsSSBO.buffer,
+    const auto nodeInstancesBufferInfo = vk::DescriptorBufferInfo{
+        nodeInstancesSSBO.buffer,
         0,
         vk::WholeSize,
     };
@@ -244,11 +246,11 @@ void SceneRenderData::updateDescriptorSet(
     descriptorWrites.emplace_back(
         vk::WriteDescriptorSet{
             descriptorSet,
-            kBindingObjectData,
+            kBindingNodeInstanceData,
             0,
             vk::DescriptorType::eStorageBuffer,
             {},
-            objectsBufferInfo,
+            nodeInstancesBufferInfo,
         });
 
     const auto materialsBufferInfo = vk::DescriptorBufferInfo{

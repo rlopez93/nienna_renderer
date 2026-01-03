@@ -3,6 +3,7 @@
 #include "Pipeline.hpp"
 #include "PipelineLayout.hpp"
 #include "SceneRenderData.hpp"
+#include "ShaderInterfaceTypes.hpp"
 
 auto Renderer::createDescriptorPool(
     Device                           &device,
@@ -220,19 +221,19 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
         frames.cmd().bindIndexBuffer(
             sceneRenderData.indexBuffers[draw.geometryIndex].buffer,
             0,
-            vk::IndexType::eUint16);
+            vk::IndexType::eUint32);
 
-        auto pushConstant = PushConstantBlock{
-            .objectIndex   = draw.objectIndex,
-            .materialIndex = draw.materialIndex,
-            .debugView     = static_cast<uint32_t>(debugView)};
+        auto pushConstant = PushConstants{
+            .nodeInstanceIndex = draw.nodeInstanceIndex,
+            .materialIndex     = draw.materialIndex,
+            .debugView         = static_cast<uint32_t>(debugView)};
 
         frames.cmd().pushConstants2(
             vk::PushConstantsInfo{
                 *pipelineLayout,
                 vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
                 0,
-                sizeof(PushConstantBlock),
+                sizeof(PushConstants),
                 &pushConstant});
 
         frames.cmd()

@@ -1,5 +1,5 @@
 #include "Pipeline.hpp"
-#include "Scene.hpp"
+#include "Geometry.hpp"
 #include "Shader.hpp"
 
 auto createPipeline(
@@ -11,76 +11,96 @@ auto createPipeline(
 {
     auto shaderModule = createShaderModule(device.handle, shaderPath);
 
-    // The stages used by this pipeline
     const auto shaderStages = std::array{
         vk::PipelineShaderStageCreateInfo{
             {},
             vk::ShaderStageFlagBits::eVertex,
             shaderModule,
             "vertexMain",
-            {}},
+            {},
+        },
         vk::PipelineShaderStageCreateInfo{
             {},
             vk::ShaderStageFlagBits::eFragment,
             shaderModule,
             "fragmentMain",
-            {}},
+            {},
+        },
     };
 
     const auto vertexBindingDescriptions = std::array{vk::VertexInputBindingDescription{
-        0,
-        sizeof(Primitive),
-        vk::VertexInputRate::eVertex}};
+        0u,
+        static_cast<std::uint32_t>(sizeof(Vertex)),
+        vk::VertexInputRate::eVertex,
+    }};
 
     const auto vertexAttributeDescriptions = std::array{
         vk::VertexInputAttributeDescription{
-            0,
-            0,
+            0u,
+            0u,
             vk::Format::eR32G32B32Sfloat,
-            offsetof(Primitive, position)},
-
+            static_cast<std::uint32_t>(offsetof(Vertex, position)),
+        },
         vk::VertexInputAttributeDescription{
-            1,
-            0,
+            1u,
+            0u,
             vk::Format::eR32G32B32Sfloat,
-            offsetof(Primitive, normal)},
+            static_cast<std::uint32_t>(offsetof(Vertex, normal)),
+        },
         vk::VertexInputAttributeDescription{
-            2,
-            0,
-            vk::Format::eR32G32Sfloat,
-            offsetof(Primitive, uv)},
-        vk::VertexInputAttributeDescription{
-            3,
-            0,
+            2u,
+            0u,
             vk::Format::eR32G32B32A32Sfloat,
-            offsetof(Primitive, color)},
+            static_cast<std::uint32_t>(offsetof(Vertex, tangent)),
+        },
+        vk::VertexInputAttributeDescription{
+            3u,
+            0u,
+            vk::Format::eR32G32Sfloat,
+            static_cast<std::uint32_t>(offsetof(Vertex, uv0)),
+        },
+        vk::VertexInputAttributeDescription{
+            4u,
+            0u,
+            vk::Format::eR32G32Sfloat,
+            static_cast<std::uint32_t>(offsetof(Vertex, uv1)),
+        },
+        vk::VertexInputAttributeDescription{
+            5u,
+            0u,
+            vk::Format::eR32G32B32A32Sfloat,
+            static_cast<std::uint32_t>(offsetof(Vertex, color)),
+        },
     };
 
     const auto vertexInputStateCreateInfo = vk::PipelineVertexInputStateCreateInfo{
         {},
         vertexBindingDescriptions,
-        vertexAttributeDescriptions};
+        vertexAttributeDescriptions,
+    };
 
     const auto inputAssemblyCreateInfo = vk::PipelineInputAssemblyStateCreateInfo{
         {},
         vk::PrimitiveTopology::eTriangleList,
-        false};
+        false,
+    };
 
     const auto pipelineViewportStateCreateInfo = vk::PipelineViewportStateCreateInfo{};
 
     const auto pipelineRasterizationStateCreateInfo =
         vk::PipelineRasterizationStateCreateInfo{
             {},
-            {},
-            {},
+            false,
+            false,
             vk::PolygonMode::eFill,
-            vk::CullModeFlags::BitsType::eBack,
+            vk::CullModeFlagBits::eBack,
             vk::FrontFace::eCounterClockwise,
-            {},
-            {},
-            {},
-            {},
-            1.0f};
+            false,
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f,
+        };
 
     const auto pipelineMultisampleStateCreateInfo =
         vk::PipelineMultisampleStateCreateInfo{};
@@ -90,10 +110,11 @@ auto createPipeline(
             {},
             true,
             true,
-            vk::CompareOp::eLessOrEqual};
+            vk::CompareOp::eLessOrEqual,
+        };
 
     const auto colorBlendAttachmentState = vk::PipelineColorBlendAttachmentState{
-        {},
+        false,
         {},
         {},
         {},
@@ -101,26 +122,34 @@ auto createPipeline(
         {},
         {},
         vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
-            | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA};
+            | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+    };
 
     const auto pipelineColorBlendStateCreateInfo =
         vk::PipelineColorBlendStateCreateInfo{
             {},
-            {},
+            false,
             vk::LogicOp::eCopy,
-            1,
-            &colorBlendAttachmentState};
+            1u,
+            &colorBlendAttachmentState,
+        };
 
     const auto dynamicStates = std::array{
         vk::DynamicState::eViewportWithCount,
         vk::DynamicState::eScissorWithCount,
-        vk::DynamicState::ePolygonModeEXT};
+        vk::DynamicState::ePolygonModeEXT,
+    };
 
-    const auto pipelineDynamicStateCreateInfo =
-        vk::PipelineDynamicStateCreateInfo{{}, dynamicStates};
+    const auto pipelineDynamicStateCreateInfo = vk::PipelineDynamicStateCreateInfo{
+        {},
+        dynamicStates,
+    };
 
-    auto pipelineRenderingCreateInfo =
-        vk::PipelineRenderingCreateInfo{{}, imageFormat, depthFormat};
+    auto pipelineRenderingCreateInfo = vk::PipelineRenderingCreateInfo{
+        {},
+        imageFormat,
+        depthFormat,
+    };
 
     auto graphicsPipelineCreateInfo = vk::GraphicsPipelineCreateInfo{
         {},
@@ -139,7 +168,12 @@ auto createPipeline(
         {},
         {},
         {},
-        &pipelineRenderingCreateInfo};
+        &pipelineRenderingCreateInfo,
+    };
 
-    return vk::raii::Pipeline{device.handle, nullptr, graphicsPipelineCreateInfo};
+    return vk::raii::Pipeline{
+        device.handle,
+        nullptr,
+        graphicsPipelineCreateInfo,
+    };
 }

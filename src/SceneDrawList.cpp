@@ -74,12 +74,12 @@ auto visitNode(
                 DrawItem{
                     .indexCount = static_cast<std::uint32_t>(primitive.indices.size()),
                     .firstIndex = 0u,
-                    .vertexOffset   = 0,
-                    .meshIndex      = meshIndex,
-                    .primitiveIndex = static_cast<std::uint32_t>(primitiveIndex),
-                    .geometryIndex  = 0u,
-                    .objectIndex    = nodeInstanceIndex,
-                    .materialIndex  = primitive.materialIndex,
+                    .vertexOffset      = 0,
+                    .meshIndex         = meshIndex,
+                    .primitiveIndex    = static_cast<std::uint32_t>(primitiveIndex),
+                    .geometryIndex     = 0u,
+                    .nodeInstanceIndex = nodeInstanceIndex,
+                    .materialIndex     = primitive.materialIndex,
                 });
         }
     }

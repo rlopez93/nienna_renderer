@@ -47,7 +47,7 @@ using mat4 = glm::mat4;
 
 // Descriptor bindings
 NIENNA_CONST u32 kBindingFrameUniforms = 0u;
-NIENNA_CONST u32 kBindingObjectData    = 1u;
+NIENNA_CONST u32 kBindingNodeInstanceData    = 1u;
 NIENNA_CONST u32 kBindingMaterialData  = 2u;
 NIENNA_CONST u32 kBindingImagesSrgb    = 3u;
 NIENNA_CONST u32 kBindingImagesLinear  = 4u;
@@ -73,15 +73,15 @@ struct NIENNA_ALIGN(16) FrameUniforms {
     PointLight       pointLight           NIENNA_INIT();
 };
 
-struct NIENNA_ALIGN(16) ObjectData {
+struct NIENNA_ALIGN(16) NodeInstanceData {
     mat4 modelMatrix NIENNA_INIT(1.0f);
 };
 
 struct PushConstants {
-    u32 objectIndex   NIENNA_INIT(0u);
-    u32 materialIndex NIENNA_INIT(0u);
-    u32 debugView     NIENNA_INIT(0u);
-    u32 _pad0         NIENNA_INIT(0u);
+    u32 nodeInstanceIndex   NIENNA_INIT(0u);
+    u32 materialIndex       NIENNA_INIT(0u);
+    u32 debugView           NIENNA_INIT(0u);
+    u32 _pad0               NIENNA_INIT(0u);
 };
 
 struct NIENNA_ALIGN(16) TextureTransform2DData {
@@ -159,8 +159,8 @@ static_assert(sizeof(PointLight) == 32u);
 static_assert(alignof(FrameUniforms) == 16u);
 static_assert(sizeof(FrameUniforms) == 128u);
 
-static_assert(alignof(ObjectData) == 16u);
-static_assert(sizeof(ObjectData) == 64u);
+static_assert(alignof(NodeInstanceData) == 16u);
+static_assert(sizeof(NodeInstanceData) == 64u);
 
 static_assert(sizeof(PushConstants) == 16u);
 

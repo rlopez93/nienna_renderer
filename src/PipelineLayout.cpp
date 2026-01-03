@@ -1,5 +1,6 @@
 // PipelineLayout.cpp
 #include "PipelineLayout.hpp"
+#include "ShaderInterfaceTypes.hpp"
 
 vk::raii::PipelineLayout createPipelineLayout(
     vk::raii::Device                        &device,
@@ -8,7 +9,7 @@ vk::raii::PipelineLayout createPipelineLayout(
     auto pushConstants = std::array{vk::PushConstantRange{
         vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
         0,
-        sizeof(PushConstantBlock)}};
+        sizeof(PushConstants)}};
 
     return {device, vk::PipelineLayoutCreateInfo{{}, setLayouts, pushConstants}};
 }
