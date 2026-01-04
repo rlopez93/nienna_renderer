@@ -115,10 +115,9 @@ auto Renderer::beginFrame() -> bool
 
 auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
 {
-    // color attachment image to render to: vk::RenderingAttachmentInfo
     auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
         context.swapchain.nextImageView(),
-        vk::ImageLayout::eAttachmentOptimal,
+        vk::ImageLayout::eColorAttachmentOptimal,
         {},
         {},
         {},
@@ -126,10 +125,9 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
         vk::AttachmentStoreOp::eStore,
         vk::ClearColorValue{std::array{0.2f, 0.5f, 1.0f, 1.0f}}};
 
-    // depth attachment buffer: vk::RenderingAttachmentInfo
     auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
         context.depth.view,
-        vk::ImageLayout::eAttachmentOptimal,
+        vk::ImageLayout::eDepthAttachmentOptimal,
         {},
         {},
         {},
@@ -137,7 +135,6 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
         vk::AttachmentStoreOp::eDontCare,
         vk::ClearDepthStencilValue{1.0f, 0}};
 
-    // rendering info for dynamic rendering
     auto renderingInfo = vk::RenderingInfo{
         {},
         vk::Rect2D{{}, context.extent()},
@@ -147,39 +144,16 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
         &renderingDepthAttachmentInfo};
 
     // transition swapchain image layout
-    // cmdTransitionImageLayout(
-    //     timeline.buffer(),
-    //     swapchain.getNextImage(),
-    //     vk::ImageLayout::eUndefined,
-    //     vk::ImageLayout::eColorAttachmentOptimal);
-
-    auto oldLayout = vk::ImageLayout{
+    auto oldLayout =
         (!context.swapchain.imageInitialized[context.swapchain.nextImageIndex])
             ? vk::ImageLayout::eUndefined
-            : vk::ImageLayout::ePresentSrcKHR};
+            : vk::ImageLayout::ePresentSrcKHR;
 
-    vk::ImageMemoryBarrier2 barrier{
-        // src: be conservative; assume last use was as a color attachment write
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::AccessFlagBits2::eColorAttachmentWrite,
-
-        // dst: color attachment read/write during rendering
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::AccessFlagBits2::eColorAttachmentRead
-            | vk::AccessFlagBits2::eColorAttachmentWrite,
-
-        // layout transition
-        oldLayout,
-        vk::ImageLayout::eColorAttachmentOptimal,
-
-        // queue family ownership unchanged
-        vk::QueueFamilyIgnored,
-        vk::QueueFamilyIgnored,
-
+    cmdBarrierSwapchainToColorAttachment(
+        frames.cmd(),
         context.swapchain.nextImage(),
-        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
-
-    frames.cmd().pipelineBarrier2(vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
+        oldLayout,
+        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
 
     context.swapchain.imageInitialized[context.swapchain.nextImageIndex] = true;
 
@@ -246,33 +220,11 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
 
 auto Renderer::submit() -> void
 {
-    // transition image layout eColorAttachmentOptimal -> ePresentSrcKHR
-    // cmdTransitionImageLayout(
-    //     timeline.buffer(),
-    //     swapchain.getNextImage(),
-    //     vk::ImageLayout::eColorAttachmentOptimal,
-    //     vk::ImageLayout::ePresentSrcKHR);
-
-    vk::ImageMemoryBarrier2 barrier{
-        // src: rendering wrote the color attachment
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::AccessFlagBits2::eColorAttachmentWrite,
-
-        // dst: presentation engine
-        vk::PipelineStageFlagBits2::eBottomOfPipe,
-        vk::AccessFlagBits2::eNone,
-
-        // layout transition
-        vk::ImageLayout::eColorAttachmentOptimal,
-        vk::ImageLayout::ePresentSrcKHR,
-
-        vk::QueueFamilyIgnored,
-        vk::QueueFamilyIgnored,
-
+    cmdBarrierColorAttachmentToPresent(
+        frames.cmd(),
         context.swapchain.nextImage(),
-        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
+        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
 
-    frames.cmd().pipelineBarrier2(vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
     frames.cmd().end();
 
     // end frame

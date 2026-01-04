@@ -200,7 +200,8 @@ auto main(
         context.device,
         context.allocator,
         uploadCmd,
-        context.swapchain.extent());
+        context.swapchain.extent(),
+        depthFormat);
 
     auto asset         = getAsset(gltfPath);
     auto sceneDrawList = buildSceneDrawList(asset);

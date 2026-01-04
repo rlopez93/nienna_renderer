@@ -1,5 +1,6 @@
 #include "RenderContext.hpp"
 #include "Command.hpp"
+#include "Utility.hpp"
 
 RenderContext::RenderContext(
     Window                          &window,
@@ -37,7 +38,12 @@ void RenderContext::recreateRenderTargets()
 
     auto transientCommand = Command(device, vk::CommandPoolCreateFlagBits::eTransient);
     // Recreate depth target using new extent
-    depth.recreate(device, allocator, transientCommand, swapchain.extent());
+    depth.recreate(
+        device,
+        allocator,
+        transientCommand,
+        swapchain.extent(),
+        depth.format);
 }
 
 auto RenderContext::extent() const -> vk::Extent2D

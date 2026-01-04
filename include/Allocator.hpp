@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include "Command.hpp"
 #include "vma.hpp"
 
 #include "Buffer.hpp"
@@ -9,7 +10,7 @@
 #include "Image.hpp"
 #include "Instance.hpp"
 #include "PhysicalDevice.hpp"
-#include "Utility.hpp"
+#include "Sync.hpp"
 
 struct Allocator {
     Allocator(
@@ -36,9 +37,9 @@ struct Allocator {
     template <typename T>
     [[nodiscard]]
     auto createBufferAndUploadData(
-        vk::raii::CommandBuffer &cmd,
-        const std::vector<T>    &vectorData,
-        vk::BufferUsageFlags2    usageFlags) -> Buffer;
+        Command              &cmd,
+        const std::vector<T> &vectorData,
+        vk::BufferUsageFlags2 usageFlags) -> Buffer;
 
     [[nodiscard]]
     auto createImage(const vk::ImageCreateInfo &imageInfo) -> Image;
@@ -48,10 +49,10 @@ struct Allocator {
     template <typename T>
     [[nodiscard]]
     auto createImageAndUploadData(
-        vk::raii::CommandBuffer &cmd,
-        const std::vector<T>    &vectorData,
-        vk::ImageCreateInfo      imageInfo,
-        vk::ImageLayout          finalLayout) -> Image;
+        Command              &cmd,
+        const std::vector<T> &vectorData,
+        vk::ImageCreateInfo   imageInfo,
+        vk::ImageLayout       finalLayout) -> Image;
 
     void freeStagingBuffers();
     void freeBuffers();
@@ -65,29 +66,32 @@ struct Allocator {
 };
 
 template <typename T>
-inline auto Allocator::createImageAndUploadData(
-    vk::raii::CommandBuffer &cmd,
-    const std::vector<T>    &vectorData,
-    vk::ImageCreateInfo      imageInfo,
-    vk::ImageLayout          finalLayout) -> Image
+[[nodiscard]]
+auto Allocator::createImageAndUploadData(
+    Command              &cmd,
+    const std::vector<T> &vectorData,
+    vk::ImageCreateInfo   imageInfo,
+    vk::ImageLayout       finalLayout) -> Image
 {
-    // Create staging buffer and upload data
-    Buffer stagingBuffer = createStagingBuffer(vectorData);
+    assert(finalLayout == vk::ImageLayout::eShaderReadOnlyOptimal);
 
-    // Create image in GPU memory
+    Buffer staging = createStagingBuffer(vectorData);
+
     imageInfo.setUsage(imageInfo.usage | vk::ImageUsageFlagBits::eTransferDst);
+
     Image image = createImage(imageInfo);
 
-    // Transition image layout for copying data
-    cmdTransitionImageLayout(
-        cmd,
-        image.image,
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eTransferDstOptimal);
+    vk::ImageSubresourceRange range{
+        vk::ImageAspectFlagBits::eColor,
+        0,
+        imageInfo.mipLevels,
+        0,
+        imageInfo.arrayLayers};
 
-    // Copy buffer data to the image
-    cmd.copyBufferToImage(
-        stagingBuffer.buffer,
+    cmdBarrierUndefinedToTransferDst(cmd.buffer, image.image, range);
+
+    cmd.buffer.copyBufferToImage(
+        staging.buffer,
         image.image,
         vk::ImageLayout::eTransferDstOptimal,
         vk::BufferImageCopy{
@@ -98,21 +102,15 @@ inline auto Allocator::createImageAndUploadData(
             {},
             imageInfo.extent});
 
-    // Transition image layout to final layout
-    cmdTransitionImageLayout(
-        cmd,
-        image.image,
-        vk::ImageLayout::eTransferDstOptimal,
-        finalLayout);
+    cmdBarrierTransferDstToShaderReadOnly(cmd.buffer, image.image, range);
 
     return image;
 }
-
 template <typename T>
 inline auto Allocator::createBufferAndUploadData(
-    vk::raii::CommandBuffer &cmd,
-    const std::vector<T>    &vectorData,
-    vk::BufferUsageFlags2    usageFlags) -> Buffer
+    Command              &cmd,
+    const std::vector<T> &vectorData,
+    vk::BufferUsageFlags2 usageFlags) -> Buffer
 {
     // fmt::print(stderr, "\n\ncalling createStagingBuffer()...\n\n");
     // Create staging buffer and upload data
@@ -128,7 +126,7 @@ inline auto Allocator::createBufferAndUploadData(
         VMA_MEMORY_USAGE_GPU_ONLY);
 
     // fmt::print(stderr, "\n\ncalling cmd.copyBuffer()...\n\n");
-    cmd.copyBuffer(
+    cmd.buffer.copyBuffer(
         stagingBuffer.buffer,
         buffer.buffer,
         vk::BufferCopy{}.setSize(bufferSize));

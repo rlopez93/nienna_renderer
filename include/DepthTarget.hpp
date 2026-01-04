@@ -1,3 +1,4 @@
+// ==> include/DepthTarget.hpp <==
 #pragma once
 
 #include <vulkan/vulkan_raii.hpp>
@@ -9,8 +10,8 @@ struct Allocator;
 struct Command;
 
 struct DepthTarget {
-    vk::Format          format{};
-    Image               image;
+    vk::Format          format = vk::Format::eUndefined;
+    Image               image{};
     vk::raii::ImageView view = nullptr;
 
     DepthTarget() = default;
@@ -19,11 +20,13 @@ struct DepthTarget {
         Device      &device,
         Allocator   &allocator,
         Command     &command,
-        vk::Extent2D extent);
+        vk::Extent2D extent,
+        vk::Format   depthFormat);
 
     void recreate(
         Device      &device,
         Allocator   &allocator,
         Command     &command,
-        vk::Extent2D extent);
+        vk::Extent2D extent,
+        vk::Format   depthFormat);
 };

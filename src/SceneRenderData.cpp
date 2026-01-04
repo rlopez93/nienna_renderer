@@ -123,12 +123,12 @@ auto SceneRenderData::create(
         for (const auto &primitive : mesh.primitives) {
 
             vertexBuffers.push_back(allocator.createBufferAndUploadData(
-                command.buffer,
+                command,
                 primitive.vertices,
                 vk::BufferUsageFlagBits2::eVertexBuffer));
 
             indexBuffers.push_back(allocator.createBufferAndUploadData(
-                command.buffer,
+                command,
                 primitive.indices,
                 vk::BufferUsageFlagBits2::eIndexBuffer));
         }
@@ -146,7 +146,7 @@ auto SceneRenderData::create(
     }
 
     materialsSSBO = allocator.createBufferAndUploadData(
-        command.buffer,
+        command,
         packedMaterials,
         vk::BufferUsageFlagBits2::eStorageBuffer);
 
@@ -170,7 +170,7 @@ auto SceneRenderData::create(
         imageInfo.usage = vk::ImageUsageFlagBits::eSampled;
 
         Image image = allocator.createImageAndUploadData(
-            command.buffer,
+            command,
             texture.rgba8,
             imageInfo,
             vk::ImageLayout::eShaderReadOnlyOptimal);

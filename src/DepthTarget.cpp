@@ -1,24 +1,50 @@
+// ==> src/DepthTarget.cpp <==
 #include "DepthTarget.hpp"
+
 #include "Allocator.hpp"
 #include "Command.hpp"
 #include "Device.hpp"
+#include "Sync.hpp"
+
+#include <cassert>
+
+namespace
+{
+
+[[nodiscard]]
+auto depthAspectMask(vk::Format fmt) -> vk::ImageAspectFlags
+{
+    switch (fmt) {
+    case vk::Format::eD32SfloatS8Uint:
+    case vk::Format::eD24UnormS8Uint:
+        return vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+    default:
+        return vk::ImageAspectFlagBits::eDepth;
+    }
+}
+
+} // namespace
 
 DepthTarget::DepthTarget(
     Device      &device,
     Allocator   &allocator,
     Command     &command,
-    vk::Extent2D extent)
+    vk::Extent2D extent,
+    vk::Format   depthFormat)
 {
-    recreate(device, allocator, command, extent);
+    recreate(device, allocator, command, extent, depthFormat);
 }
 
 void DepthTarget::recreate(
     Device      &device,
     Allocator   &allocator,
     Command     &command,
-    vk::Extent2D extent)
+    vk::Extent2D extent,
+    vk::Format   depthFormat)
 {
-    // Destroy old resources by overwriting RAII handles
+    assert(depthFormat != vk::Format::eUndefined);
+
+    format = depthFormat;
 
     image = allocator.createImage(
         vk::ImageCreateInfo{
@@ -32,6 +58,10 @@ void DepthTarget::recreate(
             vk::ImageTiling::eOptimal,
             vk::ImageUsageFlagBits::eDepthStencilAttachment});
 
+    const auto aspect = depthAspectMask(format);
+
+    const auto range = vk::ImageSubresourceRange{aspect, 0, 1, 0, 1};
+
     view = device.handle.createImageView(
         vk::ImageViewCreateInfo{
             {},
@@ -39,15 +69,11 @@ void DepthTarget::recreate(
             vk::ImageViewType::e2D,
             format,
             {},
-            vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1}});
+            range});
 
-    // Transition layout once
     command.beginSingleTime();
-    cmdTransitionImageLayout(
-        command.buffer,
-        image.image,
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eAttachmentOptimal,
-        vk::ImageAspectFlagBits::eDepth);
+
+    cmdBarrierUndefinedToDepthAttachment(command.buffer, image.image, range);
+
     command.endSingleTime(device);
 }

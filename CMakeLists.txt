@@ -40,6 +40,7 @@ target_sources(nienna PRIVATE
     src/ShaderInterface.cpp
     src/Surface.cpp
     src/Swapchain.cpp
+    src/Sync.cpp
     src/Utility.cpp
     src/Window.cpp
     src/main.cpp
