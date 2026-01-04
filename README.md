@@ -28,7 +28,7 @@ Assets from KhronosGroup/glTF-Sample-Assets:
 <img width="800" height="600" alt="Screenshot_20260101_225753" src="https://github.com/user-attachments/assets/89a1ab9e-9f4d-4e9b-846e-0739a2c739c3" />
 <img width="800" height="600" alt="Screenshot_20260101_225755" src="https://github.com/user-attachments/assets/45b83710-2193-49a0-9844-fcd5dca7af97" />
 <img width="800" height="600" alt="Screenshot_20251215_080705" src="https://github.com/user-attachments/assets/c2d69337-369f-4f4c-ac1d-8b3e4c632654" />
-<img width="800" height="600" alt="Screenshot_20251215_080919" src="https://github.com/user-attachments/assets/2921ce85-a9f4-4ace-a872-bd0c2457ea40" />
+<img width="800" height="600" alt="Screenshot_20260104_151048" src="https://github.com/user-attachments/assets/a6ca6f70-43f1-4e1d-8d6d-1fea45ee5ec0" />
 
 ## Tools & Libraries
 
