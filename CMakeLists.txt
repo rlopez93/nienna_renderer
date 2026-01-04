@@ -42,6 +42,7 @@ target_sources(nienna PRIVATE
     src/Surface.cpp
     src/Swapchain.cpp
     src/Sync.cpp
+    src/UniqueImage.cpp
     src/Utility.cpp
     src/Window.cpp
     src/main.cpp

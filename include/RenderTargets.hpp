@@ -1,28 +1,38 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 #include <vulkan/vulkan_raii.hpp>
 
-#include "Image.hpp"
+#include "UniqueImage.hpp"
 #include "vma.hpp"
 
 struct Device;
 
+struct VmaPoolDeleter {
+
+    VmaAllocator allocator;
+    auto         operator()(VmaPool_T *pool) const noexcept -> void
+    {
+        if (!allocator || !pool) {
+            return;
+        }
+
+        vmaDestroyPool(allocator, pool);
+    }
+};
+
+using UniqueVmaPool = std::unique_ptr<VmaPool_T, VmaPoolDeleter>;
+
 class RenderTargetAllocator
 {
   public:
-    RenderTargetAllocator() = default;
-
     explicit RenderTargetAllocator(VmaAllocator vma);
 
-    ~RenderTargetAllocator();
-
     [[nodiscard]]
-    auto vma() const -> VmaAllocator;
-
-    auto setAllocator(VmaAllocator vma) -> void;
+    auto handle() const -> VmaAllocator;
 
     enum class PoolKind : std::uint8_t {
         kColor,
@@ -32,52 +42,22 @@ class RenderTargetAllocator
     [[nodiscard]]
     auto createImage(
         const vk::ImageCreateInfo &info,
-        PoolKind                   kind) -> Image;
-
-    auto destroyImage(Image img) const -> void;
+        PoolKind                   kind) -> UniqueImage;
 
   private:
-    VmaAllocator allocator = nullptr;
-    VmaPool      colorPool = nullptr;
-    VmaPool      depthPool = nullptr;
+    VmaAllocator  vmaAllocator;
+    UniqueVmaPool colorPool;
+    UniqueVmaPool depthPool;
 
     [[nodiscard]]
     auto ensurePool(
         PoolKind                   kind,
         const vk::ImageCreateInfo &info) -> VmaPool;
-
-    auto destroyPool(VmaPool &pool) -> void;
-};
-class OwnedImage
-{
-  public:
-    OwnedImage() = default;
-
-    OwnedImage(
-        VmaAllocator allocator_,
-        Image        image_);
-
-    ~OwnedImage();
-
-    OwnedImage(const OwnedImage &)                     = delete;
-    auto operator=(const OwnedImage &) -> OwnedImage & = delete;
-
-    OwnedImage(OwnedImage &&other) noexcept;
-    auto operator=(OwnedImage &&other) noexcept -> OwnedImage &;
-
-    [[nodiscard]]
-    auto vkImage() const -> vk::Image;
-
-    auto reset() -> void;
-
-  private:
-    VmaAllocator allocator = nullptr;
-    Image        image{};
 };
 
 struct ColorTarget {
     vk::Format          format = vk::Format::eUndefined;
-    OwnedImage          image{};
+    UniqueImage         image{};
     vk::raii::ImageView view = nullptr;
 
     auto recreate(
@@ -87,15 +67,12 @@ struct ColorTarget {
         vk::Format             swapchainFormat) -> void;
 
     [[nodiscard]]
-    auto vkImage() const -> vk::Image;
-
-    [[nodiscard]]
     auto range() const -> vk::ImageSubresourceRange;
 };
 
 struct DepthTarget {
     vk::Format          format = vk::Format::eUndefined;
-    OwnedImage          image{};
+    UniqueImage         image{};
     vk::raii::ImageView view = nullptr;
 
     auto recreate(
@@ -105,19 +82,14 @@ struct DepthTarget {
         vk::Format             depthFormat) -> void;
 
     [[nodiscard]]
-    auto vkImage() const -> vk::Image;
-
-    [[nodiscard]]
     auto range() const -> vk::ImageSubresourceRange;
 };
 
 struct RenderTargets {
-    RenderTargetAllocator allocator{};
+    RenderTargetAllocator allocator;
     ColorTarget           sceneColorLdr{};
     DepthTarget           mainDepth{};
     vk::Extent2D          extent{};
-
-    RenderTargets() = default;
 
     RenderTargets(
         Device      &device,
@@ -128,7 +100,6 @@ struct RenderTargets {
 
     auto recreate(
         Device      &device,
-        VmaAllocator vma,
         vk::Extent2D extent_,
         vk::Format   swapchainFormat,
         vk::Format   depthFormat) -> void;

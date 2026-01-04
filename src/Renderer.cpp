@@ -170,7 +170,7 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
 
     imageLayoutState.transition(
         frames.cmd(),
-        depth.vkImage(),
+        depth.image.get(),
         depth.range(),
         ImageUse::kDepthAttachmentWrite);
 

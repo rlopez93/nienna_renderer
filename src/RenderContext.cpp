@@ -27,7 +27,7 @@ RenderContext::RenderContext(
           surface},
       renderTargets{
           device,
-          allocator.allocator,
+          allocator.handle(),
           swapchain.extent(),
           swapchain.imageFormat,
           findDepthFormat(physicalDevice.handle),
@@ -43,7 +43,6 @@ void RenderContext::recreateRenderTargets()
 
     renderTargets.recreate(
         device,
-        allocator.allocator,
         swapchain.extent(),
         swapchain.imageFormat,
         renderTargets.mainDepth.format);

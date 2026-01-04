@@ -21,6 +21,18 @@ struct Allocator {
     ~Allocator();
 
     [[nodiscard]]
+    auto handle() const -> VmaAllocator
+    {
+        return allocator.get();
+    }
+
+    [[nodiscard]]
+    auto handle() -> VmaAllocator
+    {
+        return allocator.get();
+    }
+
+    [[nodiscard]]
     auto createBuffer(
         vk::DeviceSize           deviceSize,
         vk::BufferUsageFlags2    usage,
@@ -68,6 +80,7 @@ struct Allocator {
     };
 
     using UniqueVmaAllocator = std::unique_ptr<VmaAllocator_T, VmaAllocatorDeleter>;
+
     static auto createUniqueVmaAllocator(
         Instance       &instance,
         PhysicalDevice &physicalDevice,
@@ -169,7 +182,7 @@ inline auto Allocator::createStagingBuffer(const std::vector<T> &vectorData) -> 
 
     // fmt::print(stderr, "\n\ncalling vmaCopyMemoryToAllocation()...\n\n");
     vmaCopyMemoryToAllocation(
-        allocator,
+        allocator.get(),
         vectorData.data(),
         stagingBuffer.allocation,
         0,

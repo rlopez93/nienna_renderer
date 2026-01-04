@@ -68,24 +68,19 @@ void ImageLayoutState::transition(
 
     Entry &e = entries[key];
 
-    if (e.valid && e.use == newUse) {
+    if (!e.firstUse && e.use == newUse) {
         return;
     }
 
-    const ImageUseInfo dst = imageUseInfo(newUse);
+    const auto dst = imageUseInfo(newUse);
 
-    const bool firstUse = !e.valid;
+    const auto oldLayout = e.firstUse ? vk::ImageLayout::eUndefined : e.info.layout;
 
-    const vk::ImageLayout oldLayout =
-        firstUse ? vk::ImageLayout::eUndefined : e.info.layout;
+    const auto srcStage = e.firstUse ? vk::PipelineStageFlagBits2::eNone : e.info.stage;
 
-    const vk::PipelineStageFlags2 srcStage =
-        firstUse ? vk::PipelineStageFlagBits2::eNone : e.info.stage;
+    const auto srcAccess = e.firstUse ? vk::AccessFlagBits2::eNone : e.info.access;
 
-    const vk::AccessFlags2 srcAccess =
-        firstUse ? vk::AccessFlagBits2::eNone : e.info.access;
-
-    const vk::ImageMemoryBarrier2 b{
+    const auto barrier = vk::ImageMemoryBarrier2{
         srcStage,
         srcAccess,
         dst.stage,
@@ -98,9 +93,9 @@ void ImageLayoutState::transition(
         range,
     };
 
-    cmd.pipelineBarrier2(vk::DependencyInfo{}.setImageMemoryBarriers(b));
+    cmd.pipelineBarrier2(vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
 
-    e.valid = true;
-    e.use   = newUse;
-    e.info  = dst;
+    e.firstUse = false;
+    e.use      = newUse;
+    e.info     = dst;
 }

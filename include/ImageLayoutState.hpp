@@ -16,7 +16,7 @@ enum class ImageUse : std::uint8_t {
 };
 
 struct ImageUseInfo {
-    vk::ImageLayout         layout{};
+    vk::ImageLayout         layout = vk::ImageLayout::eUndefined;
     vk::PipelineStageFlags2 stage{};
     vk::AccessFlags2        access{};
 };
@@ -29,15 +29,15 @@ struct ImageLayoutState {
 
     auto forgetImages(std::span<const vk::Image> imgs) -> void;
 
-    void transition(
+    auto transition(
         vk::raii::CommandBuffer  &cmd,
         vk::Image                 image,
         vk::ImageSubresourceRange range,
-        ImageUse                  newUse);
+        ImageUse                  newUse) -> void;
 
   private:
     struct Entry {
-        bool         valid = false;
+        bool         firstUse = true;
         ImageUse     use{};
         ImageUseInfo info{};
     };

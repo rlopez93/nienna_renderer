@@ -51,7 +51,7 @@ auto updatePerFrameUniformBuffers(
     const std::vector<NodeInstanceData> &nodeInstances) -> void
 {
     VK_CHECK(vmaCopyMemoryToAllocation(
-        allocator.allocator,
+        allocator.handle(),
         &frame,
         frameUBO.allocation,
         0,
@@ -65,7 +65,7 @@ auto updatePerFrameUniformBuffers(
                      * static_cast<vk::DeviceSize>(nodeInstances.size());
 
     VK_CHECK(vmaCopyMemoryToAllocation(
-        allocator.allocator,
+        allocator.handle(),
         nodeInstances.data(),
         nodeInstancesSSBO.allocation,
         0,
