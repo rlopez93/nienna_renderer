@@ -4,7 +4,7 @@
 
 #include "DebugView.hpp"
 #include "FrameContext.hpp"
-#include "LayoutTracker.hpp"
+#include "ImageLayoutState.hpp"
 #include "RenderContext.hpp"
 #include "RendererConfig.hpp"
 #include "ShaderInterface.hpp"
@@ -39,8 +39,8 @@ struct Renderer {
     void cycleDebugView();
 
   private:
-    RenderContext &context;
-    LayoutTracker  layoutTracker;
+    RenderContext   &context;
+    ImageLayoutState imageLayoutState;
 
     ShaderInterface          shaderInterface;
     vk::raii::DescriptorPool descriptorPool;

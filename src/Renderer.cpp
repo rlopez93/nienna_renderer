@@ -57,7 +57,6 @@ Renderer::Renderer(
     RenderContext        &context_,
     const RendererConfig &config)
     : context{context_},
-      layoutTracker{context.swapchain.images.size()},
       shaderInterface{
           context.device,
           config.shaderInterfaceDescription},
@@ -85,7 +84,7 @@ auto Renderer::beginFrame() -> bool
 {
     if (context.swapchain.needRecreate) {
         context.recreateRenderTargets();
-        layoutTracker.onSwapchainRecreated(context.swapchain.images.size());
+        imageLayoutState.resetForSwapchain(context.swapchain.images);
     }
 
     const auto &timelineSemaphore = frames.timelineSemaphore();
@@ -145,18 +144,17 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
         renderingColorAttachmentInfo,
         &renderingDepthAttachmentInfo};
 
-    const auto oldLayout =
-        layoutTracker.swapchainLayout(context.swapchain.nextImageIndex);
-
-    cmdBarrierSwapchainToColorAttachment(
+    imageLayoutState.transition(
         frames.cmd(),
         context.swapchain.nextImage(),
-        oldLayout,
-        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
-
-    layoutTracker.setSwapchainLayout(
-        context.swapchain.nextImageIndex,
-        vk::ImageLayout::eColorAttachmentOptimal);
+        vk::ImageSubresourceRange{
+            vk::ImageAspectFlagBits::eColor,
+            0,
+            1,
+            0,
+            1,
+        },
+        ImageUse::kColorAttachmentWrite);
 
     frames.cmd().beginRendering(renderingInfo);
     frames.cmd().setViewportWithCount(
@@ -221,10 +219,11 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
 
 auto Renderer::submit() -> void
 {
-    cmdBarrierColorAttachmentToPresent(
+    imageLayoutState.transition(
         frames.cmd(),
         context.swapchain.nextImage(),
-        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+        ImageUse::kPresent);
 
     frames.cmd().end();
 

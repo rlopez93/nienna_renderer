@@ -27,8 +27,8 @@ target_sources(nienna PRIVATE
     src/Device.cpp
     src/FrameContext.cpp
     src/GltfLoader.cpp
+    src/ImageLayoutState.cpp
     src/Instance.cpp
-    src/LayoutTracker.cpp
     src/MaterialPacking.cpp
     src/PhysicalDevice.cpp
     src/Pipeline.cpp
