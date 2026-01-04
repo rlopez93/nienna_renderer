@@ -144,7 +144,6 @@ auto Swapchain::create(
 
     images = handle.getImages();
     imageViews.clear();
-    imageAvailableSemaphores.clear();
     renderFinishedSemaphores.clear();
 
     const auto formats = physicalDevice.handle.getSurfaceFormatsKHR(surface.handle);
@@ -161,12 +160,8 @@ auto Swapchain::create(
                 {},
                 {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
 
-        imageAvailableSemaphores.emplace_back(device.handle, vk::SemaphoreCreateInfo{});
-
         renderFinishedSemaphores.emplace_back(device.handle, vk::SemaphoreCreateInfo{});
     }
-
-    imageInitialized.assign(images.size(), false);
 }
 
 auto Swapchain::recreate(
@@ -188,10 +183,6 @@ auto Swapchain::acquireNextImage(vk::Semaphore signalSemaphore) -> vk::Result
     std::tie(result, nextImageIndex) =
         handle.acquireNextImage(std::numeric_limits<uint64_t>::max(), signalSemaphore);
     return result;
-}
-auto Swapchain::imageAvailableSemaphore() const -> vk::Semaphore
-{
-    return *imageAvailableSemaphores[nextImageIndex];
 }
 
 auto Swapchain::renderFinishedSemaphore() const -> vk::Semaphore

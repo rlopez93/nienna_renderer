@@ -19,11 +19,11 @@ class LayoutTracker
   public:
     LayoutTracker() = default;
 
-    explicit LayoutTracker(std::uint32_t swapImgCount);
+    explicit LayoutTracker(std::size_t swapImgCount);
 
     // Call after swapchain (re)create. Sets all swap layouts to
     // eUndefined (first use rule).
-    void onSwapchainRecreated(std::uint32_t swapImgCount);
+    void onSwapchainRecreated(std::size_t swapImgCount);
 
     // Named images are renderer-owned (non-swapchain) targets.
     void registerNamedImage(

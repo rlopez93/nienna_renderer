@@ -4,6 +4,7 @@
 
 #include "DebugView.hpp"
 #include "FrameContext.hpp"
+#include "LayoutTracker.hpp"
 #include "RenderContext.hpp"
 #include "RendererConfig.hpp"
 #include "ShaderInterface.hpp"
@@ -39,6 +40,7 @@ struct Renderer {
 
   private:
     RenderContext &context;
+    LayoutTracker  layoutTracker;
 
     ShaderInterface          shaderInterface;
     vk::raii::DescriptorPool descriptorPool;

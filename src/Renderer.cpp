@@ -57,6 +57,7 @@ Renderer::Renderer(
     RenderContext        &context_,
     const RendererConfig &config)
     : context{context_},
+      layoutTracker{context.swapchain.images.size()},
       shaderInterface{
           context.device,
           config.shaderInterfaceDescription},
@@ -84,6 +85,7 @@ auto Renderer::beginFrame() -> bool
 {
     if (context.swapchain.needRecreate) {
         context.recreateRenderTargets();
+        layoutTracker.onSwapchainRecreated(context.swapchain.images.size());
     }
 
     const auto &timelineSemaphore = frames.timelineSemaphore();
@@ -143,11 +145,8 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
         renderingColorAttachmentInfo,
         &renderingDepthAttachmentInfo};
 
-    // transition swapchain image layout
-    auto oldLayout =
-        (!context.swapchain.imageInitialized[context.swapchain.nextImageIndex])
-            ? vk::ImageLayout::eUndefined
-            : vk::ImageLayout::ePresentSrcKHR;
+    const auto oldLayout =
+        layoutTracker.swapchainLayout(context.swapchain.nextImageIndex);
 
     cmdBarrierSwapchainToColorAttachment(
         frames.cmd(),
@@ -155,7 +154,9 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
         oldLayout,
         vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
 
-    context.swapchain.imageInitialized[context.swapchain.nextImageIndex] = true;
+    layoutTracker.setSwapchainLayout(
+        context.swapchain.nextImageIndex,
+        vk::ImageLayout::eColorAttachmentOptimal);
 
     frames.cmd().beginRendering(renderingInfo);
     frames.cmd().setViewportWithCount(

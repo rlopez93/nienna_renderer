@@ -62,7 +62,6 @@ struct Swapchain {
 
     vk::raii::SwapchainKHR           handle = nullptr;
     vk::Extent2D                     swapchainExtent;
-    std::vector<bool>                imageInitialized;
     uint32_t                         nextImageIndex = 0u;
     std::vector<vk::Image>           images;
     std::vector<vk::raii::ImageView> imageViews;
@@ -70,7 +69,5 @@ struct Swapchain {
     vk::Format                       depthFormat;
     bool                             needRecreate = false;
 
-    // Per-frame synchronization
-    std::vector<vk::raii::Semaphore> imageAvailableSemaphores;
     std::vector<vk::raii::Semaphore> renderFinishedSemaphores;
 };

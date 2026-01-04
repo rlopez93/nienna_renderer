@@ -2,12 +2,12 @@
 
 #include <cassert>
 
-LayoutTracker::LayoutTracker(std::uint32_t swapImgCount)
+LayoutTracker::LayoutTracker(std::size_t swapImgCount)
 {
     onSwapchainRecreated(swapImgCount);
 }
 
-void LayoutTracker::onSwapchainRecreated(std::uint32_t swapImgCount)
+void LayoutTracker::onSwapchainRecreated(std::size_t swapImgCount)
 {
     swapchainLayouts =
         std::vector<vk::ImageLayout>(swapImgCount, vk::ImageLayout::eUndefined);
