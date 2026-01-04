@@ -1,34 +1,27 @@
 #pragma once
 
 #include <vector>
+
 #include <vulkan/vulkan_raii.hpp>
 
 #include "Allocator.hpp"
-#include "DepthTarget.hpp"
 #include "Device.hpp"
 #include "Instance.hpp"
 #include "PhysicalDevice.hpp"
+#include "RenderTargets.hpp"
 #include "Surface.hpp"
 #include "Swapchain.hpp"
 
-// Forward declarations
-// struct Window;
-struct Allocator;
-struct Command;
-
 struct RenderContext {
-    // Core Vulkan context
     Instance       instance;
     Surface        surface;
     PhysicalDevice physicalDevice;
     Device         device;
     Allocator      allocator;
 
-    // Surface-dependent resources
-    Swapchain   swapchain;
-    DepthTarget depth;
+    Swapchain     swapchain;
+    RenderTargets renderTargets;
 
-    // Construction
     RenderContext(
         Window                          &window,
         const std::vector<const char *> &requiredExtensions);

@@ -46,14 +46,14 @@ auto imageUseInfo(ImageUse use) -> ImageUseInfo
     return {};
 }
 
-void ImageLayoutState::reset()
+auto ImageLayoutState::reset() -> void
 {
     entries.clear();
 }
 
-void ImageLayoutState::resetForSwapchain(const std::vector<vk::Image> &images)
+auto ImageLayoutState::forgetImages(std::span<const vk::Image> imgs) -> void
 {
-    for (vk::Image img : images) {
+    for (vk::Image img : imgs) {
         entries.erase(static_cast<VkImage>(img));
     }
 }
@@ -85,7 +85,7 @@ void ImageLayoutState::transition(
     const vk::AccessFlags2 srcAccess =
         firstUse ? vk::AccessFlagBits2::eNone : e.info.access;
 
-    vk::ImageMemoryBarrier2 b{
+    const vk::ImageMemoryBarrier2 b{
         srcStage,
         srcAccess,
         dst.stage,

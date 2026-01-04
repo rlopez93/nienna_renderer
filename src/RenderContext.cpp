@@ -1,5 +1,5 @@
 #include "RenderContext.hpp"
-#include "Command.hpp"
+
 #include "Utility.hpp"
 
 RenderContext::RenderContext(
@@ -21,29 +21,32 @@ RenderContext::RenderContext(
           instance,
           physicalDevice,
           device},
-      swapchain(
+      swapchain{
           device,
           physicalDevice,
-          surface)
+          surface},
+      renderTargets{
+          device,
+          allocator.allocator,
+          swapchain.extent(),
+          swapchain.imageFormat,
+          findDepthFormat(physicalDevice.handle),
+      }
 {
 }
 
 void RenderContext::recreateRenderTargets()
 {
-    // Ensure no work is using old swapchain-dependent resources
     device.handle.waitIdle();
 
-    // Recreate swapchain first (defines extent + color format)
     swapchain.recreate(device, physicalDevice, surface);
 
-    auto transientCommand = Command(device, vk::CommandPoolCreateFlagBits::eTransient);
-    // Recreate depth target using new extent
-    depth.recreate(
+    renderTargets.recreate(
         device,
-        allocator,
-        transientCommand,
+        allocator.allocator,
         swapchain.extent(),
-        depth.format);
+        swapchain.imageFormat,
+        renderTargets.mainDepth.format);
 }
 
 auto RenderContext::extent() const -> vk::Extent2D
@@ -58,5 +61,5 @@ auto RenderContext::colorFormat() const -> vk::Format
 
 auto RenderContext::depthFormat() const -> vk::Format
 {
-    return depth.format;
+    return renderTargets.mainDepth.format;
 }

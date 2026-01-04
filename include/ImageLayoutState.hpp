@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <span>
 #include <unordered_map>
 
 #include <vulkan/vulkan.hpp>
@@ -24,9 +25,9 @@ struct ImageUseInfo {
 auto imageUseInfo(ImageUse use) -> ImageUseInfo;
 
 struct ImageLayoutState {
-    void reset();
+    auto reset() -> void;
 
-    void resetForSwapchain(const std::vector<vk::Image> &images);
+    auto forgetImages(std::span<const vk::Image> imgs) -> void;
 
     void transition(
         vk::raii::CommandBuffer  &cmd,

@@ -23,7 +23,6 @@ target_sources(nienna PRIVATE
     src/Allocator.cpp
     src/Camera.cpp
     src/Command.cpp
-    src/DepthTarget.cpp
     src/Device.cpp
     src/FrameContext.cpp
     src/GltfLoader.cpp
@@ -34,6 +33,7 @@ target_sources(nienna PRIVATE
     src/Pipeline.cpp
     src/PipelineLayout.cpp
     src/RenderContext.cpp
+    src/RenderTargets.cpp
     src/Renderer.cpp
     src/SceneDrawList.cpp
     src/SceneRenderData.cpp

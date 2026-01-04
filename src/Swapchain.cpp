@@ -18,10 +18,11 @@ auto Swapchain::chooseSurfaceFormat(
     const std::vector<vk::SurfaceFormatKHR> &availableFormats) -> vk::SurfaceFormatKHR
 {
     constexpr auto preferredSurfaceFormats = std::array{
+        vk::Format::eB8G8R8A8Srgb,
         vk::Format::eR8G8B8A8Srgb,
         vk::Format::eB8G8R8A8Unorm,
-        vk::Format::eR8G8B8A8Snorm};
-
+        vk::Format::eR8G8B8A8Unorm,
+    };
     constexpr auto preferredColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear;
 
     for (auto preferredSurfaceFormat : preferredSurfaceFormats) {

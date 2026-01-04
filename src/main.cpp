@@ -186,22 +186,10 @@ auto main(
 
     auto context = RenderContext{window, requiredExtensions};
 
-    const auto formats =
-        context.physicalDevice.handle.getSurfaceFormatsKHR(context.surface.handle);
-
-    const auto surfaceFormat = chooseSurfaceFormat(formats);
-    const auto depthFormat   = findDepthFormat(context.physicalDevice.handle);
-
-    context.depth.format = depthFormat;
+    const auto colorFormat = context.colorFormat();
+    const auto depthFormat = context.depthFormat();
 
     Command uploadCmd{context.device, vk::CommandPoolCreateFlagBits::eTransient};
-
-    context.depth.recreate(
-        context.device,
-        context.allocator,
-        uploadCmd,
-        context.swapchain.extent(),
-        depthFormat);
 
     auto asset         = getAsset(gltfPath);
     auto sceneDrawList = buildSceneDrawList(asset);
@@ -241,7 +229,7 @@ auto main(
              vk::ShaderStageFlagBits::eFragment},
         }},
         .shaderPath                 = shaderPath,
-        .colorFormat                = surfaceFormat.format,
+        .colorFormat                = colorFormat,
         .depthFormat                = depthFormat,
         .maxFramesInFlight          = 2,
     };

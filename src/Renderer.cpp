@@ -83,8 +83,13 @@ Renderer::Renderer(
 auto Renderer::beginFrame() -> bool
 {
     if (context.swapchain.needRecreate) {
+        const auto oldSwapImgs = context.swapchain.images;
+        const auto oldRtImgs   = context.renderTargets.images();
+
         context.recreateRenderTargets();
-        imageLayoutState.resetForSwapchain(context.swapchain.images);
+
+        imageLayoutState.forgetImages(oldSwapImgs);
+        imageLayoutState.forgetImages(oldRtImgs);
     }
 
     const auto &timelineSemaphore = frames.timelineSemaphore();
@@ -124,17 +129,23 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
         {},
         vk::AttachmentLoadOp::eClear,
         vk::AttachmentStoreOp::eStore,
-        vk::ClearColorValue{std::array{0.2f, 0.5f, 1.0f, 1.0f}}};
+        vk::ClearColorValue{
+            std::array{0.2f, 0.5f, 1.0f, 1.0f},
+        },
+    };
+
+    auto &depth = context.renderTargets.mainDepth;
 
     auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
-        context.depth.view,
+        depth.view,
         vk::ImageLayout::eDepthAttachmentOptimal,
         {},
         {},
         {},
         vk::AttachmentLoadOp::eClear,
         vk::AttachmentStoreOp::eDontCare,
-        vk::ClearDepthStencilValue{1.0f, 0}};
+        vk::ClearDepthStencilValue{1.0f, 0},
+    };
 
     auto renderingInfo = vk::RenderingInfo{
         {},
@@ -142,7 +153,8 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
         1,
         {},
         renderingColorAttachmentInfo,
-        &renderingDepthAttachmentInfo};
+        &renderingDepthAttachmentInfo,
+    };
 
     imageLayoutState.transition(
         frames.cmd(),
@@ -155,6 +167,12 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
             1,
         },
         ImageUse::kColorAttachmentWrite);
+
+    imageLayoutState.transition(
+        frames.cmd(),
+        depth.vkImage(),
+        depth.range(),
+        ImageUse::kDepthAttachmentWrite);
 
     frames.cmd().beginRendering(renderingInfo);
     frames.cmd().setViewportWithCount(

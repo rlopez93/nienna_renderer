@@ -1,5 +1,5 @@
 // mesh-layer0.slang
-#include "SharedTypes.h"
+#include "../include/SharedTypes.h"
 
 // Vertex input must match createPipeline() attribute locations:
 // 0: position (float3)
