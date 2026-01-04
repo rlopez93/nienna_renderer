@@ -58,8 +58,23 @@ struct Allocator {
     void freeBuffers();
     void freeImages();
 
+  private:
+    struct VmaAllocatorDeleter {
+        VmaAllocatorDeleter() = default;
+        auto operator()(VmaAllocator_T *allocator) const -> void
+        {
+            vmaDestroyAllocator(allocator);
+        }
+    };
+
+    using UniqueVmaAllocator = std::unique_ptr<VmaAllocator_T, VmaAllocatorDeleter>;
+    static auto createUniqueVmaAllocator(
+        Instance       &instance,
+        PhysicalDevice &physicalDevice,
+        Device         &device) -> UniqueVmaAllocator;
+
+    UniqueVmaAllocator  allocator;
     vk::Device          device;
-    VmaAllocator        allocator;
     std::vector<Buffer> stagingBuffers;
     std::vector<Buffer> buffers;
     std::vector<Image>  images;

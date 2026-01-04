@@ -1,19 +1,19 @@
 #include "Allocator.hpp"
 #include "Utility.hpp"
 
-Allocator::Allocator(
+auto Allocator::createUniqueVmaAllocator(
     Instance       &instance,
     PhysicalDevice &physicalDevice,
-    Device         &device)
-    : device{device.handle}
+    Device         &device) -> UniqueVmaAllocator
 {
+
     // Initialization of VMA allocator.
     // #TODO : VK_EXT_memory_priority ? VMA_ALLOCATOR_CREATE_EXT_MEMORY_PRIORITY_BIT
     VmaAllocatorCreateInfo allocatorCreateInfo{
         .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT
                | VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE4_BIT,
         .physicalDevice   = *physicalDevice.handle,
-        .device           = this->device,
+        .device           = *device.handle,
         .instance         = *instance.handle,
         .vulkanApiVersion = vk::ApiVersion14};
 
@@ -31,7 +31,23 @@ Allocator::Allocator(
         .vkGetDeviceProcAddr   = vkGetDeviceProcAddr,
     };
     allocatorCreateInfo.pVulkanFunctions = &functions;
+
+    VmaAllocator allocator;
     VK_CHECK(vmaCreateAllocator(&allocatorCreateInfo, &allocator));
+
+    return UniqueVmaAllocator{allocator};
+}
+
+Allocator::Allocator(
+    Instance       &instance,
+    PhysicalDevice &physicalDevice,
+    Device         &device)
+    : allocator(createUniqueVmaAllocator(
+          instance,
+          physicalDevice,
+          device)),
+      device{device.handle}
+{
 }
 
 /*-- Create a buffer -*/
@@ -59,7 +75,6 @@ auto Allocator::createBuffer(
     VmaMemoryUsage           memoryUsage,
     VmaAllocationCreateFlags allocationFlags) -> Buffer
 {
-
     const auto bufferUsageFlags2CreateInfo = *vk::BufferUsageFlags2CreateInfo{
         usageFlags | vk::BufferUsageFlagBits2::eShaderDeviceAddress};
     auto bufferCreateInfo =
@@ -85,7 +100,7 @@ auto Allocator::createBuffer(
     Buffer   buffer;
     VkBuffer vk_buffer;
     VK_CHECK(vmaCreateBuffer(
-        allocator,
+        allocator.get(),
         &bufferCreateInfo,
         &vmaAllocationCreateInfo,
         &vk_buffer,
@@ -107,7 +122,7 @@ auto Allocator::createBuffer(
 //*-- Destroy a buffer -*/
 void Allocator::destroyBuffer(Buffer buffer) const
 {
-    vmaDestroyBuffer(allocator, buffer.buffer, buffer.allocation);
+    vmaDestroyBuffer(allocator.get(), buffer.buffer, buffer.allocation);
 }
 
 /*--
@@ -126,7 +141,7 @@ auto Allocator::createImage(const vk::ImageCreateInfo &imageInfo) -> Image
     VkImage           vk_image;
     VmaAllocationInfo allocInfo{};
     VK_CHECK(vmaCreateImage(
-        allocator,
+        allocator.get(),
         &imageCreateInfo,
         &createInfo,
         &vk_image,
@@ -142,7 +157,7 @@ auto Allocator::createImage(const vk::ImageCreateInfo &imageInfo) -> Image
 /*-- Destroy image --*/
 void Allocator::destroyImage(Image image) const
 {
-    vmaDestroyImage(allocator, image.image, image.allocation);
+    vmaDestroyImage(allocator.get(), image.image, image.allocation);
 }
 
 /*--
@@ -164,7 +179,6 @@ Allocator::~Allocator()
     freeStagingBuffers();
     freeBuffers();
     freeImages();
-    vmaDestroyAllocator(allocator);
 }
 void Allocator::freeBuffers()
 {
