@@ -3,9 +3,9 @@
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/vector_float3.hpp>
 
-struct Primitive;
-struct Asset;
-struct SceneDrawList;
+struct Submesh;
+struct RenderAsset;
+struct SceneView;
 
 // Axis-aligned bounding box in 3D.
 struct AABB {
@@ -28,9 +28,9 @@ auto computeWorldAABBFromLocalAABB(
     const glm::mat4 &worldFromLocalTransform) -> AABB;
 
 // Compute a primitive's local-space AABB from vertex positions.
-auto computeLocalAABB(const Primitive &primitive) -> AABB;
+auto computeLocalAABB(const Submesh &submesh) -> AABB;
 
 // Compute the active scene's world-space AABB from draw calls.
 auto computeSceneAABB(
-    const Asset         &asset,
-    const SceneDrawList &sceneDrawList) -> AABB;
+    const RenderAsset &asset,
+    const SceneView   &sceneView) -> AABB;

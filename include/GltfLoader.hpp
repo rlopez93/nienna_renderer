@@ -2,6 +2,6 @@
 
 #include <filesystem>
 
-#include "Asset.hpp"
+#include "RenderAsset.hpp"
 
-auto getAsset(const std::filesystem::path &gltfPath) -> Asset;
+auto getAsset(const std::filesystem::path &gltfPath) -> RenderAsset;

@@ -2,7 +2,7 @@
 #include "DebugView.hpp"
 #include "Pipeline.hpp"
 #include "PipelineLayout.hpp"
-#include "SceneRenderData.hpp"
+#include "RenderableResources.hpp"
 #include "ShaderInterfaceTypes.hpp"
 
 auto Renderer::createDescriptorPool(
@@ -119,7 +119,7 @@ auto Renderer::beginFrame() -> bool
     return true;
 }
 
-auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
+auto Renderer::render(const RenderableResources &renderableResources) -> void
 {
     auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
         context.swapchain.nextImageView(),
@@ -203,15 +203,15 @@ auto Renderer::render(const SceneRenderData &sceneRenderData) -> void
         frames.currentDescriptorSet(),
         {});
 
-    for (const auto &draw : sceneRenderData.draws) {
+    for (const auto &draw : renderableResources.draws) {
 
         frames.cmd().bindVertexBuffers(
             0,
-            sceneRenderData.vertexBuffers[draw.geometryIndex].buffer,
+            renderableResources.vertexBuffers[draw.geometryIndex].buffer,
             {0});
 
         frames.cmd().bindIndexBuffer(
-            sceneRenderData.indexBuffers[draw.geometryIndex].buffer,
+            renderableResources.indexBuffers[draw.geometryIndex].buffer,
             0,
             vk::IndexType::eUint32);
 

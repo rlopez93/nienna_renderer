@@ -32,11 +32,11 @@ target_sources(nienna PRIVATE
     src/PhysicalDevice.cpp
     src/Pipeline.cpp
     src/PipelineLayout.cpp
+    src/RenderableResources.cpp
     src/RenderContext.cpp
     src/RenderTargets.cpp
     src/Renderer.cpp
-    src/SceneDrawList.cpp
-    src/SceneRenderData.cpp
+    src/SceneView.cpp
     src/Shader.cpp
     src/ShaderInterface.cpp
     src/Surface.cpp

@@ -12,11 +12,11 @@
 #include "Material.hpp"
 #include "Texture.hpp"
 
-struct Scene {
-    std::vector<std::uint32_t> rootNodes;
+struct SceneRoots {
+    std::vector<std::uint32_t> rootNodeIndices;
 };
 
-struct Node {
+struct SceneNode {
     glm::vec3 translation{0.0f};
     glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 scale{1.0f};
@@ -24,14 +24,14 @@ struct Node {
     std::optional<std::uint32_t> meshIndex;
     std::optional<std::uint32_t> cameraIndex;
 
-    std::vector<std::uint32_t> children;
+    std::vector<std::uint32_t> childNodeIndices;
 };
 
-struct Asset {
+struct RenderAsset {
     std::uint32_t activeScene = 0u;
 
-    std::vector<Scene> scenes;
-    std::vector<Node>  nodes;
+    std::vector<SceneRoots> scenes;
+    std::vector<SceneNode>  nodes;
 
     std::vector<Mesh> meshes;
 

@@ -10,6 +10,8 @@ struct VmaImageDeleter {
     VmaAllocator  allocator  = nullptr;
     VmaAllocation allocation = nullptr;
 
+    // FIXME: implementation dependent behavior
+    // VkImage == VkImage_T* only on certain platforms
     auto operator()(VkImage_T *img) const noexcept -> void;
 };
 

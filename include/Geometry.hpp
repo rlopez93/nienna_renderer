@@ -6,7 +6,7 @@
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
 
-struct Vertex {
+struct MeshVertex {
     glm::vec3 position{0.0f};
     glm::vec3 normal{0.0f};
 
@@ -18,8 +18,8 @@ struct Vertex {
     glm::vec4 color{1.0f};
 };
 
-struct Primitive {
-    std::vector<Vertex>        vertices;
+struct Submesh {
+    std::vector<MeshVertex>    vertices;
     std::vector<std::uint32_t> indices;
 
     std::uint32_t materialIndex = 0u;
@@ -30,5 +30,5 @@ struct Primitive {
 };
 
 struct Mesh {
-    std::vector<Primitive> primitives;
+    std::vector<Submesh> submeshes;
 };

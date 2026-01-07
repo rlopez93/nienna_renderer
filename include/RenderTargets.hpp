@@ -14,7 +14,10 @@ struct Device;
 struct VmaPoolDeleter {
 
     VmaAllocator allocator;
-    auto         operator()(VmaPool_T *pool) const noexcept -> void
+    // FIXME: implementation dependent behavior
+    // VmaPool == VmaPool_T* only on certain platforms
+
+    auto operator()(VmaPool_T *pool) const noexcept -> void
     {
         if (!allocator || !pool) {
             return;

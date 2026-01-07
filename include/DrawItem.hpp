@@ -10,8 +10,8 @@ struct DrawItem {
     int32_t  vertexOffset = 0;  // usually 0 for now
 
     // glTF
-    uint32_t meshIndex      = 0u;
-    uint32_t primitiveIndex = 0u;
+    uint32_t meshIndex    = 0u;
+    uint32_t submeshIndex = 0u;
 
     // GPU slot
     uint32_t geometryIndex = 0u;

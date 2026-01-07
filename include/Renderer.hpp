@@ -9,7 +9,7 @@
 #include "RendererConfig.hpp"
 #include "ShaderInterface.hpp"
 
-struct SceneRenderData;
+struct RenderableResources;
 
 struct Renderer {
     Renderer(
@@ -22,7 +22,7 @@ struct Renderer {
     auto beginFrame() -> bool;
 
     // Records rendering commands into the current frame command buffer
-    auto render(const SceneRenderData &sceneRenderData) -> void;
+    auto render(const RenderableResources &renderableResources) -> void;
 
     // Submits + presents + advances frame
     auto endFrame() -> void;

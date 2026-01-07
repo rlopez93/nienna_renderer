@@ -1,12 +1,11 @@
-#include "SceneRenderData.hpp"
+#include "RenderableResources.hpp"
 
-#include "Asset.hpp"
 #include "MaterialPacking.hpp"
-#include "SceneDrawList.hpp"
+#include "RenderAsset.hpp"
+#include "SceneView.hpp"
 #include "ShaderInterfaceTypes.hpp"
 
 #include <cstdint>
-#include <numeric>
 #include <ranges>
 #include <vector>
 
@@ -62,45 +61,23 @@ auto getOrCreateSamplerIndex(
 }
 
 } // namespace
-auto SceneRenderData::create(
-    const Asset         &asset,
-    const SceneDrawList &sceneDrawList,
-    Device              &device,
-    Command             &command,
-    Allocator           &allocator) -> void
+auto RenderableResources::create(
+    const RenderAsset &asset,
+    const SceneView   &sceneView,
+    Device            &device,
+    Command           &command,
+    Allocator         &allocator) -> void
 {
-    draws = sceneDrawList.draws;
-
-    auto meshOffsets = std::vector<std::uint32_t>(asset.meshes.size() + 1, 0u);
-    // each mesh's offset in our geometry buffers (vertex/index buffers) can be found by
-    // generating prefix sums of the primitive counts in each mesh, using
-    // std::transform_inclusive_scan()
-    // meshOffsets[m] is the geometry index for the first primitive in mesh m
-    (void)std::transform_inclusive_scan(
-        asset.meshes.begin(),
-        asset.meshes.end(),
-        meshOffsets.begin() + 1, // we start our inclusive_scan at meshOffsets[1] so
-                                 // that meshOffsets.front() == 0
-                                 // and meshOffsets.back() == total primitive count
-        std::plus<>{},
-        [](const auto &mesh) {
-            return static_cast<std::uint32_t>(mesh.primitives.size());
-        });
-
-    // we use the mesh offsets and the primitive index to get the final geometry index
-    // for every draw call
-    for (DrawItem &draw : draws) {
-        draw.geometryIndex = meshOffsets[draw.meshIndex] + draw.primitiveIndex;
-    }
+    draws = sceneView.draws;
 
     vertexBuffers.clear();
     indexBuffers.clear();
 
     // meshOffsets.back() is the total primitive count
-    const auto primitiveCount = meshOffsets.back();
-
-    vertexBuffers.reserve(primitiveCount);
-    indexBuffers.reserve(primitiveCount);
+    // const auto primitiveCount = meshOffsets.back();
+    //
+    // vertexBuffers.reserve(primitiveCount);
+    // indexBuffers.reserve(primitiveCount);
 
     textureImages.clear();
     srgbTextureImageViews.clear();
@@ -120,7 +97,7 @@ auto SceneRenderData::create(
 
     // TODO: create large geometry buffers to "flatten out" vertex/indexBuffers
     for (const auto &mesh : asset.meshes) {
-        for (const auto &primitive : mesh.primitives) {
+        for (const auto &primitive : mesh.submeshes) {
 
             vertexBuffers.push_back(allocator.createBufferAndUploadData(
                 command,
@@ -218,7 +195,7 @@ auto SceneRenderData::create(
     }
 }
 
-void SceneRenderData::updateDescriptorSet(
+void RenderableResources::updateDescriptorSet(
     Device           &device,
     vk::DescriptorSet descriptorSet,
     const Buffer     &frameUBO,

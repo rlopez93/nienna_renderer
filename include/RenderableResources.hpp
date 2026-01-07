@@ -1,12 +1,12 @@
 #pragma once
 
 #include "Allocator.hpp"
-#include "Asset.hpp"
 #include "Buffer.hpp"
 #include "Command.hpp"
 #include "Device.hpp"
 #include "DrawItem.hpp"
 #include "Image.hpp"
+#include "RenderAsset.hpp"
 
 #include <unordered_map>
 #include <vector>
@@ -14,15 +14,15 @@
 #include <vulkan/vulkan_hash.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
-struct SceneDrawList;
+struct SceneView;
 
-struct SceneRenderData {
+struct RenderableResources {
     void create(
-        const Asset         &asset,
-        const SceneDrawList &sceneDrawList,
-        Device              &device,
-        Command             &command,
-        Allocator           &allocator);
+        const RenderAsset &asset,
+        const SceneView   &sceneView,
+        Device            &device,
+        Command           &command,
+        Allocator         &allocator);
 
     void updateDescriptorSet(
         Device           &device,

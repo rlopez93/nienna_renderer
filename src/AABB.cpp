@@ -7,9 +7,9 @@
 #include <glm/common.hpp>
 #include <glm/ext/vector_float4.hpp>
 
-#include "Asset.hpp"
 #include "Geometry.hpp"
-#include "SceneDrawList.hpp"
+#include "RenderAsset.hpp"
+#include "SceneView.hpp"
 
 auto AABB::invalid() -> AABB
 {
@@ -124,21 +124,19 @@ auto computeWorldAABBFromLocalAABB(
     return worldAABB;
 }
 
-auto computeLocalAABB(const Primitive &primitive) -> AABB
+auto computeLocalAABB(const Submesh &submesh) -> AABB
 {
     // Bounds from vertex positions only.
-    if (primitive.vertices.empty()) {
+    if (submesh.vertices.empty()) {
         return AABB::invalid();
     }
 
     auto localAABB = AABB::invalid();
 
-    for (const auto &vertex : primitive.vertices) {
-        const auto &position = vertex.position;
-
+    for (const auto &vertex : submesh.vertices) {
         // Expand AABB to enclose each vertex
-        localAABB.min = glm::min(localAABB.min, position);
-        localAABB.max = glm::max(localAABB.max, position);
+        localAABB.min = glm::min(localAABB.min, vertex.position);
+        localAABB.max = glm::max(localAABB.max, vertex.position);
     }
 
     return localAABB;
@@ -147,21 +145,21 @@ auto computeLocalAABB(const Primitive &primitive) -> AABB
 // Compute a world-space AABB for the scene by iterating draw calls to
 // account for instancing.
 auto computeSceneAABB(
-    const Asset         &asset,
-    const SceneDrawList &sceneDrawList) -> AABB
+    const RenderAsset &asset,
+    const SceneView   &sceneView) -> AABB
 {
     auto sceneAABB = AABB::invalid();
 
-    for (const auto &drawItem : sceneDrawList.draws) {
+    for (const auto &drawItem : sceneView.draws) {
 
-        const auto &primitive =
-            asset.meshes[drawItem.meshIndex].primitives[drawItem.primitiveIndex];
+        const auto &submesh =
+            asset.meshes[drawItem.meshIndex].submeshes[drawItem.submeshIndex];
 
-        const auto localAABB = computeLocalAABB(primitive);
+        const auto localAABB = computeLocalAABB(submesh);
 
         // Use the per-instance transform when producing world bounds.
         const auto &worldFromLocalTransform =
-            sceneDrawList.nodeInstances[drawItem.nodeInstanceIndex].modelMatrix;
+            sceneView.nodeInstances[drawItem.nodeInstanceIndex].modelMatrix;
 
         const auto worldAABB =
             computeWorldAABBFromLocalAABB(localAABB, worldFromLocalTransform);

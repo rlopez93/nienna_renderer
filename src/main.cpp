@@ -2,9 +2,9 @@
 #include "Camera.hpp"
 #include "GltfLoader.hpp"
 #include "RenderContext.hpp"
+#include "RenderableResources.hpp"
 #include "Renderer.hpp"
-#include "SceneDrawList.hpp"
-#include "SceneRenderData.hpp"
+#include "SceneView.hpp"
 #include "ShaderInterfaceTypes.hpp"
 #include "Utility.hpp"
 #include "Window.hpp"
@@ -98,9 +98,9 @@ auto computePerspectiveCameraDistanceToFitSceneHalfExtents(
 }
 
 auto upsertDefaultCameraInstance(
-    const Asset   &asset,
-    SceneDrawList &sceneDrawList,
-    float          viewportAspect) -> void
+    const RenderAsset &asset,
+    SceneView         &sceneView,
+    float              viewportAspect) -> void
 {
     if (asset.cameras.empty()) {
         throw std::runtime_error{fmt::format("asset.cameras is empty")};
@@ -109,7 +109,7 @@ auto upsertDefaultCameraInstance(
     const auto defaultCameraIndex =
         static_cast<std::uint32_t>(asset.cameras.size() - 1u);
 
-    const auto sceneAABB = computeSceneAABB(asset, sceneDrawList);
+    const auto sceneAABB = computeSceneAABB(asset, sceneView);
 
     const auto sceneCenter = 0.5f * (sceneAABB.min + sceneAABB.max);
 
@@ -132,7 +132,7 @@ auto upsertDefaultCameraInstance(
 
     const std::uint32_t invalidNodeIndex = std::numeric_limits<std::uint32_t>::max();
 
-    sceneDrawList.cameraInstances.push_back(
+    sceneView.cameraInstances.push_back(
         CameraInstance{
             .translation = defaultCameraTranslation,
             .rotation    = defaultCameraRotation,
@@ -141,8 +141,8 @@ auto upsertDefaultCameraInstance(
         });
 
     // If no cameras existed, make the inserted one active.
-    if (sceneDrawList.cameraInstances.size() == 1u) {
-        sceneDrawList.activeCameraInstanceIndex = 0u;
+    if (sceneView.cameraInstances.size() == 1u) {
+        sceneView.activeCameraInstanceIndex = 0u;
     }
 }
 
@@ -192,7 +192,7 @@ auto main(
     Command uploadCmd{context.device, vk::CommandPoolCreateFlagBits::eTransient};
 
     auto asset         = getAsset(gltfPath);
-    auto sceneDrawList = buildSceneDrawList(asset);
+    auto sceneDrawList = buildSceneView(asset);
 
     auto textureCount = static_cast<uint32_t>(asset.textures.size());
 
@@ -240,8 +240,8 @@ auto main(
                                       / static_cast<float>(initialExtent.height);
 
     upsertDefaultCameraInstance(asset, sceneDrawList, initialViewportAspect);
-    auto sceneRenderData = SceneRenderData{};
-    sceneRenderData
+    auto renderableResources = RenderableResources{};
+    renderableResources
         .create(asset, sceneDrawList, context.device, uploadCmd, context.allocator);
 
     auto nodeInstancesData = std::vector<NodeInstanceData>{};
@@ -319,13 +319,13 @@ auto main(
             frameUniforms,
             nodeInstancesData);
 
-        sceneRenderData.updateDescriptorSet(
+        renderableResources.updateDescriptorSet(
             context.device,
             renderer.currentDescriptorSet(),
             renderer.currentFrameUBO(),
             renderer.currentNodeInstancesSSBO());
 
-        renderer.render(sceneRenderData);
+        renderer.render(renderableResources);
 
         renderer.endFrame();
     }

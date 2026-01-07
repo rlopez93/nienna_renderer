@@ -219,7 +219,7 @@ auto makeSamplerInfo(
         return samplerInfo;
     }
 
-    const fastgltf::Sampler &sampler = gltfAsset.samplers[*samplerIndex];
+    const auto &sampler = gltfAsset.samplers[*samplerIndex];
 
     samplerInfo.addressModeU = mapWrap(sampler.wrapS);
     samplerInfo.addressModeV = mapWrap(sampler.wrapT);
@@ -227,8 +227,8 @@ auto makeSamplerInfo(
 
     samplerInfo.magFilter = mapMagFilter(sampler.magFilter);
 
-    vk::Filter            minFilter  = vk::Filter::eLinear;
-    vk::SamplerMipmapMode mipmapMode = vk::SamplerMipmapMode::eLinear;
+    auto minFilter  = vk::Filter::eLinear;
+    auto mipmapMode = vk::SamplerMipmapMode::eLinear;
 
     mapMinFilter(sampler.minFilter, minFilter, mipmapMode);
 
@@ -407,7 +407,7 @@ auto decodeImage(
     return image.data.visit(visitor);
 }
 
-auto makeDefaultTextures(Asset &asset) -> void
+auto makeDefaultTextures(RenderAsset &asset) -> void
 {
     const auto defaultSamplerInfo = makeDefaultSamplerInfo();
 
@@ -453,7 +453,7 @@ auto makeTextureRef(
 }
 
 auto loadTextures(
-    Asset                       &asset,
+    RenderAsset                 &asset,
     const fastgltf::Asset       &gltfAsset,
     const std::filesystem::path &directory,
     std::vector<std::uint32_t>  &texRemap) -> void
@@ -489,7 +489,7 @@ auto loadTextures(
 }
 
 auto loadMaterials(
-    Asset                            &asset,
+    RenderAsset                      &asset,
     const fastgltf::Asset            &gltfAsset,
     const std::vector<std::uint32_t> &texRemap,
     std::vector<std::uint32_t>       &matRemap) -> void
@@ -580,7 +580,7 @@ auto loadMaterials(
 }
 
 auto loadMeshes(
-    Asset                            &asset,
+    RenderAsset                      &asset,
     const fastgltf::Asset            &gltfAsset,
     const std::vector<std::uint32_t> &matRemap) -> void
 {
@@ -591,45 +591,45 @@ auto loadMeshes(
         const fastgltf::Mesh &gltfMesh = gltfAsset.meshes[meshIndex];
         Mesh                 &mesh     = asset.meshes[meshIndex];
 
-        mesh.primitives.clear();
-        mesh.primitives.reserve(gltfMesh.primitives.size());
+        mesh.submeshes.clear();
+        mesh.submeshes.reserve(gltfMesh.primitives.size());
 
         for (const fastgltf::Primitive &gltfPrimitive : gltfMesh.primitives) {
             if (gltfPrimitive.type != fastgltf::PrimitiveType::Triangles) {
                 throw std::runtime_error("primitive type not TRIANGLES");
             }
 
-            Primitive primitive{};
-            primitive.topology = vk::PrimitiveTopology::eTriangleList;
+            Submesh submesh{};
+            submesh.topology = vk::PrimitiveTopology::eTriangleList;
 
             if (gltfPrimitive.materialIndex.has_value()) {
-                primitive.materialIndex = matRemap[*gltfPrimitive.materialIndex];
+                submesh.materialIndex = matRemap[*gltfPrimitive.materialIndex];
             } else {
-                primitive.materialIndex = 0u;
+                submesh.materialIndex = 0u;
             }
 
             const auto &positionAccessor =
                 gltfAsset
                     .accessors[gltfPrimitive.findAttribute("POSITION")->accessorIndex];
-            primitive.vertices.resize(positionAccessor.count);
+            submesh.vertices.resize(positionAccessor.count);
 
             fastgltf::iterateAccessorWithIndex<glm::vec3>(
                 gltfAsset,
                 positionAccessor,
                 [&](const glm::vec3 position, std::size_t idx) {
-                    primitive.vertices[idx].position = position;
+                    submesh.vertices[idx].position = position;
                 });
 
             // indices assumed present (GenerateMeshIndices)
             const auto &indexAccessor =
                 gltfAsset.accessors[gltfPrimitive.indicesAccessor.value()];
-            primitive.indices.resize(indexAccessor.count);
+            submesh.indices.resize(indexAccessor.count);
 
             fastgltf::iterateAccessorWithIndex<std::uint32_t>(
                 gltfAsset,
                 indexAccessor,
                 [&](std::uint32_t index, std::size_t idx) {
-                    primitive.indices[idx] = index;
+                    submesh.indices[idx] = index;
                 });
 
             bool hasNormals  = false;
@@ -643,7 +643,7 @@ auto loadMeshes(
                         gltfAsset,
                         accessor,
                         [&](glm::vec3 normal, std::size_t idx) {
-                            primitive.vertices[idx].normal = normal;
+                            submesh.vertices[idx].normal = normal;
                         });
                 }
 
@@ -653,7 +653,7 @@ auto loadMeshes(
                         gltfAsset,
                         accessor,
                         [&](glm::vec4 tangent, std::size_t idx) {
-                            primitive.vertices[idx].tangent = tangent;
+                            submesh.vertices[idx].tangent = tangent;
                         });
                 }
 
@@ -662,7 +662,7 @@ auto loadMeshes(
                         gltfAsset,
                         accessor,
                         [&](glm::vec2 uv, std::size_t idx) {
-                            primitive.vertices[idx].uv0 = uv;
+                            submesh.vertices[idx].uv0 = uv;
                         });
                 }
 
@@ -671,7 +671,7 @@ auto loadMeshes(
                         gltfAsset,
                         accessor,
                         [&](glm::vec2 uv, std::size_t idx) {
-                            primitive.vertices[idx].uv1 = uv;
+                            submesh.vertices[idx].uv1 = uv;
                         });
                 }
 
@@ -681,27 +681,27 @@ auto loadMeshes(
                             gltfAsset,
                             accessor,
                             [&](glm::vec3 color, std::size_t idx) {
-                                primitive.vertices[idx].color = glm::vec4(color, 1.0f);
+                                submesh.vertices[idx].color = glm::vec4(color, 1.0f);
                             });
                     } else if (accessor.type == fastgltf::AccessorType::Vec4) {
                         fastgltf::iterateAccessorWithIndex<glm::vec4>(
                             gltfAsset,
                             accessor,
                             [&](glm::vec4 color, std::size_t idx) {
-                                primitive.vertices[idx].color = color;
+                                submesh.vertices[idx].color = color;
                             });
                     }
                 }
             }
 
-            primitive.tangentsValid = hasNormals && hasTangents;
-            mesh.primitives.push_back(std::move(primitive));
+            submesh.tangentsValid = hasNormals && hasTangents;
+            mesh.submeshes.push_back(std::move(submesh));
         }
     }
 }
 
 auto loadCameras(
-    Asset                 &asset,
+    RenderAsset           &asset,
     const fastgltf::Asset &gltfAsset) -> void
 {
     asset.cameras.clear();
@@ -741,7 +741,7 @@ auto loadCameras(
 }
 
 auto loadNodes(
-    Asset                 &asset,
+    RenderAsset           &asset,
     const fastgltf::Asset &gltfAsset) -> void
 {
     asset.nodes.clear();
@@ -751,12 +751,12 @@ auto loadNodes(
 
         const fastgltf::Node &gltfNode = gltfAsset.nodes[nodeIndex];
 
-        Node node{};
+        SceneNode node{};
 
-        node.children.reserve(gltfNode.children.size());
+        node.childNodeIndices.reserve(gltfNode.children.size());
 
         for (const std::size_t childIndex : gltfNode.children) {
-            node.children.push_back(static_cast<std::uint32_t>(childIndex));
+            node.childNodeIndices.push_back(static_cast<std::uint32_t>(childIndex));
         }
 
         const auto visitor = overloads{
@@ -785,7 +785,7 @@ auto loadNodes(
 }
 
 auto loadScenes(
-    Asset                 &asset,
+    RenderAsset           &asset,
     const fastgltf::Asset &gltfAsset) -> void
 {
     asset.scenes.clear();
@@ -794,16 +794,16 @@ auto loadScenes(
     for (std::size_t sceneIndex = 0u; sceneIndex < gltfAsset.scenes.size();
          ++sceneIndex) {
 
-        const fastgltf::Scene &gltfScene = gltfAsset.scenes[sceneIndex];
+        const auto &gltfScene = gltfAsset.scenes[sceneIndex];
 
-        Scene scene{};
-        scene.rootNodes.reserve(gltfScene.nodeIndices.size());
+        SceneRoots sceneRoots{};
+        sceneRoots.rootNodeIndices.reserve(gltfScene.nodeIndices.size());
 
         for (const std::size_t nodeIndex : gltfScene.nodeIndices) {
-            scene.rootNodes.push_back(static_cast<std::uint32_t>(nodeIndex));
+            sceneRoots.rootNodeIndices.push_back(static_cast<std::uint32_t>(nodeIndex));
         }
 
-        asset.scenes[sceneIndex] = std::move(scene);
+        asset.scenes[sceneIndex] = std::move(sceneRoots);
     }
 
     if (gltfAsset.defaultScene.has_value()) {
@@ -815,9 +815,9 @@ auto loadScenes(
 
 auto extractAsset(
     const fastgltf::Asset       &gltfAsset,
-    const std::filesystem::path &directory) -> Asset
+    const std::filesystem::path &directory) -> RenderAsset
 {
-    Asset asset{};
+    RenderAsset asset{};
 
     makeDefaultTextures(asset);
 
@@ -835,7 +835,7 @@ auto extractAsset(
     return asset;
 }
 
-auto postProcessAsset(Asset &) -> void
+auto postProcessAsset(RenderAsset &) -> void
 {
     // TODO:
     // - Generate flat normals when missing.
@@ -845,11 +845,11 @@ auto postProcessAsset(Asset &) -> void
 
 } // namespace
 
-auto getAsset(const std::filesystem::path &gltfPath) -> Asset
+auto getAsset(const std::filesystem::path &gltfPath) -> RenderAsset
 {
     const fastgltf::Asset gltfAsset = parseGltfAsset(gltfPath);
 
-    Asset asset = extractAsset(gltfAsset, gltfPath.parent_path());
+    RenderAsset asset = extractAsset(gltfAsset, gltfPath.parent_path());
 
     postProcessAsset(asset);
 

@@ -1,6 +1,7 @@
-#include "SceneDrawList.hpp"
+#include "SceneView.hpp"
 
 #include <cstdint>
+#include <numeric>
 #include <optional>
 #include <ranges>
 #include <stdexcept>
@@ -11,13 +12,13 @@
 #include <glm/geometric.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-#include "Asset.hpp"
+#include "RenderAsset.hpp"
 
 namespace
 {
 
 // Build a local TRS matrix in glTF order: M = T * R * S.
-auto makeLocalTransform(const Node &node) -> glm::mat4
+auto makeLocalTransform(const SceneNode &node) -> glm::mat4
 {
     const auto t = glm::translate(glm::mat4{1.0f}, node.translation);
     const auto r = glm::mat4_cast(node.rotation);
@@ -119,10 +120,10 @@ auto extractCameraTranslationRotation(const glm::mat4 &worldTransform) -> Camera
 }
 
 auto visitNode(
-    SceneDrawList   &sceneDrawList,
-    const Asset     &asset,
-    std::uint32_t    nodeIndex,
-    const glm::mat4 &parentWorldTransform) -> void
+    SceneView         &sceneView,
+    const RenderAsset &asset,
+    std::uint32_t      nodeIndex,
+    const glm::mat4   &parentWorldTransform) -> void
 {
     const auto &node = asset.nodes[nodeIndex];
 
@@ -134,7 +135,7 @@ auto visitNode(
 
         const auto cameraTR = extractCameraTranslationRotation(worldTransform);
 
-        sceneDrawList.cameraInstances.push_back(
+        sceneView.cameraInstances.push_back(
             CameraInstance{
                 .translation = cameraTR.translation,
                 .rotation    = cameraTR.rotation,
@@ -147,55 +148,76 @@ auto visitNode(
 
         const auto meshIndex = node.meshIndex.value();
 
+        // create a nodeInstanceIndex
         const auto nodeInstanceIndex =
-            static_cast<std::uint32_t>(sceneDrawList.nodeInstances.size());
+            static_cast<std::uint32_t>(sceneView.nodeInstances.size());
 
-        sceneDrawList.nodeInstances.push_back(
+        // create a NodeInstance
+        sceneView.nodeInstances.push_back(
             NodeInstance{
                 .modelMatrix = worldTransform,
                 .nodeIndex   = nodeIndex,
             });
 
-        const auto &mesh = asset.meshes[meshIndex];
+        for (const auto &[submeshIndex, submesh] :
+             std::views::enumerate(asset.meshes[meshIndex].submeshes)) {
 
-        for (const auto &[primitiveIndex, primitive] :
-             std::views::enumerate(mesh.primitives)) {
-
-            sceneDrawList.draws.push_back(
+            sceneView.draws.push_back(
                 DrawItem{
-                    .indexCount = static_cast<std::uint32_t>(primitive.indices.size()),
-                    .firstIndex = 0u,
-                    .vertexOffset      = 0,
-                    .meshIndex         = meshIndex,
-                    .primitiveIndex    = static_cast<std::uint32_t>(primitiveIndex),
-                    .geometryIndex     = 0u,
+                    .indexCount    = static_cast<std::uint32_t>(submesh.indices.size()),
+                    .firstIndex    = 0u,
+                    .vertexOffset  = 0,
+                    .meshIndex     = meshIndex,
+                    .submeshIndex  = static_cast<std::uint32_t>(submeshIndex),
+                    .geometryIndex = 0u,
                     .nodeInstanceIndex = nodeInstanceIndex,
-                    .materialIndex     = primitive.materialIndex,
+                    .materialIndex     = submesh.materialIndex,
                 });
         }
     }
 
-    for (const auto childIndex : node.children) {
-        visitNode(sceneDrawList, asset, childIndex, worldTransform);
+    for (const auto childIndex : node.childNodeIndices) {
+        visitNode(sceneView, asset, childIndex, worldTransform);
     }
 }
 } // namespace
 
-auto buildSceneDrawList(const Asset &asset) -> SceneDrawList
+auto buildSceneView(const RenderAsset &asset) -> SceneView
 {
-    auto sceneDrawList = SceneDrawList{
+    auto sceneView = SceneView{
         .sceneIndex = asset.activeScene,
     };
 
     if (asset.scenes.empty()) {
-        return sceneDrawList;
+        return sceneView;
     }
 
-    const auto &scene = asset.scenes[sceneDrawList.sceneIndex];
+    const auto &sceneRoots = asset.scenes[sceneView.sceneIndex];
 
-    for (const auto rootIndex : scene.rootNodes) {
-        visitNode(sceneDrawList, asset, rootIndex, glm::mat4{1.0f});
+    for (const auto rootIndex : sceneRoots.rootNodeIndices) {
+        visitNode(sceneView, asset, rootIndex, glm::mat4{1.0f});
     }
 
-    return sceneDrawList;
+    auto meshOffsets = std::vector<std::uint32_t>(asset.meshes.size() + 1, 0u);
+    // each mesh's offset in our geometry buffers (vertex/index buffers) can be found by
+    // generating prefix sums of the primitive counts in each mesh, using
+    // std::transform_inclusive_scan()
+    // meshOffsets[m] is the geometry index for the first primitive in mesh m
+    (void)std::transform_inclusive_scan(
+        asset.meshes.begin(),
+        asset.meshes.end(),
+        meshOffsets.begin() + 1, // we start our inclusive_scan at meshOffsets[1] so
+                                 // that meshOffsets.front() == 0
+        std::plus<>{},
+        [](const Mesh &mesh) {
+            return static_cast<std::uint32_t>(mesh.submeshes.size());
+        });
+
+    // we use the mesh offsets and the primitive index to get the final geometry index
+    // for every draw call
+    for (auto &draw : sceneView.draws) {
+        draw.geometryIndex = meshOffsets[draw.meshIndex] + draw.submeshIndex;
+    }
+
+    return sceneView;
 }

@@ -30,7 +30,7 @@ auto createPipeline(
 
     const auto vertexBindingDescriptions = std::array{vk::VertexInputBindingDescription{
         0u,
-        static_cast<std::uint32_t>(sizeof(Vertex)),
+        static_cast<std::uint32_t>(sizeof(MeshVertex)),
         vk::VertexInputRate::eVertex,
     }};
 
@@ -39,37 +39,37 @@ auto createPipeline(
             0u,
             0u,
             vk::Format::eR32G32B32Sfloat,
-            static_cast<std::uint32_t>(offsetof(Vertex, position)),
+            static_cast<std::uint32_t>(offsetof(MeshVertex, position)),
         },
         vk::VertexInputAttributeDescription{
             1u,
             0u,
             vk::Format::eR32G32B32Sfloat,
-            static_cast<std::uint32_t>(offsetof(Vertex, normal)),
+            static_cast<std::uint32_t>(offsetof(MeshVertex, normal)),
         },
         vk::VertexInputAttributeDescription{
             2u,
             0u,
             vk::Format::eR32G32B32A32Sfloat,
-            static_cast<std::uint32_t>(offsetof(Vertex, tangent)),
+            static_cast<std::uint32_t>(offsetof(MeshVertex, tangent)),
         },
         vk::VertexInputAttributeDescription{
             3u,
             0u,
             vk::Format::eR32G32Sfloat,
-            static_cast<std::uint32_t>(offsetof(Vertex, uv0)),
+            static_cast<std::uint32_t>(offsetof(MeshVertex, uv0)),
         },
         vk::VertexInputAttributeDescription{
             4u,
             0u,
             vk::Format::eR32G32Sfloat,
-            static_cast<std::uint32_t>(offsetof(Vertex, uv1)),
+            static_cast<std::uint32_t>(offsetof(MeshVertex, uv1)),
         },
         vk::VertexInputAttributeDescription{
             5u,
             0u,
             vk::Format::eR32G32B32A32Sfloat,
-            static_cast<std::uint32_t>(offsetof(Vertex, color)),
+            static_cast<std::uint32_t>(offsetof(MeshVertex, color)),
         },
     };
 

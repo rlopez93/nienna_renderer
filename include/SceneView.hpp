@@ -1,4 +1,3 @@
-// SceneDrawList.hpp
 #pragma once
 
 #include "DrawItem.hpp"
@@ -10,7 +9,7 @@
 #include <cstdint>
 #include <vector>
 
-struct Asset;
+struct RenderAsset;
 
 struct NodeInstance {
     glm::mat4 modelMatrix{1.0f};
@@ -26,7 +25,7 @@ struct CameraInstance {
     std::uint32_t cameraIndex = 0u;
 };
 
-struct SceneDrawList {
+struct SceneView {
     std::uint32_t             sceneIndex = 0u;
     std::vector<NodeInstance> nodeInstances;
     std::vector<DrawItem>     draws;
@@ -41,4 +40,4 @@ struct SceneDrawList {
     }
 };
 
-auto buildSceneDrawList(const Asset &asset) -> SceneDrawList;
+auto buildSceneView(const RenderAsset &asset) -> SceneView;
