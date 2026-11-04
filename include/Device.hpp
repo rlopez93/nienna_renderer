@@ -20,21 +20,21 @@ struct QueueFamilyIndices {
 
 struct Device {
     Device(
-        const PhysicalDevice            &physicalDevice,
-        const Window                    &window,
-        const Surface                   &surface,
-        const std::vector<const char *> &requiredExtensions);
+        PhysicalDevice const&           physicalDevice,
+        Window const&                   window,
+        Surface const&                  surface,
+        std::vector<char const*> const& requiredExtensions);
 
     static auto createDevice(
-        const PhysicalDevice            &physicalDevice,
-        const QueueFamilyIndices        &queueFamilyIndices,
-        const std::vector<const char *> &requiredExtensions) -> vk::raii::Device;
+        PhysicalDevice const&           physicalDevice,
+        QueueFamilyIndices const&       queueFamilyIndices,
+        std::vector<char const*> const& requiredExtensions) -> vk::raii::Device;
 
     static auto findQueueFamilies(
-        const PhysicalDevice &physicalDevice,
-        const Surface        &surface) -> QueueFamilyIndices;
+        PhysicalDevice const& physicalDevice,
+        Surface const&        surface) -> QueueFamilyIndices;
 
-    const Window      &window;
+    Window const&      window;
     QueueFamilyIndices queueFamilyIndices;
     vk::raii::Device   handle;
     vk::raii::Queue    graphicsQueue;

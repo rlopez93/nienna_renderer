@@ -12,7 +12,7 @@ struct VmaImageDeleter {
 
     // FIXME: implementation dependent behavior
     // VkImage == VkImage_T* only on certain platforms
-    auto operator()(VkImage_T *img) const noexcept -> void;
+    auto operator()(VkImage_T* img) const noexcept -> void;
 };
 
 using UniqueImage = std::unique_ptr<VkImage_T, VmaImageDeleter>;

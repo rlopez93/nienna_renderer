@@ -8,12 +8,12 @@
 struct Surface {
 
     Surface(
-        Instance &instance,
-        Window   &window);
+        Instance& instance,
+        Window&   window);
 
     static auto createSurface(
-        Instance &instance,
-        Window   &window) -> vk::raii::SurfaceKHR;
+        Instance& instance,
+        Window&   window) -> vk::raii::SurfaceKHR;
 
     vk::raii::SurfaceKHR handle;
 };

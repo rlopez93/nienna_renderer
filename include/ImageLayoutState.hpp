@@ -27,10 +27,10 @@ auto imageUseInfo(ImageUse use) -> ImageUseInfo;
 struct ImageLayoutState {
     auto reset() -> void;
 
-    auto forgetImages(std::span<const vk::Image> imgs) -> void;
+    auto forgetImages(std::span<vk::Image const> imgs) -> void;
 
     auto transition(
-        vk::raii::CommandBuffer  &cmd,
+        vk::raii::CommandBuffer&  cmd,
         vk::Image                 image,
         vk::ImageSubresourceRange range,
         ImageUse                  newUse) -> void;

@@ -7,18 +7,16 @@
 struct PhysicalDevice {
 
     PhysicalDevice(
-        const Instance                  &instance,
-        const std::vector<const char *> &requiredExtensions);
+        Instance const&                 instance,
+        std::vector<char const*> const& requiredExtensions);
 
     static auto choosePhysicalDevice(
-        const Instance                  &instance,
-        const std::vector<const char *> &requiredExtensions)
-        -> vk::raii::PhysicalDevice;
+        Instance const&                 instance,
+        std::vector<char const*> const& requiredExtensions) -> vk::raii::PhysicalDevice;
 
     static auto getMissingExtensions(
-        const vk::raii::PhysicalDevice  &physicalDevice,
-        const std::vector<const char *> &requiredExtensions)
-        -> std::vector<std::string>;
+        vk::raii::PhysicalDevice const& physicalDevice,
+        std::vector<char const*> const& requiredExtensions) -> std::vector<std::string>;
 
     vk::raii::PhysicalDevice handle;
 };

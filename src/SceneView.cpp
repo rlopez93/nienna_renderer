@@ -18,11 +18,11 @@ namespace
 {
 
 // Build a local TRS matrix in glTF order: M = T * R * S.
-auto makeLocalTransform(const SceneNode &node) -> glm::mat4
+auto makeLocalTransform(SceneNode const& node) -> glm::mat4
 {
-    const auto t = glm::translate(glm::mat4{1.0f}, node.translation);
-    const auto r = glm::mat4_cast(node.rotation);
-    const auto s = glm::scale(glm::mat4{1.0f}, node.scale);
+    auto const t = glm::translate(glm::mat4{1.0f}, node.translation);
+    auto const r = glm::mat4_cast(node.rotation);
+    auto const s = glm::scale(glm::mat4{1.0f}, node.scale);
 
     return t * r * s;
 }
@@ -30,8 +30,8 @@ auto makeLocalTransform(const SceneNode &node) -> glm::mat4
 // Remove the component of a along b (Gram-Schmidt "reject").
 // Assumes b is normalized.
 auto reject(
-    const glm::vec3 &a,
-    const glm::vec3 &b) -> glm::vec3
+    glm::vec3 const& a,
+    glm::vec3 const& b) -> glm::vec3
 {
     return a - b * glm::dot(a, b);
 }
@@ -39,10 +39,10 @@ auto reject(
 // Normalize v if its length is >= eps.
 // Returns nullopt if v is too small to normalize safely.
 auto safeNormalize(
-    const glm::vec3 &v,
-    const float      eps) -> std::optional<glm::vec3>
+    glm::vec3 const& v,
+    float const      eps) -> std::optional<glm::vec3>
 {
-    const auto length_v = glm::length(v);
+    auto const length_v = glm::length(v);
     if (length_v < eps) {
         return std::nullopt;
     }
@@ -52,7 +52,7 @@ auto safeNormalize(
 
 // Extract the (possibly scaled/sheared) basis from a mat4.
 // GLM is column-major: m[0], m[1], m[2] are basis columns.
-auto extractBasisColumns(const glm::mat4 &m) -> glm::mat3
+auto extractBasisColumns(glm::mat4 const& m) -> glm::mat3
 {
     return glm::mat3{
         glm::vec3{m[0]},
@@ -63,10 +63,10 @@ auto extractBasisColumns(const glm::mat4 &m) -> glm::mat3
 
 // Construct a right-handed orthonormal basis given orthonormal x,y.
 auto makeRightHanded(
-    const glm::vec3 &x,
-    const glm::vec3 &y) -> glm::mat3
+    glm::vec3 const& x,
+    glm::vec3 const& y) -> glm::mat3
 {
-    const auto z = glm::cross(x, y);
+    auto const z = glm::cross(x, y);
     return glm::mat3{x, y, z};
 }
 
@@ -79,7 +79,7 @@ auto orthonormalize(
 {
     constexpr auto eps = 1e-8f;
 
-    const auto xOpt = safeNormalize(x, eps);
+    auto const xOpt = safeNormalize(x, eps);
     if (!xOpt.has_value()) {
         throw std::runtime_error{fmt::format("camera basis degenerate (x)")};
     }
@@ -88,7 +88,7 @@ auto orthonormalize(
 
     y = reject(y, x);
 
-    const auto yOpt = safeNormalize(y, eps);
+    auto const yOpt = safeNormalize(y, eps);
     if (!yOpt.has_value()) {
         throw std::runtime_error{fmt::format("camera basis degenerate (y)")};
     }
@@ -105,13 +105,13 @@ struct CameraTR {
 
 // Extract camera translation and rotation from a world matrix while
 // explicitly ignoring scale (and shear) in the rotation.
-auto extractCameraTranslationRotation(const glm::mat4 &worldTransform) -> CameraTR
+auto extractCameraTranslationRotation(glm::mat4 const& worldTransform) -> CameraTR
 {
-    const auto translation = glm::vec3{worldTransform[3]};
+    auto const translation = glm::vec3{worldTransform[3]};
 
-    const auto basis = extractBasisColumns(worldTransform);
-    const auto rotM  = orthonormalize(basis[0], basis[1]);
-    const auto rotQ  = glm::normalize(glm::quat_cast(rotM));
+    auto const basis = extractBasisColumns(worldTransform);
+    auto const rotM  = orthonormalize(basis[0], basis[1]);
+    auto const rotQ  = glm::normalize(glm::quat_cast(rotM));
 
     return CameraTR{
         .translation = translation,
@@ -120,20 +120,20 @@ auto extractCameraTranslationRotation(const glm::mat4 &worldTransform) -> Camera
 }
 
 auto visitNode(
-    SceneView         &sceneView,
-    const RenderAsset &asset,
+    SceneView&         sceneView,
+    RenderAsset const& asset,
     std::uint32_t      nodeIndex,
-    const glm::mat4   &parentWorldTransform) -> void
+    glm::mat4 const&   parentWorldTransform) -> void
 {
-    const auto &node = asset.nodes[nodeIndex];
+    auto const& node = asset.nodes[nodeIndex];
 
-    const auto localTransform = makeLocalTransform(node);
+    auto const localTransform = makeLocalTransform(node);
 
-    const auto worldTransform = parentWorldTransform * localTransform;
+    auto const worldTransform = parentWorldTransform * localTransform;
 
     if (node.cameraIndex.has_value()) {
 
-        const auto cameraTR = extractCameraTranslationRotation(worldTransform);
+        auto const cameraTR = extractCameraTranslationRotation(worldTransform);
 
         sceneView.cameraInstances.push_back(
             CameraInstance{
@@ -146,10 +146,10 @@ auto visitNode(
 
     if (node.meshIndex.has_value()) {
 
-        const auto meshIndex = node.meshIndex.value();
+        auto const meshIndex = node.meshIndex.value();
 
         // create a nodeInstanceIndex
-        const auto nodeInstanceIndex =
+        auto const nodeInstanceIndex =
             static_cast<std::uint32_t>(sceneView.nodeInstances.size());
 
         // create a NodeInstance
@@ -159,7 +159,7 @@ auto visitNode(
                 .nodeIndex   = nodeIndex,
             });
 
-        for (const auto &[submeshIndex, submesh] :
+        for (auto const& [submeshIndex, submesh] :
              std::views::enumerate(asset.meshes[meshIndex].submeshes)) {
 
             sceneView.draws.push_back(
@@ -176,13 +176,13 @@ auto visitNode(
         }
     }
 
-    for (const auto childIndex : node.childNodeIndices) {
+    for (auto const childIndex : node.childNodeIndices) {
         visitNode(sceneView, asset, childIndex, worldTransform);
     }
 }
 } // namespace
 
-auto buildSceneView(const RenderAsset &asset) -> SceneView
+auto buildSceneView(RenderAsset const& asset) -> SceneView
 {
     auto sceneView = SceneView{
         .sceneIndex = asset.activeScene,
@@ -192,9 +192,9 @@ auto buildSceneView(const RenderAsset &asset) -> SceneView
         return sceneView;
     }
 
-    const auto &sceneRoots = asset.scenes[sceneView.sceneIndex];
+    auto const& sceneRoots = asset.scenes[sceneView.sceneIndex];
 
-    for (const auto rootIndex : sceneRoots.rootNodeIndices) {
+    for (auto const rootIndex : sceneRoots.rootNodeIndices) {
         visitNode(sceneView, asset, rootIndex, glm::mat4{1.0f});
     }
 
@@ -209,13 +209,13 @@ auto buildSceneView(const RenderAsset &asset) -> SceneView
         meshOffsets.begin() + 1, // we start our inclusive_scan at meshOffsets[1] so
                                  // that meshOffsets.front() == 0
         std::plus<>{},
-        [](const Mesh &mesh) {
+        [](Mesh const& mesh) {
             return static_cast<std::uint32_t>(mesh.submeshes.size());
         });
 
     // we use the mesh offsets and the primitive index to get the final geometry index
     // for every draw call
-    for (auto &draw : sceneView.draws) {
+    for (auto& draw : sceneView.draws) {
         draw.geometryIndex = meshOffsets[draw.meshIndex] + draw.submeshIndex;
     }
 

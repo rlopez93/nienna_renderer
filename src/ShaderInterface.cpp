@@ -6,8 +6,8 @@
 #include <vector>
 
 ShaderInterface::ShaderInterface(
-    Device                           &device,
-    const ShaderInterfaceDescription &description)
+    Device&                           device,
+    ShaderInterfaceDescription const& description)
     : handle{create(
           device,
           description)}
@@ -15,13 +15,13 @@ ShaderInterface::ShaderInterface(
 }
 
 auto ShaderInterface::create(
-    Device                           &device,
-    const ShaderInterfaceDescription &description) -> vk::raii::DescriptorSetLayout
+    Device&                           device,
+    ShaderInterfaceDescription const& description) -> vk::raii::DescriptorSetLayout
 {
     std::vector<vk::DescriptorSetLayoutBinding> bindings;
     bindings.reserve(description.bindings.size());
 
-    for (const auto &b : description.bindings) {
+    for (auto const& b : description.bindings) {
         bindings.emplace_back(b.binding, b.type, b.count, b.stages);
     }
 

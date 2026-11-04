@@ -5,4 +5,4 @@
 struct Material;
 
 [[nodiscard]]
-auto packMaterialData(const Material &material) -> MaterialData;
+auto packMaterialData(Material const& material) -> MaterialData;

@@ -5,7 +5,7 @@
 #include <fmt/base.h>
 #include <fmt/format.h>
 
-void WindowDeleter::operator()(SDL_Window *window) const
+void WindowDeleter::operator()(SDL_Window* window) const
 {
     SDL_DestroyWindow(window);
 }
@@ -42,7 +42,7 @@ auto createWindow(
     return Window{window};
 }
 
-auto getFramebufferExtent(SDL_Window *window) -> vk::Extent2D
+auto getFramebufferExtent(SDL_Window* window) -> vk::Extent2D
 {
     int width  = 0;
     int height = 0;

@@ -15,7 +15,7 @@ auto imageUseInfo(ImageUse use) -> ImageUseInfo
         return ImageUseInfo{
             .layout = vk::ImageLayout::eDepthAttachmentOptimal,
             .stage  = vk::PipelineStageFlagBits2::eEarlyFragmentTests
-                   | vk::PipelineStageFlagBits2::eLateFragmentTests,
+                    | vk::PipelineStageFlagBits2::eLateFragmentTests,
             .access = vk::AccessFlagBits2::eDepthStencilAttachmentWrite
                     | vk::AccessFlagBits2::eDepthStencilAttachmentRead,
         };
@@ -24,7 +24,7 @@ auto imageUseInfo(ImageUse use) -> ImageUseInfo
         return ImageUseInfo{
             .layout = vk::ImageLayout::eShaderReadOnlyOptimal,
             .stage  = vk::PipelineStageFlagBits2::eFragmentShader
-                   | vk::PipelineStageFlagBits2::eComputeShader,
+                    | vk::PipelineStageFlagBits2::eComputeShader,
             .access = vk::AccessFlagBits2::eShaderSampledRead,
         };
 
@@ -51,7 +51,7 @@ auto ImageLayoutState::reset() -> void
     entries.clear();
 }
 
-auto ImageLayoutState::forgetImages(std::span<const vk::Image> imgs) -> void
+auto ImageLayoutState::forgetImages(std::span<vk::Image const> imgs) -> void
 {
     for (vk::Image img : imgs) {
         entries.erase(static_cast<VkImage>(img));
@@ -59,28 +59,28 @@ auto ImageLayoutState::forgetImages(std::span<const vk::Image> imgs) -> void
 }
 
 void ImageLayoutState::transition(
-    vk::raii::CommandBuffer  &cmd,
+    vk::raii::CommandBuffer&  cmd,
     vk::Image                 image,
     vk::ImageSubresourceRange range,
     ImageUse                  newUse)
 {
-    const auto key = static_cast<VkImage>(image);
+    auto const key = static_cast<VkImage>(image);
 
-    Entry &e = entries[key];
+    Entry& e = entries[key];
 
     if (!e.firstUse && e.use == newUse) {
         return;
     }
 
-    const auto dst = imageUseInfo(newUse);
+    auto const dst = imageUseInfo(newUse);
 
-    const auto oldLayout = e.firstUse ? vk::ImageLayout::eUndefined : e.info.layout;
+    auto const oldLayout = e.firstUse ? vk::ImageLayout::eUndefined : e.info.layout;
 
-    const auto srcStage = e.firstUse ? vk::PipelineStageFlagBits2::eNone : e.info.stage;
+    auto const srcStage = e.firstUse ? vk::PipelineStageFlagBits2::eNone : e.info.stage;
 
-    const auto srcAccess = e.firstUse ? vk::AccessFlagBits2::eNone : e.info.access;
+    auto const srcAccess = e.firstUse ? vk::AccessFlagBits2::eNone : e.info.access;
 
-    const auto barrier = vk::ImageMemoryBarrier2{
+    auto const barrier = vk::ImageMemoryBarrier2{
         srcStage,
         srcAccess,
         dst.stage,

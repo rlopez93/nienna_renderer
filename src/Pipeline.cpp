@@ -3,15 +3,15 @@
 #include "Shader.hpp"
 
 auto createPipeline(
-    Device                      &device,
-    const std::filesystem::path &shaderPath,
+    Device&                      device,
+    std::filesystem::path const& shaderPath,
     vk::Format                   imageFormat,
     vk::Format                   depthFormat,
-    vk::raii::PipelineLayout    &pipelineLayout) -> vk::raii::Pipeline
+    vk::raii::PipelineLayout&    pipelineLayout) -> vk::raii::Pipeline
 {
     auto shaderModule = createShaderModule(device.handle, shaderPath);
 
-    const auto shaderStages = std::array{
+    auto const shaderStages = std::array{
         vk::PipelineShaderStageCreateInfo{
             {},
             vk::ShaderStageFlagBits::eVertex,
@@ -28,13 +28,13 @@ auto createPipeline(
         },
     };
 
-    const auto vertexBindingDescriptions = std::array{vk::VertexInputBindingDescription{
+    auto const vertexBindingDescriptions = std::array{vk::VertexInputBindingDescription{
         0u,
         static_cast<std::uint32_t>(sizeof(MeshVertex)),
         vk::VertexInputRate::eVertex,
     }};
 
-    const auto vertexAttributeDescriptions = std::array{
+    auto const vertexAttributeDescriptions = std::array{
         vk::VertexInputAttributeDescription{
             0u,
             0u,
@@ -73,21 +73,21 @@ auto createPipeline(
         },
     };
 
-    const auto vertexInputStateCreateInfo = vk::PipelineVertexInputStateCreateInfo{
+    auto const vertexInputStateCreateInfo = vk::PipelineVertexInputStateCreateInfo{
         {},
         vertexBindingDescriptions,
         vertexAttributeDescriptions,
     };
 
-    const auto inputAssemblyCreateInfo = vk::PipelineInputAssemblyStateCreateInfo{
+    auto const inputAssemblyCreateInfo = vk::PipelineInputAssemblyStateCreateInfo{
         {},
         vk::PrimitiveTopology::eTriangleList,
         false,
     };
 
-    const auto pipelineViewportStateCreateInfo = vk::PipelineViewportStateCreateInfo{};
+    auto const pipelineViewportStateCreateInfo = vk::PipelineViewportStateCreateInfo{};
 
-    const auto pipelineRasterizationStateCreateInfo =
+    auto const pipelineRasterizationStateCreateInfo =
         vk::PipelineRasterizationStateCreateInfo{
             {},
             false,
@@ -100,20 +100,20 @@ auto createPipeline(
             0.0f,
             0.0f,
             1.0f,
-        };
+    };
 
-    const auto pipelineMultisampleStateCreateInfo =
+    auto const pipelineMultisampleStateCreateInfo =
         vk::PipelineMultisampleStateCreateInfo{};
 
-    const auto pipelineDepthStencilStateCreateInfo =
+    auto const pipelineDepthStencilStateCreateInfo =
         vk::PipelineDepthStencilStateCreateInfo{
             {},
             true,
             true,
             vk::CompareOp::eLessOrEqual,
-        };
+    };
 
-    const auto colorBlendAttachmentState = vk::PipelineColorBlendAttachmentState{
+    auto const colorBlendAttachmentState = vk::PipelineColorBlendAttachmentState{
         false,
         {},
         {},
@@ -125,22 +125,22 @@ auto createPipeline(
             | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
     };
 
-    const auto pipelineColorBlendStateCreateInfo =
+    auto const pipelineColorBlendStateCreateInfo =
         vk::PipelineColorBlendStateCreateInfo{
             {},
             false,
             vk::LogicOp::eCopy,
             1u,
             &colorBlendAttachmentState,
-        };
+    };
 
-    const auto dynamicStates = std::array{
+    auto const dynamicStates = std::array{
         vk::DynamicState::eViewportWithCount,
         vk::DynamicState::eScissorWithCount,
         vk::DynamicState::ePolygonModeEXT,
     };
 
-    const auto pipelineDynamicStateCreateInfo = vk::PipelineDynamicStateCreateInfo{
+    auto const pipelineDynamicStateCreateInfo = vk::PipelineDynamicStateCreateInfo{
         {},
         dynamicStates,
     };

@@ -14,9 +14,9 @@
 
 struct Allocator {
     Allocator(
-        Instance       &instance,
-        PhysicalDevice &physicalDevice,
-        Device         &device);
+        Instance&       instance,
+        PhysicalDevice& physicalDevice,
+        Device&         device);
 
     ~Allocator();
 
@@ -44,25 +44,25 @@ struct Allocator {
 
     template <typename T>
     [[nodiscard]]
-    auto createStagingBuffer(const std::vector<T> &vectorData) -> Buffer;
+    auto createStagingBuffer(std::vector<T> const& vectorData) -> Buffer;
 
     template <typename T>
     [[nodiscard]]
     auto createBufferAndUploadData(
-        Command              &cmd,
-        const std::vector<T> &vectorData,
+        Command&              cmd,
+        std::vector<T> const& vectorData,
         vk::BufferUsageFlags2 usageFlags) -> Buffer;
 
     [[nodiscard]]
-    auto createImage(const vk::ImageCreateInfo &imageInfo) -> Image;
+    auto createImage(vk::ImageCreateInfo const& imageInfo) -> Image;
 
     void destroyImage(Image image) const;
 
     template <typename T>
     [[nodiscard]]
     auto createImageAndUploadData(
-        Command              &cmd,
-        const std::vector<T> &vectorData,
+        Command&              cmd,
+        std::vector<T> const& vectorData,
         vk::ImageCreateInfo   imageInfo,
         vk::ImageLayout       finalLayout) -> Image;
 
@@ -73,7 +73,7 @@ struct Allocator {
   private:
     struct VmaAllocatorDeleter {
         VmaAllocatorDeleter() = default;
-        auto operator()(VmaAllocator_T *allocator) const -> void
+        auto operator()(VmaAllocator_T* allocator) const -> void
         {
             vmaDestroyAllocator(allocator);
         }
@@ -82,9 +82,9 @@ struct Allocator {
     using UniqueVmaAllocator = std::unique_ptr<VmaAllocator_T, VmaAllocatorDeleter>;
 
     static auto createUniqueVmaAllocator(
-        Instance       &instance,
-        PhysicalDevice &physicalDevice,
-        Device         &device) -> UniqueVmaAllocator;
+        Instance&       instance,
+        PhysicalDevice& physicalDevice,
+        Device&         device) -> UniqueVmaAllocator;
 
     UniqueVmaAllocator  allocator;
     vk::Device          device;
@@ -96,18 +96,18 @@ struct Allocator {
 template <typename T>
 [[nodiscard]]
 auto Allocator::createImageAndUploadData(
-    Command              &cmd,
-    const std::vector<T> &vectorData,
+    Command&              cmd,
+    std::vector<T> const& vectorData,
     vk::ImageCreateInfo   imageInfo,
     vk::ImageLayout       finalLayout) -> Image
 {
     assert(finalLayout == vk::ImageLayout::eShaderReadOnlyOptimal);
 
-    Buffer staging = createStagingBuffer(vectorData);
+    auto staging = createStagingBuffer(vectorData);
 
     imageInfo.setUsage(imageInfo.usage | vk::ImageUsageFlagBits::eTransferDst);
 
-    Image image = createImage(imageInfo);
+    auto image = createImage(imageInfo);
 
     vk::ImageSubresourceRange range{
         vk::ImageAspectFlagBits::eColor,
@@ -136,19 +136,19 @@ auto Allocator::createImageAndUploadData(
 }
 template <typename T>
 inline auto Allocator::createBufferAndUploadData(
-    Command              &cmd,
-    const std::vector<T> &vectorData,
+    Command&              cmd,
+    std::vector<T> const& vectorData,
     vk::BufferUsageFlags2 usageFlags) -> Buffer
 {
     // fmt::print(stderr, "\n\ncalling createStagingBuffer()...\n\n");
     // Create staging buffer and upload data
-    Buffer stagingBuffer = createStagingBuffer(vectorData);
+    auto stagingBuffer = createStagingBuffer(vectorData);
 
     // Create the final buffer in GPU memory
-    const vk::DeviceSize bufferSize = sizeof(T) * vectorData.size();
+    auto const bufferSize = static_cast<vk::DeviceSize>(sizeof(T) * vectorData.size());
 
     // fmt::print(stderr, "\n\ncalling createBuffer()...\n\n");
-    Buffer buffer = createBuffer(
+    auto buffer = createBuffer(
         bufferSize,
         usageFlags | vk::BufferUsageFlagBits2::eTransferDst,
         VMA_MEMORY_USAGE_GPU_ONLY);
@@ -164,15 +164,15 @@ inline auto Allocator::createBufferAndUploadData(
 }
 
 template <typename T>
-inline auto Allocator::createStagingBuffer(const std::vector<T> &vectorData) -> Buffer
+inline auto Allocator::createStagingBuffer(std::vector<T> const& vectorData) -> Buffer
 {
-    const vk::DeviceSize bufferSize = sizeof(T) * vectorData.size();
+    auto const bufferSize = static_cast<vk::DeviceSize>(sizeof(T) * vectorData.size());
 
     // fmt::println(stderr, "size {}", vectorData.size() * sizeof(T));
 
     // fmt::println(stderr, "calling createBuffer()...");
     // Create a staging buffer
-    Buffer stagingBuffer = createBuffer(
+    auto stagingBuffer = createBuffer(
         bufferSize,
         vk::BufferUsageFlagBits2::eTransferSrc,
         true,

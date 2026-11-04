@@ -5,10 +5,10 @@
 #include <vector>
 
 Device::Device(
-    const PhysicalDevice            &physicalDevice,
-    const Window                    &window,
-    const Surface                   &surface,
-    const std::vector<const char *> &requiredExtensions)
+    PhysicalDevice const&           physicalDevice,
+    Window const&                   window,
+    Surface const&                  surface,
+    std::vector<char const*> const& requiredExtensions)
     : window{window},
       queueFamilyIndices{findQueueFamilies(
           physicalDevice,
@@ -29,9 +29,9 @@ Device::Device(
 }
 
 auto Device::createDevice(
-    const PhysicalDevice            &physicalDevice,
-    const QueueFamilyIndices        &queueFamilyIndices,
-    const std::vector<const char *> &requiredExtensions) -> vk::raii::Device
+    PhysicalDevice const&           physicalDevice,
+    QueueFamilyIndices const&       queueFamilyIndices,
+    std::vector<char const*> const& requiredExtensions) -> vk::raii::Device
 {
 
     auto features2 = physicalDevice.handle.getFeatures2<
@@ -52,7 +52,7 @@ auto Device::createDevice(
         vk::PhysicalDeviceExtendedDynamicState2FeaturesEXT,
         vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT>();
 
-    const float queuePriority = 1.0f;
+    auto const queuePriority = 1.0f;
 
     std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t>                     uniqueQueueFamilies = {
@@ -76,15 +76,15 @@ auto Device::createDevice(
 }
 
 auto Device::findQueueFamilies(
-    const PhysicalDevice &physicalDevice,
-    const Surface        &surface) -> QueueFamilyIndices
+    PhysicalDevice const& physicalDevice,
+    Surface const&        surface) -> QueueFamilyIndices
 {
     auto queueFamilyIndices = QueueFamilyIndices{};
 
-    const auto queueFamilyProperties = physicalDevice.handle.getQueueFamilyProperties();
+    auto const queueFamilyProperties = physicalDevice.handle.getQueueFamilyProperties();
 
     for (uint32_t index = 0; index < queueFamilyProperties.size(); ++index) {
-        const auto &properties = queueFamilyProperties[index];
+        auto const& properties = queueFamilyProperties[index];
 
         if ((properties.queueFlags & vk::QueueFlagBits::eGraphics)
             && queueFamilyIndices.graphicsIndex

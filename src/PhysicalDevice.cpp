@@ -9,8 +9,8 @@
 #include <vector>
 
 PhysicalDevice::PhysicalDevice(
-    const Instance                  &instance,
-    const std::vector<const char *> &requiredExtensions)
+    Instance const&                 instance,
+    std::vector<char const*> const& requiredExtensions)
     : handle{choosePhysicalDevice(
           instance,
           requiredExtensions)}
@@ -21,14 +21,14 @@ PhysicalDevice::PhysicalDevice(
 // Helper: return a list of missing extensions for this device
 // --------------------------------------------------------------
 auto PhysicalDevice::getMissingExtensions(
-    const vk::raii::PhysicalDevice  &physicalDevice,
-    const std::vector<const char *> &requiredExtensions) -> std::vector<std::string>
+    vk::raii::PhysicalDevice const& physicalDevice,
+    std::vector<char const*> const& requiredExtensions) -> std::vector<std::string>
 {
     // Collect device extension names into a vector<string>
     auto deviceExtensions =
         physicalDevice.enumerateDeviceExtensionProperties()
         | std::views::transform(
-            [](const vk::ExtensionProperties &properties) -> std::string {
+            [](vk::ExtensionProperties const& properties) -> std::string {
                 return properties.extensionName;
             })
         | std::ranges::to<std::vector>();
@@ -44,8 +44,8 @@ auto PhysicalDevice::getMissingExtensions(
 }
 
 auto PhysicalDevice::choosePhysicalDevice(
-    const Instance                  &instance,
-    const std::vector<const char *> &requiredExtensions) -> vk::raii::PhysicalDevice
+    Instance const&                 instance,
+    std::vector<char const*> const& requiredExtensions) -> vk::raii::PhysicalDevice
 {
     auto physicalDevices = vk::raii::PhysicalDevices{instance.handle};
 
@@ -56,20 +56,21 @@ auto PhysicalDevice::choosePhysicalDevice(
     // collect diagnostic information for if no device is found
     std::stringstream diagnostic;
 
-    for (const auto &physicalDevice : physicalDevices) {
-        const auto properties = physicalDevice.getProperties();
+    for (auto const& physicalDevice : physicalDevices) {
+        auto const properties = physicalDevice.getProperties();
 
         if (properties.apiVersion < vk::ApiVersion14) {
             diagnostic << "Device \"" << properties.deviceName
                        << "\" does not have Vulkan 1.4 or newer\n";
         }
 
-        else if (auto missingExtensions =
-                     getMissingExtensions(physicalDevice, requiredExtensions);
-                 !missingExtensions.empty()) {
+        else if (
+            auto missingExtensions =
+                getMissingExtensions(physicalDevice, requiredExtensions);
+            !missingExtensions.empty()) {
             diagnostic << "Device \"" << properties.deviceName
                        << "\" missing required extensions:\n";
-            for (const auto &extension : missingExtensions) {
+            for (auto const& extension : missingExtensions) {
                 diagnostic << "\t" << extension << '\n';
             }
         }

@@ -1,9 +1,8 @@
 #include "Command.hpp"
 Command::Command(
-    Device                    &device,
+    Device&                    device,
     vk::CommandPoolCreateFlags poolFlags)
-    :
-      pool{
+    : pool{
           device.handle,
           vk::CommandPoolCreateInfo{
               poolFlags | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -22,7 +21,7 @@ auto Command::beginSingleTime() -> void
 {
     buffer.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
 }
-auto Command::endSingleTime(Device &device) -> void
+auto Command::endSingleTime(Device& device) -> void
 {
     // submit command buffer
     buffer.end();

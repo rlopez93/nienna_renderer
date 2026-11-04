@@ -38,20 +38,20 @@ auto makeHashable(vk::SamplerCreateInfo samplerCreateInfo) -> vk::SamplerCreateI
 
 [[nodiscard]]
 auto getOrCreateSamplerIndex(
-    Device               &device,
+    Device&               device,
     vk::SamplerCreateInfo samplerCreateInfo,
-    SamplerCache         &samplerCache,
-    UniqueSamplers       &uniqueSamplers) -> std::uint32_t
+    SamplerCache&         samplerCache,
+    UniqueSamplers&       uniqueSamplers) -> std::uint32_t
 {
     samplerCreateInfo = makeHashable(samplerCreateInfo);
 
-    const auto samplerCacheIterator = samplerCache.find(samplerCreateInfo);
+    auto const samplerCacheIterator = samplerCache.find(samplerCreateInfo);
 
     if (samplerCacheIterator != samplerCache.end()) {
         return samplerCacheIterator->second;
     }
 
-    const auto uniqueSamplerIndex = static_cast<std::uint32_t>(uniqueSamplers.size());
+    auto const uniqueSamplerIndex = static_cast<std::uint32_t>(uniqueSamplers.size());
 
     uniqueSamplers.emplace_back(device.handle, samplerCreateInfo);
 
@@ -62,11 +62,11 @@ auto getOrCreateSamplerIndex(
 
 } // namespace
 auto RenderableResources::create(
-    const RenderAsset &asset,
-    const SceneView   &sceneView,
-    Device            &device,
-    Command           &command,
-    Allocator         &allocator) -> void
+    RenderAsset const& asset,
+    SceneView const&   sceneView,
+    Device&            device,
+    Command&           command,
+    Allocator&         allocator) -> void
 {
     draws = sceneView.draws;
 
@@ -96,8 +96,8 @@ auto RenderableResources::create(
     command.beginSingleTime();
 
     // TODO: create large geometry buffers to "flatten out" vertex/indexBuffers
-    for (const auto &mesh : asset.meshes) {
-        for (const auto &primitive : mesh.submeshes) {
+    for (auto const& mesh : asset.meshes) {
+        for (auto const& primitive : mesh.submeshes) {
 
             vertexBuffers.push_back(allocator.createBufferAndUploadData(
                 command,
@@ -117,7 +117,7 @@ auto RenderableResources::create(
     if (asset.materials.empty()) {
         packedMaterials.push_back(packMaterialData(Material{}));
     } else {
-        for (const Material &material : asset.materials) {
+        for (Material const& material : asset.materials) {
             packedMaterials.push_back(packMaterialData(material));
         }
     }
@@ -127,9 +127,9 @@ auto RenderableResources::create(
         packedMaterials,
         vk::BufferUsageFlagBits2::eStorageBuffer);
 
-    for (const Texture &texture : asset.textures) {
+    for (Texture const& texture : asset.textures) {
 
-        const vk::Extent3D extent3D{texture.extent.width, texture.extent.height, 1u};
+        vk::Extent3D const extent3D{texture.extent.width, texture.extent.height, 1u};
 
         vk::ImageCreateInfo imageInfo{};
         imageInfo.flags = vk::ImageCreateFlagBits::eMutableFormat;
@@ -183,9 +183,9 @@ auto RenderableResources::create(
 
     command.endSingleTime(device);
 
-    for (const auto &[textureIndex, texture] : std::views::enumerate(asset.textures)) {
+    for (auto const& [textureIndex, texture] : std::views::enumerate(asset.textures)) {
 
-        const std::uint32_t uniqueSamplerIndex = getOrCreateSamplerIndex(
+        std::uint32_t const uniqueSamplerIndex = getOrCreateSamplerIndex(
             device,
             texture.samplerInfo,
             samplerCache,
@@ -196,14 +196,14 @@ auto RenderableResources::create(
 }
 
 void RenderableResources::updateDescriptorSet(
-    Device           &device,
+    Device&           device,
     vk::DescriptorSet descriptorSet,
-    const Buffer     &frameUBO,
-    const Buffer     &nodeInstancesSSBO) const
+    Buffer const&     frameUBO,
+    Buffer const&     nodeInstancesSSBO) const
 {
     auto descriptorWrites = std::vector<vk::WriteDescriptorSet>{};
 
-    const auto frameBufferInfo =
+    auto const frameBufferInfo =
         vk::DescriptorBufferInfo{frameUBO.buffer, 0, sizeof(FrameUniforms)};
 
     descriptorWrites.emplace_back(
@@ -214,7 +214,7 @@ void RenderableResources::updateDescriptorSet(
             vk::DescriptorType::eUniformBuffer,
             {},
             frameBufferInfo});
-    const auto nodeInstancesBufferInfo = vk::DescriptorBufferInfo{
+    auto const nodeInstancesBufferInfo = vk::DescriptorBufferInfo{
         nodeInstancesSSBO.buffer,
         0,
         vk::WholeSize,
@@ -230,7 +230,7 @@ void RenderableResources::updateDescriptorSet(
             nodeInstancesBufferInfo,
         });
 
-    const auto materialsBufferInfo = vk::DescriptorBufferInfo{
+    auto const materialsBufferInfo = vk::DescriptorBufferInfo{
         materialsSSBO.buffer,
         0,
         vk::WholeSize,
@@ -249,7 +249,7 @@ void RenderableResources::updateDescriptorSet(
     std::vector<vk::DescriptorImageInfo> srgbTextureImageViewInfos;
     srgbTextureImageViewInfos.reserve(srgbTextureImageViews.size());
 
-    for (const auto &srgbView : srgbTextureImageViews) {
+    for (auto const& srgbView : srgbTextureImageViews) {
         srgbTextureImageViewInfos.emplace_back(
             vk::DescriptorImageInfo{
                 vk::Sampler{},
@@ -270,7 +270,7 @@ void RenderableResources::updateDescriptorSet(
     std::vector<vk::DescriptorImageInfo> linearTextureImageViewInfos;
     linearTextureImageViewInfos.reserve(linearTextureImageViews.size());
 
-    for (const auto &linearView : linearTextureImageViews) {
+    for (auto const& linearView : linearTextureImageViews) {
         linearTextureImageViewInfos.emplace_back(
             vk::DescriptorImageInfo{
                 vk::Sampler{},

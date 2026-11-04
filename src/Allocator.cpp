@@ -2,16 +2,16 @@
 #include "Utility.hpp"
 
 auto Allocator::createUniqueVmaAllocator(
-    Instance       &instance,
-    PhysicalDevice &physicalDevice,
-    Device         &device) -> UniqueVmaAllocator
+    Instance&       instance,
+    PhysicalDevice& physicalDevice,
+    Device&         device) -> UniqueVmaAllocator
 {
 
     // Initialization of VMA allocator.
     // #TODO : VK_EXT_memory_priority ? VMA_ALLOCATOR_CREATE_EXT_MEMORY_PRIORITY_BIT
     VmaAllocatorCreateInfo allocatorCreateInfo{
-        .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT
-               | VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE4_BIT,
+        .flags            = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT
+                          | VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE4_BIT,
         .physicalDevice   = *physicalDevice.handle,
         .device           = *device.handle,
         .instance         = *instance.handle,
@@ -26,7 +26,7 @@ auto Allocator::createUniqueVmaAllocator(
                                                    // VkBufferUsageFlags2CreateInfoKHR
 
     // Because we use VMA_DYNAMIC_VULKAN_FUNCTIONS
-    const VmaVulkanFunctions functions = {
+    VmaVulkanFunctions const functions = {
         .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
         .vkGetDeviceProcAddr   = vkGetDeviceProcAddr,
     };
@@ -39,9 +39,9 @@ auto Allocator::createUniqueVmaAllocator(
 }
 
 Allocator::Allocator(
-    Instance       &instance,
-    PhysicalDevice &physicalDevice,
-    Device         &device)
+    Instance&       instance,
+    PhysicalDevice& physicalDevice,
+    Device&         device)
     : allocator(createUniqueVmaAllocator(
           instance,
           physicalDevice,
@@ -75,7 +75,7 @@ auto Allocator::createBuffer(
     VmaMemoryUsage           memoryUsage,
     VmaAllocationCreateFlags allocationFlags) -> Buffer
 {
-    const auto bufferUsageFlags2CreateInfo = *vk::BufferUsageFlags2CreateInfo{
+    auto const bufferUsageFlags2CreateInfo = *vk::BufferUsageFlags2CreateInfo{
         usageFlags | vk::BufferUsageFlagBits2::eShaderDeviceAddress};
     auto bufferCreateInfo =
         *vk::BufferCreateInfo{{}, bufferSize, {}, vk::SharingMode::eExclusive};
@@ -131,11 +131,11 @@ void Allocator::destroyBuffer(Buffer buffer) const
  * See createImageAndUploadData for creating an image and uploading data.
 -*/
 [[nodiscard]]
-auto Allocator::createImage(const vk::ImageCreateInfo &imageInfo) -> Image
+auto Allocator::createImage(vk::ImageCreateInfo const& imageInfo) -> Image
 {
-    const auto imageCreateInfo = *imageInfo;
+    auto const imageCreateInfo = *imageInfo;
 
-    const VmaAllocationCreateInfo createInfo{.usage = VMA_MEMORY_USAGE_GPU_ONLY};
+    VmaAllocationCreateInfo const createInfo{.usage = VMA_MEMORY_USAGE_GPU_ONLY};
 
     Image             image;
     VkImage           vk_image;
@@ -168,7 +168,7 @@ completed, then the staging buffer can be cleared.
 -*/
 void Allocator::freeStagingBuffers()
 {
-    for (const auto &buffer : stagingBuffers) {
+    for (auto const& buffer : stagingBuffers) {
         destroyBuffer(buffer);
     }
 
@@ -182,7 +182,7 @@ Allocator::~Allocator()
 }
 void Allocator::freeBuffers()
 {
-    for (const auto &buffer : buffers) {
+    for (auto const& buffer : buffers) {
         destroyBuffer(buffer);
     }
 
@@ -191,7 +191,7 @@ void Allocator::freeBuffers()
 
 void Allocator::freeImages()
 {
-    for (const auto &image : images) {
+    for (auto const& image : images) {
         destroyImage(image);
     }
     images.clear();

@@ -4,4 +4,4 @@
 
 #include "RenderAsset.hpp"
 
-auto getAsset(const std::filesystem::path &gltfPath) -> RenderAsset;
+auto getAsset(std::filesystem::path const& gltfPath) -> RenderAsset;

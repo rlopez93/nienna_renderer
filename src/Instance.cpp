@@ -23,8 +23,8 @@ Instance::Instance()
 VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageFunc(
     vk::DebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
     vk::DebugUtilsMessageTypeFlagsEXT             messageTypes,
-    vk::DebugUtilsMessengerCallbackDataEXT const *pCallbackData,
-    void * /*pUserData*/)
+    vk::DebugUtilsMessengerCallbackDataEXT const* pCallbackData,
+    void* /*pUserData*/)
 {
     std::ostringstream message;
 
@@ -75,7 +75,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageFunc(
     return false;
 }
 
-auto Instance::createDebugUtilsMessenger(const vk::raii::Instance &instance)
+auto Instance::createDebugUtilsMessenger(vk::raii::Instance const& instance)
     -> vk::raii::DebugUtilsMessengerEXT
 {
     vk::DebugUtilsMessageSeverityFlagsEXT severityFlags(
@@ -96,7 +96,7 @@ auto Instance::createDebugUtilsMessenger(const vk::raii::Instance &instance)
     return {instance, debugUtilsMessengerCreateInfoEXT};
 }
 
-auto Instance::createInstance(const vk::raii::Context &context) -> vk::raii::Instance
+auto Instance::createInstance(vk::raii::Context const& context) -> vk::raii::Instance
 {
     auto instanceLayers = std::vector{"VK_LAYER_KHRONOS_validation"};
 
@@ -104,7 +104,7 @@ auto Instance::createInstance(const vk::raii::Context &context) -> vk::raii::Ins
     auto availableLayers =
         context.enumerateInstanceLayerProperties()
         | std::views::transform(
-            [](const vk::LayerProperties &properties) -> std::string {
+            [](vk::LayerProperties const& properties) -> std::string {
                 return properties.layerName;
             })
         | std::ranges::to<std::vector>();
@@ -149,7 +149,7 @@ auto Instance::createInstance(const vk::raii::Context &context) -> vk::raii::Ins
     auto availableExtensions =
         context.enumerateInstanceExtensionProperties()
         | std::views::transform(
-            [](const vk::ExtensionProperties &properties) -> std::string {
+            [](vk::ExtensionProperties const& properties) -> std::string {
                 return properties.extensionName;
             })
         | std::ranges::to<std::vector>();
@@ -164,10 +164,10 @@ auto Instance::createInstance(const vk::raii::Context &context) -> vk::raii::Ins
         }
     }
 
-    const auto applicationInfo =
+    auto const applicationInfo =
         vk::ApplicationInfo{"Nienna", 1, "Nienna", 1, vk::ApiVersion14};
 
-    const auto instanceCreateInfo = vk::InstanceCreateInfo{
+    auto const instanceCreateInfo = vk::InstanceCreateInfo{
         {},
         &applicationInfo,
         instanceLayers,

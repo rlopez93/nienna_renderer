@@ -1,6 +1,6 @@
 #include "UniqueImage.hpp"
 
-auto VmaImageDeleter::operator()(VkImage_T *img) const noexcept -> void
+auto VmaImageDeleter::operator()(VkImage_T* img) const noexcept -> void
 {
     if (!allocator || !img) {
         return;

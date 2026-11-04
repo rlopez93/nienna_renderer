@@ -1,0 +1,8 @@
+INPUT                = src include
+RECURSIVE            = YES
+EXTRACT_ALL          = YES
+HAVE_DOT             = YES
+INCLUDE_GRAPH        = YES
+INCLUDED_BY_GRAPH    = YES
+GENERATE_HTML        = YES
+GENERATE_LATEX       = NO

@@ -8,39 +8,39 @@
 
 struct Swapchain {
     explicit Swapchain(
-        const Device         &device,
-        const PhysicalDevice &physicalDevice,
-        const Surface        &surface);
+        Device const&         device,
+        PhysicalDevice const& physicalDevice,
+        Surface const&        surface);
 
     auto create(
-        const Device         &device,
-        const PhysicalDevice &physicalDevice,
-        const Surface        &surface,
+        Device const&         device,
+        PhysicalDevice const& physicalDevice,
+        Surface const&        surface,
         vk::SwapchainKHR      oldSwapchain = {}) -> void;
 
     auto recreate(
-        const Device         &device,
-        const PhysicalDevice &physicalDevice,
-        const Surface        &surface) -> void;
+        Device const&         device,
+        PhysicalDevice const& physicalDevice,
+        Surface const&        surface) -> void;
 
     [[nodiscard]]
-    auto chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats)
+    auto chooseSurfaceFormat(std::vector<vk::SurfaceFormatKHR> const& availableFormats)
         -> vk::SurfaceFormatKHR;
 
     [[nodiscard]]
-    auto choosePresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes)
+    auto choosePresentMode(std::vector<vk::PresentModeKHR> const& availablePresentModes)
         -> vk::PresentModeKHR;
 
     [[nodiscard]]
     auto chooseExtent(
-        const vk::SurfaceCapabilitiesKHR &caps,
-        const vk::Extent2D               &desired) -> vk::Extent2D;
+        vk::SurfaceCapabilitiesKHR const& caps,
+        vk::Extent2D const&               desired) -> vk::Extent2D;
 
     [[nodiscard]]
     auto createSwapchain(
-        const Device         &device,
-        const PhysicalDevice &physicalDevice,
-        const Surface        &surface,
+        Device const&         device,
+        PhysicalDevice const& physicalDevice,
+        Surface const&        surface,
         vk::SwapchainKHR      oldSwapchain) -> vk::raii::SwapchainKHR;
 
     [[nodiscard]]
@@ -55,7 +55,7 @@ struct Swapchain {
     auto nextImage() -> vk::Image;
 
     [[nodiscard]]
-    auto nextImageView() -> vk::raii::ImageView &;
+    auto nextImageView() -> vk::raii::ImageView&;
 
     [[nodiscard]]
     auto extent() const -> vk::Extent2D;

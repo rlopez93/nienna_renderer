@@ -7,15 +7,15 @@
 #include <stdexcept>
 
 Swapchain::Swapchain(
-    const Device         &device,
-    const PhysicalDevice &physicalDevice,
-    const Surface        &surface)
+    Device const&         device,
+    PhysicalDevice const& physicalDevice,
+    Surface const&        surface)
 {
     create(device, physicalDevice, surface);
 }
 
 auto Swapchain::chooseSurfaceFormat(
-    const std::vector<vk::SurfaceFormatKHR> &availableFormats) -> vk::SurfaceFormatKHR
+    std::vector<vk::SurfaceFormatKHR> const& availableFormats) -> vk::SurfaceFormatKHR
 {
     constexpr auto preferredSurfaceFormats = std::array{
         vk::Format::eB8G8R8A8Srgb,
@@ -38,7 +38,7 @@ auto Swapchain::chooseSurfaceFormat(
 }
 
 auto Swapchain::choosePresentMode(
-    const std::vector<vk::PresentModeKHR> &availablePresentModes) -> vk::PresentModeKHR
+    std::vector<vk::PresentModeKHR> const& availablePresentModes) -> vk::PresentModeKHR
 {
     constexpr auto preferredPresentModes =
         std::array{vk::PresentModeKHR::eMailbox, vk::PresentModeKHR::eImmediate};
@@ -55,8 +55,8 @@ auto Swapchain::choosePresentMode(
 }
 
 auto Swapchain::chooseExtent(
-    const vk::SurfaceCapabilitiesKHR &capabilities,
-    const vk::Extent2D               &desired) -> vk::Extent2D
+    vk::SurfaceCapabilitiesKHR const& capabilities,
+    vk::Extent2D const&               desired) -> vk::Extent2D
 {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
         return capabilities.currentExtent;
@@ -75,26 +75,26 @@ auto Swapchain::chooseExtent(
 }
 
 auto Swapchain::createSwapchain(
-    const Device         &device,
-    const PhysicalDevice &physicalDevice,
-    const Surface        &surface,
+    Device const&         device,
+    PhysicalDevice const& physicalDevice,
+    Surface const&        surface,
     vk::SwapchainKHR      oldSwapchain) -> vk::raii::SwapchainKHR
 {
-    const auto capabilities =
+    auto const capabilities =
         physicalDevice.handle.getSurfaceCapabilitiesKHR(surface.handle);
 
-    const auto formats = physicalDevice.handle.getSurfaceFormatsKHR(surface.handle);
+    auto const formats = physicalDevice.handle.getSurfaceFormatsKHR(surface.handle);
 
-    const auto presentModes =
+    auto const presentModes =
         physicalDevice.handle.getSurfacePresentModesKHR(surface.handle);
 
     if (formats.empty() || presentModes.empty()) {
         throw std::runtime_error("Surface reports no formats or present modes");
     }
 
-    const auto surfaceFormat = chooseSurfaceFormat(formats);
-    const auto presentMode   = choosePresentMode(presentModes);
-    const auto desiredExtent = getFramebufferExtent(device.window.get());
+    auto const surfaceFormat = chooseSurfaceFormat(formats);
+    auto const presentMode   = choosePresentMode(presentModes);
+    auto const desiredExtent = getFramebufferExtent(device.window.get());
     swapchainExtent          = chooseExtent(capabilities, desiredExtent);
 
     if (swapchainExtent.width == 0 || swapchainExtent.height == 0) {
@@ -106,12 +106,12 @@ auto Swapchain::createSwapchain(
         capabilities.minImageCount,
         capabilities.maxImageCount > 0 ? capabilities.maxImageCount : UINT32_MAX);
 
-    const auto graphicsFamilyQueueIndex = device.queueFamilyIndices.graphicsIndex;
-    const auto presentFamilyQueueIndex  = device.queueFamilyIndices.presentIndex;
+    auto const graphicsFamilyQueueIndex = device.queueFamilyIndices.graphicsIndex;
+    auto const presentFamilyQueueIndex  = device.queueFamilyIndices.presentIndex;
 
-    const auto concurrent = (graphicsFamilyQueueIndex != presentFamilyQueueIndex);
+    auto const concurrent = (graphicsFamilyQueueIndex != presentFamilyQueueIndex);
 
-    const auto queueFamilies =
+    auto const queueFamilies =
         std::array{graphicsFamilyQueueIndex, presentFamilyQueueIndex};
 
     vk::SwapchainCreateInfoKHR createInfo{
@@ -136,9 +136,9 @@ auto Swapchain::createSwapchain(
 }
 
 auto Swapchain::create(
-    const Device         &device,
-    const PhysicalDevice &physicalDevice,
-    const Surface        &surface,
+    Device const&         device,
+    PhysicalDevice const& physicalDevice,
+    Surface const&        surface,
     vk::SwapchainKHR      oldSwapchain) -> void
 {
     handle = createSwapchain(device, physicalDevice, surface, oldSwapchain);
@@ -147,7 +147,7 @@ auto Swapchain::create(
     imageViews.clear();
     renderFinishedSemaphores.clear();
 
-    const auto formats = physicalDevice.handle.getSurfaceFormatsKHR(surface.handle);
+    auto const formats = physicalDevice.handle.getSurfaceFormatsKHR(surface.handle);
     imageFormat        = chooseSurfaceFormat(formats).format;
 
     for (vk::Image image : images) {
@@ -166,9 +166,9 @@ auto Swapchain::create(
 }
 
 auto Swapchain::recreate(
-    const Device         &device,
-    const PhysicalDevice &physicalDevice,
-    const Surface        &surface) -> void
+    Device const&         device,
+    PhysicalDevice const& physicalDevice,
+    Surface const&        surface) -> void
 {
     device.graphicsQueue.waitIdle();
     imageViews.clear();
@@ -196,7 +196,7 @@ auto Swapchain::nextImage() -> vk::Image
     return images[nextImageIndex];
 }
 
-auto Swapchain::nextImageView() -> vk::raii::ImageView &
+auto Swapchain::nextImageView() -> vk::raii::ImageView&
 {
     return imageViews[nextImageIndex];
 }

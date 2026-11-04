@@ -17,7 +17,7 @@ struct VmaPoolDeleter {
     // FIXME: implementation dependent behavior
     // VmaPool == VmaPool_T* only on certain platforms
 
-    auto operator()(VmaPool_T *pool) const noexcept -> void
+    auto operator()(VmaPool_T* pool) const noexcept -> void
     {
         if (!allocator || !pool) {
             return;
@@ -44,7 +44,7 @@ class RenderTargetAllocator
 
     [[nodiscard]]
     auto createImage(
-        const vk::ImageCreateInfo &info,
+        vk::ImageCreateInfo const& info,
         PoolKind                   kind) -> UniqueImage;
 
   private:
@@ -55,7 +55,7 @@ class RenderTargetAllocator
     [[nodiscard]]
     auto ensurePool(
         PoolKind                   kind,
-        const vk::ImageCreateInfo &info) -> VmaPool;
+        vk::ImageCreateInfo const& info) -> VmaPool;
 };
 
 struct ColorTarget {
@@ -64,8 +64,8 @@ struct ColorTarget {
     vk::raii::ImageView view = nullptr;
 
     auto recreate(
-        Device                &device,
-        RenderTargetAllocator &alloc,
+        Device&                device,
+        RenderTargetAllocator& alloc,
         vk::Extent2D           extent,
         vk::Format             swapchainFormat) -> void;
 
@@ -79,8 +79,8 @@ struct DepthTarget {
     vk::raii::ImageView view = nullptr;
 
     auto recreate(
-        Device                &device,
-        RenderTargetAllocator &alloc,
+        Device&                device,
+        RenderTargetAllocator& alloc,
         vk::Extent2D           extent,
         vk::Format             depthFormat) -> void;
 
@@ -95,14 +95,14 @@ struct RenderTargets {
     vk::Extent2D          extent{};
 
     RenderTargets(
-        Device      &device,
+        Device&      device,
         VmaAllocator vma,
         vk::Extent2D extent_,
         vk::Format   swapchainFormat,
         vk::Format   depthFormat);
 
     auto recreate(
-        Device      &device,
+        Device&      device,
         vk::Extent2D extent_,
         vk::Format   swapchainFormat,
         vk::Format   depthFormat) -> void;

@@ -18,19 +18,19 @@ struct AABB {
     auto isValid() const -> bool;
 
     // Union other into *this.
-    auto merge(const AABB &other) -> void;
+    auto merge(AABB const& other) -> void;
 };
 
 // Compute a world-space AABB that encloses localAABB after applying
 // worldFromLocalTransform.
 auto computeWorldAABBFromLocalAABB(
-    const AABB      &localAABB,
-    const glm::mat4 &worldFromLocalTransform) -> AABB;
+    AABB const&      localAABB,
+    glm::mat4 const& worldFromLocalTransform) -> AABB;
 
 // Compute a primitive's local-space AABB from vertex positions.
-auto computeLocalAABB(const Submesh &submesh) -> AABB;
+auto computeLocalAABB(Submesh const& submesh) -> AABB;
 
 // Compute the active scene's world-space AABB from draw calls.
 auto computeSceneAABB(
-    const RenderAsset &asset,
-    const SceneView   &sceneView) -> AABB;
+    RenderAsset const& asset,
+    SceneView const&   sceneView) -> AABB;

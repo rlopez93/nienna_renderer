@@ -1,6 +1,6 @@
 #include "Utility.hpp"
 
-auto findDepthFormat(vk::raii::PhysicalDevice &physicalDevice) -> vk::Format
+auto findDepthFormat(vk::raii::PhysicalDevice& physicalDevice) -> vk::Format
 {
     auto candidateFormats = std::array{
 

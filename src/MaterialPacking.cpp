@@ -5,7 +5,7 @@ namespace
 {
 
 [[nodiscard]]
-auto packTextureTransform2DData(const UVTransform2D &transform)
+auto packTextureTransform2DData(UVTransform2D const& transform)
     -> TextureTransform2DData
 {
     TextureTransform2DData data{};
@@ -19,7 +19,7 @@ auto packTextureTransform2DData(const UVTransform2D &transform)
 }
 
 [[nodiscard]]
-auto packTextureRefData(const TextureRef &textureRef) -> TextureRefData
+auto packTextureRefData(TextureRef const& textureRef) -> TextureRefData
 {
     TextureRefData data{};
 
@@ -32,7 +32,7 @@ auto packTextureRefData(const TextureRef &textureRef) -> TextureRefData
 
 } // namespace
 
-auto packMaterialData(const Material &material) -> MaterialData
+auto packMaterialData(Material const& material) -> MaterialData
 {
     MaterialData packed{};
 

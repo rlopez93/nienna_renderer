@@ -4,7 +4,7 @@
 #include <numeric>
 
 auto FrameContext::createTimelineSemaphore(
-    Device  &device,
+    Device&  device,
     uint32_t maxFramesInFlight) -> vk::raii::Semaphore
 {
     vk::SemaphoreTypeCreateInfo timelineInfo{
@@ -17,7 +17,7 @@ auto FrameContext::createTimelineSemaphore(
 }
 
 FrameContext::FrameContext(
-    Device  &device,
+    Device&  device,
     uint32_t maxFrames)
     : frameIndex(0),
       maxFramesInFlight(maxFrames),
@@ -34,7 +34,7 @@ FrameContext::FrameContext(
     for (uint32_t i = 0; i < maxFramesInFlight; ++i) {
         commands.emplace_back(
             device,
-            vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
+            vk::CommandPoolCreateFlagBits::eResetCommandBuffer); // TODO : Why?
         // Binary semaphores per frame
         imageAvailableSemaphores.emplace_back(device.handle, vk::SemaphoreCreateInfo{});
     }
@@ -57,22 +57,22 @@ auto FrameContext::advance() -> void
     frameIndex = (frameIndex + 1) % maxFramesInFlight;
 }
 
-auto FrameContext::cmd() -> vk::raii::CommandBuffer &
+auto FrameContext::cmd() -> vk::raii::CommandBuffer&
 {
     return commands[frameIndex].buffer;
 }
 
-auto FrameContext::cmdPool() -> vk::raii::CommandPool &
+auto FrameContext::cmdPool() -> vk::raii::CommandPool&
 {
     return commands[frameIndex].pool;
 }
 
-auto FrameContext::timelineValue() const -> const uint64_t &
+auto FrameContext::timelineValue() const -> uint64_t const&
 {
     return timelineValues[frameIndex];
 }
 
-auto FrameContext::timelineValue() -> uint64_t &
+auto FrameContext::timelineValue() -> uint64_t&
 {
     return timelineValues[frameIndex];
 }
@@ -92,13 +92,13 @@ auto FrameContext::currentDescriptorSet() const -> vk::DescriptorSet
     return *descriptorSets[frameIndex];
 }
 
-auto FrameContext::setDescriptorSets(std::vector<vk::raii::DescriptorSet> &&sets)
+auto FrameContext::setDescriptorSets(std::vector<vk::raii::DescriptorSet>&& sets)
 {
     descriptorSets = std::move(sets);
 }
 
 auto FrameContext::initializePerFrameUniformBuffers(
-    Allocator &allocator,
+    Allocator& allocator,
     uint32_t   nodeInstanceCount) -> void
 {
     frameUBO.clear();
@@ -107,11 +107,9 @@ auto FrameContext::initializePerFrameUniformBuffers(
     frameUBO.reserve(maxFramesInFlight);
     nodeInstancesSSBO.reserve(maxFramesInFlight);
 
-    const uint32_t elemCount = (nodeInstanceCount == 0u) ? 1u : nodeInstanceCount;
-
-    const auto frameBytes = static_cast<vk::DeviceSize>(sizeof(FrameUniforms));
-
-    const auto nodeInstanceBytes = static_cast<vk::DeviceSize>(sizeof(NodeInstanceData))
+    auto const elemCount         = (nodeInstanceCount == 0u) ? 1u : nodeInstanceCount;
+    auto const frameBytes        = static_cast<vk::DeviceSize>(sizeof(FrameUniforms));
+    auto const nodeInstanceBytes = static_cast<vk::DeviceSize>(sizeof(NodeInstanceData))
                                  * static_cast<vk::DeviceSize>(elemCount);
 
     for (uint32_t i = 0u; i < maxFramesInFlight; ++i) {

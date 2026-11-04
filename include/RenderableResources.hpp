@@ -18,17 +18,17 @@ struct SceneView;
 
 struct RenderableResources {
     void create(
-        const RenderAsset &asset,
-        const SceneView   &sceneView,
-        Device            &device,
-        Command           &command,
-        Allocator         &allocator);
+        RenderAsset const& asset,
+        SceneView const&   sceneView,
+        Device&            device,
+        Command&           command,
+        Allocator&         allocator);
 
     void updateDescriptorSet(
-        Device           &device,
+        Device&           device,
         vk::DescriptorSet descriptorSet,
-        const Buffer     &frameUBO,
-        const Buffer     &nodeInstancesSSBO) const;
+        Buffer const&     frameUBO,
+        Buffer const&     nodeInstancesSSBO) const;
 
     // draw list consumed by Renderer
     std::vector<DrawItem> draws;

@@ -34,10 +34,10 @@ struct SceneView {
 
     std::uint32_t activeCameraInstanceIndex = 0u;
 
-    auto activeCameraInstance() -> CameraInstance &
+    auto activeCameraInstance() -> CameraInstance&
     {
         return cameraInstances[activeCameraInstanceIndex];
     }
 };
 
-auto buildSceneView(const RenderAsset &asset) -> SceneView;
+auto buildSceneView(RenderAsset const& asset) -> SceneView;

@@ -8,11 +8,11 @@ struct ShaderInterface {
     vk::raii::DescriptorSetLayout handle;
 
     ShaderInterface(
-        Device                           &device,
-        const ShaderInterfaceDescription &description);
+        Device&                           device,
+        ShaderInterfaceDescription const& description);
 
   private:
     static auto create(
-        Device                           &device,
-        const ShaderInterfaceDescription &description) -> vk::raii::DescriptorSetLayout;
+        Device&                           device,
+        ShaderInterfaceDescription const& description) -> vk::raii::DescriptorSetLayout;
 };

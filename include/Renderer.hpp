@@ -13,8 +13,8 @@ struct RenderableResources;
 
 struct Renderer {
     Renderer(
-        RenderContext        &context,
-        const RendererConfig &config);
+        RenderContext&        context,
+        RendererConfig const& config);
 
     // Returns false if the frame should be skipped (e.g. swapchain
     // out-of-date/minimized)
@@ -22,24 +22,24 @@ struct Renderer {
     auto beginFrame() -> bool;
 
     // Records rendering commands into the current frame command buffer
-    auto render(const RenderableResources &renderableResources) -> void;
+    auto render(RenderableResources const& renderableResources) -> void;
 
     // Submits + presents + advances frame
     auto endFrame() -> void;
 
     // Frame-relative resource access (read/write by application)
-    vk::DescriptorSet currentDescriptorSet() const;
-    Buffer           &currentFrameUBO();
-    Buffer           &currentNodeInstancesSSBO();
+    auto currentDescriptorSet() const -> vk::DescriptorSet;
+    auto currentFrameUBO() -> Buffer&;
+    auto currentNodeInstancesSSBO() -> Buffer&;
 
     auto initializePerFrameUniformBuffers(
-        Allocator &allocator,
+        Allocator& allocator,
         uint32_t   nodeInstancesCount) -> void;
 
     void cycleDebugView();
 
   private:
-    RenderContext   &context;
+    RenderContext&   context;
     ImageLayoutState imageLayoutState;
 
     ShaderInterface          shaderInterface;
@@ -56,7 +56,7 @@ struct Renderer {
     auto        present() -> void;
     auto        allocateFrameDescriptorSets() -> void;
     static auto createDescriptorPool(
-        Device                           &device,
-        const ShaderInterfaceDescription &interfaceDesc,
+        Device&                           device,
+        ShaderInterfaceDescription const& interfaceDesc,
         uint32_t maxFramesInFlight) -> vk::raii::DescriptorPool;
 };

@@ -4,8 +4,8 @@
 #include <fmt/base.h>
 
 Surface::Surface(
-    Instance &instance,
-    Window   &window)
+    Instance& instance,
+    Window&   window)
     : handle{createSurface(
           instance,
           window)}
@@ -13,8 +13,8 @@ Surface::Surface(
 }
 
 auto Surface::createSurface(
-    Instance &instance,
-    Window   &window) -> vk::raii::SurfaceKHR
+    Instance& instance,
+    Window&   window) -> vk::raii::SurfaceKHR
 {
     VkSurfaceKHR surface;
     if (!SDL_Vulkan_CreateSurface(window.get(), *instance.handle, nullptr, &surface)) {

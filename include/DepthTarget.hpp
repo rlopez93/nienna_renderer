@@ -17,16 +17,16 @@ struct DepthTarget {
     DepthTarget() = default;
 
     DepthTarget(
-        Device      &device,
-        Allocator   &allocator,
-        Command     &command,
+        Device&      device,
+        Allocator&   allocator,
+        Command&     command,
         vk::Extent2D extent,
         vk::Format   depthFormat);
 
     void recreate(
-        Device      &device,
-        Allocator   &allocator,
-        Command     &command,
+        Device&      device,
+        Allocator&   allocator,
+        Command&     command,
         vk::Extent2D extent,
         vk::Format   depthFormat);
 };

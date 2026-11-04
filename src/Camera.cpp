@@ -16,8 +16,8 @@ template <class... Ts> struct overloads : Ts... {
 } // namespace
 
 auto Camera::getViewMatrix(
-    const glm::vec3 &translation,
-    const glm::quat &rotation) const -> glm::mat4
+    glm::vec3 const& translation,
+    glm::quat const& rotation) const -> glm::mat4
 {
     return glm::inverse(
         glm::translate(glm::mat4(1.0f), translation) * glm::mat4_cast(rotation));
@@ -25,11 +25,11 @@ auto Camera::getViewMatrix(
 
 auto Camera::getProjectionMatrix(float viewportAspect) const -> glm::mat4
 {
-    const auto visitor = overloads{
-        [&](const PerspectiveCamera &p) -> glm::mat4 {
-            const float a = p.aspectRatio.has_value() ? *p.aspectRatio : viewportAspect;
+    auto const visitor = overloads{
+        [&](PerspectiveCamera const& p) -> glm::mat4 {
+            auto const a = p.aspectRatio.has_value() ? *p.aspectRatio : viewportAspect;
 
-            glm::mat4 proj{1.0f};
+            auto proj = glm::mat4{1.0f};
 
             if (p.zfar.has_value()) {
                 proj = glm::perspectiveRH_ZO(p.yfov, a, p.znear, *p.zfar);
@@ -40,13 +40,13 @@ auto Camera::getProjectionMatrix(float viewportAspect) const -> glm::mat4
             proj[1][1] *= -1.0f;
             return proj;
         },
-        [&](const OrthographicCamera &o) -> glm::mat4 {
-            const float l = -o.xmag;
-            const float r = o.xmag;
-            const float b = -o.ymag;
-            const float t = o.ymag;
+        [&](OrthographicCamera const& o) -> glm::mat4 {
+            auto const l = -o.xmag;
+            auto const r = o.xmag;
+            auto const b = -o.ymag;
+            auto const t = o.ymag;
 
-            glm::mat4 proj = glm::orthoRH_ZO(l, r, b, t, o.znear, o.zfar);
+            auto proj = glm::orthoRH_ZO(l, r, b, t, o.znear, o.zfar);
 
             proj[1][1] *= -1.0f;
             return proj;

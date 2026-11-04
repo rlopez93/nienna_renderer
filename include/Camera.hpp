@@ -31,8 +31,8 @@ struct Camera {
 
     [[nodiscard]]
     auto getViewMatrix(
-        const glm::vec3 &translation,
-        const glm::quat &rotation) const -> glm::mat4;
+        glm::vec3 const& translation,
+        glm::quat const& rotation) const -> glm::mat4;
 
     [[nodiscard]]
     auto getProjectionMatrix(float viewportAspect) const -> glm::mat4;

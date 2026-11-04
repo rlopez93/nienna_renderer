@@ -5,7 +5,7 @@
 #include <cassert>
 #include <fstream>
 
-auto readShaders(const std::string &filename) -> std::vector<char>
+auto readShaders(std::string const& filename) -> std::vector<char>
 {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
@@ -23,7 +23,7 @@ auto readShaders(const std::string &filename) -> std::vector<char>
     return buffer;
 }
 
-auto reflectShader(const std::vector<char> &code) -> VertexReflectionData
+auto reflectShader(std::vector<char> const& code) -> VertexReflectionData
 {
     auto reflection = spv_reflect::ShaderModule(code.size(), code.data());
 
@@ -32,9 +32,9 @@ auto reflectShader(const std::vector<char> &code) -> VertexReflectionData
             "Could not process shader code (is it a valid SPIR-V bytecode?)"};
     }
 
-    auto &shaderModule = reflection.GetShaderModule();
+    auto& shaderModule = reflection.GetShaderModule();
 
-    const auto entry_point_name = std::string{shaderModule.entry_point_name};
+    auto const entry_point_name = std::string{shaderModule.entry_point_name};
 
     // fmt::print(stderr, "{}\n", entry_point_name);
 
@@ -133,8 +133,8 @@ auto reflectShader(const std::vector<char> &code) -> VertexReflectionData
 }
 
 auto createShaderModule(
-    vk::raii::Device            &device,
-    const std::filesystem::path &path) -> vk::raii::ShaderModule
+    vk::raii::Device&            device,
+    std::filesystem::path const& path) -> vk::raii::ShaderModule
 {
     // fmt::println(stderr, "creating shader module for {}", path.string());
     auto shaderCode = readShaders(path);
@@ -146,5 +146,5 @@ auto createShaderModule(
         vk::ShaderModuleCreateInfo{
             {},
             shaderCode.size(),
-            reinterpret_cast<const uint32_t *>(shaderCode.data())}};
+            reinterpret_cast<uint32_t const*>(shaderCode.data())}};
 }

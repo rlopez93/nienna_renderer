@@ -20,31 +20,31 @@ template <class... Ts> struct overloads : Ts... {
     using Ts::operator()...;
 };
 
-auto toGlm(const fastgltf::math::fvec3 &vector) -> glm::vec3
+auto toGlm(fastgltf::math::fvec3 const& vector) -> glm::vec3
 {
     return {vector.x(), vector.y(), vector.z()};
 }
 
-auto toGlm(const fastgltf::math::fvec4 &vector) -> glm::vec4
+auto toGlm(fastgltf::math::fvec4 const& vector) -> glm::vec4
 {
     return {vector.x(), vector.y(), vector.z(), vector.w()};
 }
 
-auto toGlm(const fastgltf::math::fquat &quat) -> glm::quat
+auto toGlm(fastgltf::math::fquat const& quat) -> glm::quat
 {
     return {quat.w(), quat.x(), quat.y(), quat.z()};
 }
 
-auto parseGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset
+auto parseGltfAsset(std::filesystem::path const& gltfPath) -> fastgltf::Asset
 {
-    const auto supportedExtensions = fastgltf::Extensions::KHR_texture_transform
+    auto const supportedExtensions = fastgltf::Extensions::KHR_texture_transform
                                    | fastgltf::Extensions::KHR_materials_unlit
                                    | fastgltf::Extensions::KHR_lights_punctual
                                    | fastgltf::Extensions::KHR_materials_specular
                                    | fastgltf::Extensions::KHR_materials_ior
                                    | fastgltf::Extensions::KHR_materials_clearcoat;
 
-    fastgltf::Parser parser{supportedExtensions};
+    auto parser = fastgltf::Parser{supportedExtensions};
 
     constexpr auto gltfOptions = fastgltf::Options::DontRequireValidAssetMember
                                | fastgltf::Options::LoadExternalBuffers
@@ -53,7 +53,7 @@ auto parseGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset
 
     auto gltfFile = fastgltf::GltfDataBuffer::FromPath(gltfPath);
 
-    if (!bool(gltfFile)) {
+    if (!gltfFile) {
         throw std::runtime_error("parseGltfAsset failed");
     }
 
@@ -64,20 +64,6 @@ auto parseGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset
     }
 
     return std::move(loaded.get());
-}
-
-auto makePixel(
-    std::uint8_t red,
-    std::uint8_t green,
-    std::uint8_t blue,
-    std::uint8_t alpha) -> std::vector<std::byte>
-{
-    return {
-        static_cast<std::byte>(red),
-        static_cast<std::byte>(green),
-        static_cast<std::byte>(blue),
-        static_cast<std::byte>(alpha),
-    };
 }
 
 auto makeDefaultSamplerInfo() -> vk::SamplerCreateInfo
@@ -141,7 +127,7 @@ auto mapFilter(fastgltf::Filter filter) -> vk::Filter
     }
 }
 
-auto mapMagFilter(const fastgltf::Optional<fastgltf::Filter> &magFilter) -> vk::Filter
+auto mapMagFilter(fastgltf::Optional<fastgltf::Filter> const& magFilter) -> vk::Filter
 {
     if (!magFilter.has_value()) {
         return vk::Filter::eLinear;
@@ -153,17 +139,15 @@ auto mapMagFilter(const fastgltf::Optional<fastgltf::Filter> &magFilter) -> vk::
     case fastgltf::Filter::Linear:
         return vk::Filter::eLinear;
 
-    // glTF disallows mipmapped enums for magFilter, but we assume
-    // well-formed; fall back defensively without extra checks.
     default:
         return vk::Filter::eLinear;
     }
 }
 
 auto mapMinFilter(
-    const fastgltf::Optional<fastgltf::Filter> &minFilter,
-    vk::Filter                                 &outMinFilter,
-    vk::SamplerMipmapMode                      &outMipmapMode) -> void
+    fastgltf::Optional<fastgltf::Filter> const& minFilter,
+    vk::Filter&                                 outMinFilter,
+    vk::SamplerMipmapMode&                      outMipmapMode) -> void
 {
     if (!minFilter.has_value()) {
         outMinFilter  = vk::Filter::eLinear;
@@ -210,8 +194,8 @@ auto mapMinFilter(
 }
 
 auto makeSamplerInfo(
-    const fastgltf::Optional<std::size_t> &samplerIndex,
-    const fastgltf::Asset                 &gltfAsset) -> vk::SamplerCreateInfo
+    fastgltf::Optional<std::size_t> const& samplerIndex,
+    fastgltf::Asset const&                 gltfAsset) -> vk::SamplerCreateInfo
 {
     auto samplerInfo = makeDefaultSamplerInfo();
 
@@ -219,7 +203,7 @@ auto makeSamplerInfo(
         return samplerInfo;
     }
 
-    const auto &sampler = gltfAsset.samplers[*samplerIndex];
+    auto const& sampler = gltfAsset.samplers[*samplerIndex];
 
     samplerInfo.addressModeU = mapWrap(sampler.wrapS);
     samplerInfo.addressModeV = mapWrap(sampler.wrapT);
@@ -227,17 +211,8 @@ auto makeSamplerInfo(
 
     samplerInfo.magFilter = mapMagFilter(sampler.magFilter);
 
-    auto minFilter  = vk::Filter::eLinear;
-    auto mipmapMode = vk::SamplerMipmapMode::eLinear;
+    mapMinFilter(sampler.minFilter, samplerInfo.minFilter, samplerInfo.mipmapMode);
 
-    mapMinFilter(sampler.minFilter, minFilter, mipmapMode);
-
-    samplerInfo.minFilter  = minFilter;
-    samplerInfo.mipmapMode = mipmapMode;
-
-    samplerInfo.pNext = nullptr;
-
-    // TODO: Sampler caching (deferred).
     return samplerInfo;
 }
 
@@ -246,29 +221,22 @@ struct DecodedImage {
     vk::Extent2D           extent{0u, 0u};
 };
 
-auto decodeImageFromFile(const std::filesystem::path &path) -> DecodedImage
+auto decodeImageData(
+    int            width,
+    int            height,
+    unsigned char* stbiData) -> DecodedImage
 {
-    int width    = 0;
-    int height   = 0;
-    int channels = 0;
-
-    unsigned char *stbiData =
-        stbi_load(path.string().c_str(), &width, &height, &channels, 4);
-
-    if (stbiData == nullptr) {
-        throw std::runtime_error("decodeImage failed");
-    }
-
-    const std::size_t byteCount =
+    auto const byteCount =
         static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u;
 
-    DecodedImage decoded{};
+    auto decoded = DecodedImage{};
+
+    decoded.rgba8.resize(byteCount);
+
     decoded.extent = vk::Extent2D{
         static_cast<std::uint32_t>(width),
         static_cast<std::uint32_t>(height),
     };
-
-    decoded.rgba8.resize(byteCount);
 
     std::memcpy(decoded.rgba8.data(), stbiData, byteCount);
 
@@ -277,70 +245,70 @@ auto decodeImageFromFile(const std::filesystem::path &path) -> DecodedImage
     return decoded;
 }
 
+auto decodeImageFromFile(std::filesystem::path const& path) -> DecodedImage
+{
+    auto width    = 0;
+    auto height   = 0;
+    auto channels = 0;
+
+    auto* stbiData = stbi_load(path.string().c_str(), &width, &height, &channels, 4);
+
+    if (stbiData == nullptr) {
+        throw std::runtime_error("decodeImage failed");
+    }
+
+    return decodeImageData(width, height, stbiData);
+}
+
 auto decodeImageFromMemory(
-    const unsigned char *data,
+    unsigned char const* data,
     int                  dataSize) -> DecodedImage
 {
-    int width    = 0;
-    int height   = 0;
-    int channels = 0;
+    auto width    = 0;
+    auto height   = 0;
+    auto channels = 0;
 
-    unsigned char *stbiData =
+    auto* stbiData =
         stbi_load_from_memory(data, dataSize, &width, &height, &channels, 4);
 
     if (stbiData == nullptr) {
         throw std::runtime_error("decodeImage failed");
     }
 
-    const std::size_t byteCount =
-        static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u;
-
-    DecodedImage decoded{};
-    decoded.extent = vk::Extent2D{
-        static_cast<std::uint32_t>(width),
-        static_cast<std::uint32_t>(height),
-    };
-
-    decoded.rgba8.resize(byteCount);
-
-    std::memcpy(decoded.rgba8.data(), stbiData, byteCount);
-
-    stbi_image_free(stbiData);
-
-    return decoded;
+    return decodeImageData(width, height, stbiData);
 }
 
 struct BytesView {
-    const std::byte *data = nullptr;
+    std::byte const* data = nullptr;
     std::size_t      size = 0u;
 };
 
 auto getBufferBytes(
-    const fastgltf::Asset &gltfAsset,
+    fastgltf::Asset const& gltfAsset,
     std::size_t            bufferIndex) -> BytesView
 {
-    const fastgltf::Buffer &buffer = gltfAsset.buffers[bufferIndex];
+    auto const& buffer = gltfAsset.buffers[bufferIndex];
 
-    const auto visitor = overloads{
-        [&](const fastgltf::sources::Vector &vector) -> BytesView {
+    auto const visitor = overloads{
+        [&](fastgltf::sources::Vector const& vector) -> BytesView {
             return {
                 vector.bytes.data(),
                 vector.bytes.size(),
             };
         },
-        [&](const fastgltf::sources::ByteView &byteView) -> BytesView {
+        [&](fastgltf::sources::ByteView const& byteView) -> BytesView {
             return {
                 byteView.bytes.data(),
                 byteView.bytes.size(),
             };
         },
-        [&](const fastgltf::sources::Array &array) -> BytesView {
+        [&](fastgltf::sources::Array const& array) -> BytesView {
             return {
                 array.bytes.data(),
                 array.bytes.size(),
             };
         },
-        [&](const auto &) -> BytesView {
+        [&](auto const&) -> BytesView {
             throw std::runtime_error("buffer bytes unsupported");
         },
     };
@@ -349,12 +317,12 @@ auto getBufferBytes(
 }
 
 auto decodeImage(
-    const fastgltf::Asset       &gltfAsset,
-    const fastgltf::Image       &image,
-    const std::filesystem::path &directory) -> DecodedImage
+    fastgltf::Asset const&       gltfAsset,
+    fastgltf::Image const&       image,
+    std::filesystem::path const& directory) -> DecodedImage
 {
-    const auto visitor = overloads{
-        [&](const fastgltf::sources::URI &uri) -> DecodedImage {
+    auto const visitor = overloads{
+        [&](fastgltf::sources::URI const& uri) -> DecodedImage {
             if (!uri.uri.isLocalPath()) {
                 throw std::runtime_error("image URI unsupported");
             }
@@ -363,43 +331,36 @@ auto decodeImage(
                 throw std::runtime_error("image URI offset");
             }
 
-            const auto path = directory / uri.uri.fspath();
+            auto const path = directory / uri.uri.fspath();
             return decodeImageFromFile(path);
         },
-        [&](const fastgltf::sources::Vector &vector) -> DecodedImage {
-            const auto *data =
-                reinterpret_cast<const unsigned char *>(vector.bytes.data());
-
-            const int size = static_cast<int>(vector.bytes.size());
-
-            return decodeImageFromMemory(data, size);
-        },
-        [&](const fastgltf::sources::ByteView &byteView) -> DecodedImage {
-            const auto *data =
-                reinterpret_cast<const unsigned char *>(byteView.bytes.data());
-
-            const int size = static_cast<int>(byteView.bytes.size());
+        [&](fastgltf::sources::Vector const& vector) -> DecodedImage {
+            auto const* data =
+                reinterpret_cast<unsigned char const*>(vector.bytes.data());
+            auto const size = static_cast<int>(vector.bytes.size());
 
             return decodeImageFromMemory(data, size);
         },
-        [&](const fastgltf::sources::BufferView &view) -> DecodedImage {
-            const fastgltf::BufferView &bufferView =
-                gltfAsset.bufferViews[view.bufferViewIndex];
-
-            const BytesView bufferBytes =
-                getBufferBytes(gltfAsset, bufferView.bufferIndex);
-
-            const std::size_t offset = bufferView.byteOffset;
-            const std::size_t length = bufferView.byteLength;
-
-            const auto *data =
-                reinterpret_cast<const unsigned char *>(bufferBytes.data + offset);
-
-            const int size = static_cast<int>(length);
+        [&](fastgltf::sources::ByteView const& byteView) -> DecodedImage {
+            auto const* data =
+                reinterpret_cast<unsigned char const*>(byteView.bytes.data());
+            auto const size = static_cast<int>(byteView.bytes.size());
 
             return decodeImageFromMemory(data, size);
         },
-        [&](const auto &) -> DecodedImage {
+        [&](fastgltf::sources::BufferView const& view) -> DecodedImage {
+            auto const& bufferView  = gltfAsset.bufferViews[view.bufferViewIndex];
+            auto const  bufferBytes = getBufferBytes(gltfAsset, bufferView.bufferIndex);
+            auto const  offset      = bufferView.byteOffset;
+            auto const  length      = bufferView.byteLength;
+
+            auto const* data =
+                reinterpret_cast<unsigned char const*>(bufferBytes.data + offset);
+            auto const size = static_cast<int>(length);
+
+            return decodeImageFromMemory(data, size);
+        },
+        [&](auto const&) -> DecodedImage {
             throw std::runtime_error("image source unsupported");
         },
     };
@@ -407,56 +368,64 @@ auto decodeImage(
     return image.data.visit(visitor);
 }
 
-auto makeDefaultTextures(RenderAsset &asset) -> void
+auto makeDefaultTextures(RenderAsset& asset) -> void
 {
-    const auto defaultSamplerInfo = makeDefaultSamplerInfo();
+    auto const defaultSamplerInfo = makeDefaultSamplerInfo();
 
     {
-        Texture texture{};
-        texture.extent      = vk::Extent2D{1u, 1u};
-        texture.rgba8       = makePixel(255u, 255u, 255u, 255u);
+        auto texture   = Texture{};
+        texture.extent = vk::Extent2D{1u, 1u};
+        texture.rgba8  = std::vector{
+            std::byte{255u},
+            std::byte{255u},
+            std::byte{255u},
+            std::byte{255u}};
         texture.samplerInfo = defaultSamplerInfo;
         asset.textures.push_back(std::move(texture));
     }
 
     {
-        Texture texture{};
-        texture.extent      = vk::Extent2D{1u, 1u};
-        texture.rgba8       = makePixel(255u, 255u, 255u, 255u);
+        auto texture   = Texture{};
+        texture.extent = vk::Extent2D{1u, 1u};
+        texture.rgba8  = std::vector{
+            std::byte{255u},
+            std::byte{255u},
+            std::byte{255u},
+            std::byte{255u}};
         texture.samplerInfo = defaultSamplerInfo;
         asset.textures.push_back(std::move(texture));
     }
 
     {
-        Texture texture{};
-        texture.extent      = vk::Extent2D{1u, 1u};
-        texture.rgba8       = makePixel(128u, 128u, 255u, 255u);
+        auto texture   = Texture{};
+        texture.extent = vk::Extent2D{1u, 1u};
+        texture.rgba8  = std::vector{
+            std::byte{128u},
+            std::byte{128u},
+            std::byte{255u},
+            std::byte{255u}};
         texture.samplerInfo = defaultSamplerInfo;
         asset.textures.push_back(std::move(texture));
     }
 }
 
 auto makeTextureRef(
-    const fastgltf::TextureInfo      &textureInfo,
-    const std::vector<std::uint32_t> &texRemap) -> TextureRef
+    fastgltf::TextureInfo const&      textureInfo,
+    std::vector<std::uint32_t> const& texRemap) -> TextureRef
 {
-    TextureRef textureRef{};
-
+    auto textureRef         = TextureRef{};
     textureRef.textureIndex = texRemap[textureInfo.textureIndex];
-
-    textureRef.texCoord = static_cast<std::uint32_t>(textureInfo.texCoordIndex);
-
-    // TODO: KHR_texture_transform (deferred).
+    textureRef.texCoord     = static_cast<std::uint32_t>(textureInfo.texCoordIndex);
     textureRef.uvTransform.enabled = vk::False;
 
     return textureRef;
 }
 
 auto loadTextures(
-    RenderAsset                 &asset,
-    const fastgltf::Asset       &gltfAsset,
-    const std::filesystem::path &directory,
-    std::vector<std::uint32_t>  &texRemap) -> void
+    RenderAsset&                 asset,
+    fastgltf::Asset const&       gltfAsset,
+    std::filesystem::path const& directory,
+    std::vector<std::uint32_t>&  texRemap) -> void
 {
     texRemap.clear();
     texRemap.resize(gltfAsset.textures.size(), 0u);
@@ -464,23 +433,20 @@ auto loadTextures(
     for (std::size_t textureIndex = 0u; textureIndex < gltfAsset.textures.size();
          ++textureIndex) {
 
-        const fastgltf::Texture &gltfTexture = gltfAsset.textures[textureIndex];
+        auto const& gltfTexture = gltfAsset.textures[textureIndex];
 
         if (!gltfTexture.imageIndex.has_value()) {
             throw std::runtime_error("texture missing image");
         }
 
-        const fastgltf::Image &image = gltfAsset.images[*gltfTexture.imageIndex];
+        auto const& image = gltfAsset.images[*gltfTexture.imageIndex];
 
-        DecodedImage decoded = decodeImage(gltfAsset, image, directory);
+        auto decoded = decodeImage(gltfAsset, image, directory);
 
-        Texture texture{};
-        texture.extent = decoded.extent;
-        texture.rgba8  = std::move(decoded.rgba8);
-
+        auto texture        = Texture{};
+        texture.rgba8       = std::move(decoded.rgba8);
+        texture.extent      = decoded.extent;
         texture.samplerInfo = makeSamplerInfo(gltfTexture.samplerIndex, gltfAsset);
-
-        texture.samplerInfo.pNext = nullptr;
 
         texRemap[textureIndex] = static_cast<std::uint32_t>(asset.textures.size());
 
@@ -489,17 +455,13 @@ auto loadTextures(
 }
 
 auto loadMaterials(
-    RenderAsset                      &asset,
-    const fastgltf::Asset            &gltfAsset,
-    const std::vector<std::uint32_t> &texRemap,
-    std::vector<std::uint32_t>       &matRemap) -> void
+    RenderAsset&                      asset,
+    fastgltf::Asset const&            gltfAsset,
+    std::vector<std::uint32_t> const& texRemap,
+    std::vector<std::uint32_t>&       matRemap) -> void
 {
     asset.materials.clear();
-
-    {
-        Material defaultMaterial{};
-        asset.materials.push_back(defaultMaterial);
-    }
+    asset.materials.emplace_back(); // default material
 
     matRemap.clear();
     matRemap.resize(gltfAsset.materials.size(), 0u);
@@ -507,14 +469,11 @@ auto loadMaterials(
     for (std::size_t materialIndex = 0u; materialIndex < gltfAsset.materials.size();
          ++materialIndex) {
 
-        const fastgltf::Material &gltfMaterial = gltfAsset.materials[materialIndex];
+        auto const& gltfMaterial = gltfAsset.materials[materialIndex];
 
-        Material material{};
-
+        auto material                 = Material{};
         material.core.baseColorFactor = toGlm(gltfMaterial.pbrData.baseColorFactor);
-
-        material.core.metallicFactor = gltfMaterial.pbrData.metallicFactor;
-
+        material.core.metallicFactor  = gltfMaterial.pbrData.metallicFactor;
         material.core.roughnessFactor = gltfMaterial.pbrData.roughnessFactor;
 
         if (gltfMaterial.pbrData.baseColorTexture.has_value()) {
@@ -529,7 +488,7 @@ auto loadMaterials(
         }
 
         if (gltfMaterial.normalTexture.has_value()) {
-            const auto &info            = *gltfMaterial.normalTexture;
+            auto const& info            = *gltfMaterial.normalTexture;
             material.core.normalTexture = makeTextureRef(
                 fastgltf::TextureInfo{info.textureIndex, info.texCoordIndex},
                 texRemap);
@@ -537,7 +496,7 @@ auto loadMaterials(
         }
 
         if (gltfMaterial.occlusionTexture.has_value()) {
-            const auto &info               = *gltfMaterial.occlusionTexture;
+            auto const& info               = *gltfMaterial.occlusionTexture;
             material.core.occlusionTexture = makeTextureRef(
                 fastgltf::TextureInfo{info.textureIndex, info.texCoordIndex},
                 texRemap);
@@ -570,7 +529,6 @@ auto loadMaterials(
         material.core.cullMode = gltfMaterial.doubleSided ? vk::CullModeFlagBits::eNone
                                                           : vk::CullModeFlagBits::eBack;
 
-        // TODO: Extension extraction (deferred).
         material.unlit.enabled = gltfMaterial.unlit ? vk::True : vk::False;
 
         matRemap[materialIndex] = static_cast<std::uint32_t>(asset.materials.size());
@@ -580,27 +538,26 @@ auto loadMaterials(
 }
 
 auto loadMeshes(
-    RenderAsset                      &asset,
-    const fastgltf::Asset            &gltfAsset,
-    const std::vector<std::uint32_t> &matRemap) -> void
+    RenderAsset&                      asset,
+    fastgltf::Asset const&            gltfAsset,
+    std::vector<std::uint32_t> const& matRemap) -> void
 {
     asset.meshes.clear();
     asset.meshes.resize(gltfAsset.meshes.size());
 
     for (std::size_t meshIndex = 0u; meshIndex < gltfAsset.meshes.size(); ++meshIndex) {
-        const fastgltf::Mesh &gltfMesh = gltfAsset.meshes[meshIndex];
-        Mesh                 &mesh     = asset.meshes[meshIndex];
+        auto const& gltfMesh = gltfAsset.meshes[meshIndex];
+        auto&       mesh     = asset.meshes[meshIndex];
 
         mesh.submeshes.clear();
         mesh.submeshes.reserve(gltfMesh.primitives.size());
 
-        for (const fastgltf::Primitive &gltfPrimitive : gltfMesh.primitives) {
+        for (fastgltf::Primitive const& gltfPrimitive : gltfMesh.primitives) {
             if (gltfPrimitive.type != fastgltf::PrimitiveType::Triangles) {
                 throw std::runtime_error("primitive type not TRIANGLES");
             }
 
-            Submesh submesh{};
-            submesh.topology = vk::PrimitiveTopology::eTriangleList;
+            auto submesh = Submesh{};
 
             if (gltfPrimitive.materialIndex.has_value()) {
                 submesh.materialIndex = matRemap[*gltfPrimitive.materialIndex];
@@ -608,7 +565,7 @@ auto loadMeshes(
                 submesh.materialIndex = 0u;
             }
 
-            const auto &positionAccessor =
+            auto const& positionAccessor =
                 gltfAsset
                     .accessors[gltfPrimitive.findAttribute("POSITION")->accessorIndex];
             submesh.vertices.resize(positionAccessor.count);
@@ -616,33 +573,33 @@ auto loadMeshes(
             fastgltf::iterateAccessorWithIndex<glm::vec3>(
                 gltfAsset,
                 positionAccessor,
-                [&](const glm::vec3 position, std::size_t idx) {
+                [&](glm::vec3 const position, std::size_t idx) -> void {
                     submesh.vertices[idx].position = position;
                 });
 
             // indices assumed present (GenerateMeshIndices)
-            const auto &indexAccessor =
+            auto const& indexAccessor =
                 gltfAsset.accessors[gltfPrimitive.indicesAccessor.value()];
             submesh.indices.resize(indexAccessor.count);
 
             fastgltf::iterateAccessorWithIndex<std::uint32_t>(
                 gltfAsset,
                 indexAccessor,
-                [&](std::uint32_t index, std::size_t idx) {
+                [&](std::uint32_t index, std::size_t idx) -> void {
                     submesh.indices[idx] = index;
                 });
 
-            bool hasNormals  = false;
-            bool hasTangents = false;
-            for (auto &attribute : gltfPrimitive.attributes) {
-                auto &accessor = gltfAsset.accessors[attribute.accessorIndex];
+            auto hasNormals  = false;
+            auto hasTangents = false;
+            for (auto& attribute : gltfPrimitive.attributes) {
+                auto& accessor = gltfAsset.accessors[attribute.accessorIndex];
 
                 if (attribute.name == "NORMAL") {
                     hasNormals = true;
                     fastgltf::iterateAccessorWithIndex<glm::vec3>(
                         gltfAsset,
                         accessor,
-                        [&](glm::vec3 normal, std::size_t idx) {
+                        [&](glm::vec3 normal, std::size_t idx) -> void {
                             submesh.vertices[idx].normal = normal;
                         });
                 }
@@ -652,7 +609,7 @@ auto loadMeshes(
                     fastgltf::iterateAccessorWithIndex<glm::vec4>(
                         gltfAsset,
                         accessor,
-                        [&](glm::vec4 tangent, std::size_t idx) {
+                        [&](glm::vec4 tangent, std::size_t idx) -> void {
                             submesh.vertices[idx].tangent = tangent;
                         });
                 }
@@ -661,7 +618,7 @@ auto loadMeshes(
                     fastgltf::iterateAccessorWithIndex<glm::vec2>(
                         gltfAsset,
                         accessor,
-                        [&](glm::vec2 uv, std::size_t idx) {
+                        [&](glm::vec2 uv, std::size_t idx) -> void {
                             submesh.vertices[idx].uv0 = uv;
                         });
                 }
@@ -670,7 +627,7 @@ auto loadMeshes(
                     fastgltf::iterateAccessorWithIndex<glm::vec2>(
                         gltfAsset,
                         accessor,
-                        [&](glm::vec2 uv, std::size_t idx) {
+                        [&](glm::vec2 uv, std::size_t idx) -> void {
                             submesh.vertices[idx].uv1 = uv;
                         });
                 }
@@ -680,14 +637,14 @@ auto loadMeshes(
                         fastgltf::iterateAccessorWithIndex<glm::vec3>(
                             gltfAsset,
                             accessor,
-                            [&](glm::vec3 color, std::size_t idx) {
+                            [&](glm::vec3 color, std::size_t idx) -> void {
                                 submesh.vertices[idx].color = glm::vec4(color, 1.0f);
                             });
                     } else if (accessor.type == fastgltf::AccessorType::Vec4) {
                         fastgltf::iterateAccessorWithIndex<glm::vec4>(
                             gltfAsset,
                             accessor,
-                            [&](glm::vec4 color, std::size_t idx) {
+                            [&](glm::vec4 color, std::size_t idx) -> void {
                                 submesh.vertices[idx].color = color;
                             });
                     }
@@ -701,14 +658,14 @@ auto loadMeshes(
 }
 
 auto loadCameras(
-    RenderAsset           &asset,
-    const fastgltf::Asset &gltfAsset) -> void
+    RenderAsset&           asset,
+    fastgltf::Asset const& gltfAsset) -> void
 {
     asset.cameras.clear();
     asset.cameras.resize(gltfAsset.cameras.size());
 
-    const auto cameraVisitor = overloads{
-        [&](const fastgltf::Camera::Perspective &p) -> CameraModel {
+    auto const cameraVisitor = overloads{
+        [&](fastgltf::Camera::Perspective const& p) -> CameraModel {
             PerspectiveCamera perspectiveCamera{};
             perspectiveCamera.yfov        = p.yfov;
             perspectiveCamera.aspectRatio = p.aspectRatio;
@@ -717,7 +674,7 @@ auto loadCameras(
 
             return perspectiveCamera;
         },
-        [&](const fastgltf::Camera::Orthographic &o) -> CameraModel {
+        [&](fastgltf::Camera::Orthographic const& o) -> CameraModel {
             OrthographicCamera orthographicCamera{};
             orthographicCamera.xmag  = o.xmag;
             orthographicCamera.ymag  = o.ymag;
@@ -730,7 +687,7 @@ auto loadCameras(
     for (std::size_t cameraIndex = 0u; cameraIndex < gltfAsset.cameras.size();
          ++cameraIndex) {
 
-        const fastgltf::Camera &gltfCamera = gltfAsset.cameras[cameraIndex];
+        auto const& gltfCamera = gltfAsset.cameras[cameraIndex];
 
         asset.cameras[cameraIndex] =
             Camera{.model = gltfCamera.camera.visit(cameraVisitor)};
@@ -741,31 +698,31 @@ auto loadCameras(
 }
 
 auto loadNodes(
-    RenderAsset           &asset,
-    const fastgltf::Asset &gltfAsset) -> void
+    RenderAsset&           asset,
+    fastgltf::Asset const& gltfAsset) -> void
 {
     asset.nodes.clear();
     asset.nodes.resize(gltfAsset.nodes.size());
 
     for (std::size_t nodeIndex = 0u; nodeIndex < gltfAsset.nodes.size(); ++nodeIndex) {
 
-        const fastgltf::Node &gltfNode = gltfAsset.nodes[nodeIndex];
+        auto const& gltfNode = gltfAsset.nodes[nodeIndex];
 
-        SceneNode node{};
+        auto node = SceneNode{};
 
         node.childNodeIndices.reserve(gltfNode.children.size());
 
-        for (const std::size_t childIndex : gltfNode.children) {
+        for (std::size_t const childIndex : gltfNode.children) {
             node.childNodeIndices.push_back(static_cast<std::uint32_t>(childIndex));
         }
 
-        const auto visitor = overloads{
-            [&](const fastgltf::TRS &trs) {
+        auto const visitor = overloads{
+            [&](fastgltf::TRS const& trs) -> void {
                 node.translation = toGlm(trs.translation);
                 node.rotation    = toGlm(trs.rotation);
                 node.scale       = toGlm(trs.scale);
             },
-            [&](const fastgltf::math::fmat4x4 &) {
+            [&](fastgltf::math::fmat4x4 const&) -> void {
                 throw std::runtime_error("node transform not TRS");
             },
         };
@@ -785,8 +742,8 @@ auto loadNodes(
 }
 
 auto loadScenes(
-    RenderAsset           &asset,
-    const fastgltf::Asset &gltfAsset) -> void
+    RenderAsset&           asset,
+    fastgltf::Asset const& gltfAsset) -> void
 {
     asset.scenes.clear();
     asset.scenes.resize(gltfAsset.scenes.size());
@@ -794,12 +751,12 @@ auto loadScenes(
     for (std::size_t sceneIndex = 0u; sceneIndex < gltfAsset.scenes.size();
          ++sceneIndex) {
 
-        const auto &gltfScene = gltfAsset.scenes[sceneIndex];
+        auto const& gltfScene = gltfAsset.scenes[sceneIndex];
 
-        SceneRoots sceneRoots{};
+        auto sceneRoots = SceneRoots{};
         sceneRoots.rootNodeIndices.reserve(gltfScene.nodeIndices.size());
 
-        for (const std::size_t nodeIndex : gltfScene.nodeIndices) {
+        for (std::size_t const nodeIndex : gltfScene.nodeIndices) {
             sceneRoots.rootNodeIndices.push_back(static_cast<std::uint32_t>(nodeIndex));
         }
 
@@ -814,17 +771,17 @@ auto loadScenes(
 }
 
 auto extractAsset(
-    const fastgltf::Asset       &gltfAsset,
-    const std::filesystem::path &directory) -> RenderAsset
+    fastgltf::Asset const&       gltfAsset,
+    std::filesystem::path const& directory) -> RenderAsset
 {
-    RenderAsset asset{};
+    auto asset = RenderAsset{};
 
     makeDefaultTextures(asset);
 
-    std::vector<std::uint32_t> texRemap{};
+    auto texRemap = std::vector<std::uint32_t>{};
     loadTextures(asset, gltfAsset, directory, texRemap);
 
-    std::vector<std::uint32_t> matRemap{};
+    auto matRemap = std::vector<std::uint32_t>{};
     loadMaterials(asset, gltfAsset, texRemap, matRemap);
 
     loadMeshes(asset, gltfAsset, matRemap);
@@ -835,21 +792,20 @@ auto extractAsset(
     return asset;
 }
 
-auto postProcessAsset(RenderAsset &) -> void
+auto postProcessAsset(RenderAsset&) -> void
 {
     // TODO:
     // - Generate flat normals when missing.
     // - Generate tangents (MikkTSpace) when needed.
-    // - Validate missing-normal magnitude heuristic.
 }
 
 } // namespace
 
-auto getAsset(const std::filesystem::path &gltfPath) -> RenderAsset
+auto getAsset(std::filesystem::path const& gltfPath) -> RenderAsset
 {
-    const fastgltf::Asset gltfAsset = parseGltfAsset(gltfPath);
+    auto const gltfAsset = parseGltfAsset(gltfPath);
 
-    RenderAsset asset = extractAsset(gltfAsset, gltfPath.parent_path());
+    auto asset = extractAsset(gltfAsset, gltfPath.parent_path());
 
     postProcessAsset(asset);
 

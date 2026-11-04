@@ -6,8 +6,8 @@ struct Instance {
 
     Instance();
 
-    static auto createInstance(const vk::raii::Context &context) -> vk::raii::Instance;
-    static auto createDebugUtilsMessenger(const vk::raii::Instance &instance)
+    static auto createInstance(vk::raii::Context const& context) -> vk::raii::Instance;
+    static auto createDebugUtilsMessenger(vk::raii::Instance const& instance)
         -> vk::raii::DebugUtilsMessengerEXT;
 
     vk::raii::Context                context;

@@ -23,8 +23,8 @@ struct RenderContext {
     RenderTargets renderTargets;
 
     RenderContext(
-        Window                          &window,
-        const std::vector<const char *> &requiredExtensions);
+        Window&                         window,
+        std::vector<char const*> const& requiredExtensions);
 
     void recreateRenderTargets();
 

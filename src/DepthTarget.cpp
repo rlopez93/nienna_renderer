@@ -26,9 +26,9 @@ auto depthAspectMask(vk::Format fmt) -> vk::ImageAspectFlags
 } // namespace
 
 DepthTarget::DepthTarget(
-    Device      &device,
-    Allocator   &allocator,
-    Command     &command,
+    Device&      device,
+    Allocator&   allocator,
+    Command&     command,
     vk::Extent2D extent,
     vk::Format   depthFormat)
 {
@@ -36,9 +36,9 @@ DepthTarget::DepthTarget(
 }
 
 void DepthTarget::recreate(
-    Device      &device,
-    Allocator   &allocator,
-    Command     &command,
+    Device&      device,
+    Allocator&   allocator,
+    Command&     command,
     vk::Extent2D extent,
     vk::Format   depthFormat)
 {
@@ -58,9 +58,9 @@ void DepthTarget::recreate(
             vk::ImageTiling::eOptimal,
             vk::ImageUsageFlagBits::eDepthStencilAttachment});
 
-    const auto aspect = depthAspectMask(format);
+    auto const aspect = depthAspectMask(format);
 
-    const auto range = vk::ImageSubresourceRange{aspect, 0, 1, 0, 1};
+    auto const range = vk::ImageSubresourceRange{aspect, 0, 1, 0, 1};
 
     view = device.handle.createImageView(
         vk::ImageViewCreateInfo{

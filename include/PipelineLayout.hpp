@@ -2,6 +2,6 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
-vk::raii::PipelineLayout createPipelineLayout(
-    vk::raii::Device                        &device,
-    std::span<const vk::DescriptorSetLayout> setLayouts);
+auto createPipelineLayout(
+    vk::raii::Device&                        device,
+    std::span<vk::DescriptorSetLayout const> setLayouts) -> vk::raii::PipelineLayout;

@@ -6,8 +6,8 @@
 
 #include "Scene.hpp"
 
-auto getGltfAsset(const std::filesystem::path &gltfPath) -> fastgltf::Asset;
+auto getGltfAsset(std::filesystem::path const& gltfPath) -> fastgltf::Asset;
 
 auto getSceneData(
-    const fastgltf::Asset       &asset,
-    const std::filesystem::path &directory) -> Scene;
+    fastgltf::Asset const&       asset,
+    std::filesystem::path const& directory) -> Scene;

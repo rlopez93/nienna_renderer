@@ -5,7 +5,7 @@ namespace
 {
 
 auto submitImageBarrier(
-    vk::raii::CommandBuffer &cmd,
+    vk::raii::CommandBuffer& cmd,
     vk::ImageMemoryBarrier2  barrier) -> void
 {
     cmd.pipelineBarrier2(vk::DependencyInfo{}.setImageMemoryBarriers(barrier));
@@ -14,7 +14,7 @@ auto submitImageBarrier(
 } // namespace
 
 void cmdBarrierUndefinedToTransferDst(
-    vk::raii::CommandBuffer  &cmd,
+    vk::raii::CommandBuffer&  cmd,
     vk::Image                 image,
     vk::ImageSubresourceRange range)
 {
@@ -34,7 +34,7 @@ void cmdBarrierUndefinedToTransferDst(
 }
 
 void cmdBarrierTransferDstToShaderReadOnly(
-    vk::raii::CommandBuffer  &cmd,
+    vk::raii::CommandBuffer&  cmd,
     vk::Image                 image,
     vk::ImageSubresourceRange range)
 {
@@ -55,7 +55,7 @@ void cmdBarrierTransferDstToShaderReadOnly(
 }
 
 void cmdBarrierUndefinedToDepthAttachment(
-    vk::raii::CommandBuffer  &cmd,
+    vk::raii::CommandBuffer&  cmd,
     vk::Image                 image,
     vk::ImageSubresourceRange range)
 {
@@ -77,7 +77,7 @@ void cmdBarrierUndefinedToDepthAttachment(
 }
 
 void cmdBarrierSwapchainToColorAttachment(
-    vk::raii::CommandBuffer  &cmd,
+    vk::raii::CommandBuffer&  cmd,
     vk::Image                 image,
     vk::ImageLayout           oldLayout,
     vk::ImageSubresourceRange range)
@@ -99,7 +99,7 @@ void cmdBarrierSwapchainToColorAttachment(
 }
 
 void cmdBarrierColorAttachmentToPresent(
-    vk::raii::CommandBuffer  &cmd,
+    vk::raii::CommandBuffer&  cmd,
     vk::Image                 image,
     vk::ImageSubresourceRange range)
 {

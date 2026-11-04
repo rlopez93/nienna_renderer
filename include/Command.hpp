@@ -6,11 +6,11 @@
 
 struct Command {
     Command(
-        Device                    &device,
+        Device&                    device,
         vk::CommandPoolCreateFlags poolFlags);
 
     auto beginSingleTime() -> void;
-    auto endSingleTime(Device &device) -> void;
+    auto endSingleTime(Device& device) -> void;
 
     vk::raii::CommandPool   pool;
     vk::raii::CommandBuffer buffer;

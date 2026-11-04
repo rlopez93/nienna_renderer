@@ -54,17 +54,17 @@ auto RenderTargetAllocator::handle() const -> VmaAllocator
 
 auto RenderTargetAllocator::ensurePool(
     PoolKind                   kind,
-    const vk::ImageCreateInfo &info) -> VmaPool
+    vk::ImageCreateInfo const& info) -> VmaPool
 {
     assert(vmaAllocator != nullptr);
 
-    auto &pool = (kind == PoolKind::kColor) ? colorPool : depthPool;
+    auto& pool = (kind == PoolKind::kColor) ? colorPool : depthPool;
 
     if (pool) {
         return pool.get();
     }
 
-    const VkImageCreateInfo vkInfo = *info;
+    VkImageCreateInfo const vkInfo = *info;
 
     VmaAllocationCreateInfo allocInfo{};
     allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -88,7 +88,7 @@ auto RenderTargetAllocator::ensurePool(
 }
 
 auto RenderTargetAllocator::createImage(
-    const vk::ImageCreateInfo &info,
+    vk::ImageCreateInfo const& info,
     PoolKind                   kind) -> UniqueImage
 {
     assert(vmaAllocator != nullptr);
@@ -101,7 +101,7 @@ auto RenderTargetAllocator::createImage(
     VmaAllocation     vmaAlloc{};
     VmaAllocationInfo vmaAllocInfo{};
 
-    const VkImageCreateInfo vkInfo = *info;
+    VkImageCreateInfo const vkInfo = *info;
 
     VK_CHECK(vmaCreateImage(
         vmaAllocator,
@@ -115,14 +115,14 @@ auto RenderTargetAllocator::createImage(
 }
 
 auto ColorTarget::recreate(
-    Device                &device,
-    RenderTargetAllocator &alloc,
+    Device&                device,
+    RenderTargetAllocator& alloc,
     vk::Extent2D           extent,
     vk::Format             swapchainFormat) -> void
 {
     format = ldrFormatFromSwapchain(swapchainFormat);
 
-    const vk::ImageCreateInfo info{
+    vk::ImageCreateInfo const info{
         {},
         vk::ImageType::e2D,
         format,
@@ -159,14 +159,14 @@ auto ColorTarget::range() const -> vk::ImageSubresourceRange
 }
 
 auto DepthTarget::recreate(
-    Device                &device,
-    RenderTargetAllocator &alloc,
+    Device&                device,
+    RenderTargetAllocator& alloc,
     vk::Extent2D           extent,
     vk::Format             depthFormat) -> void
 {
     format = depthFormat;
 
-    const vk::ImageCreateInfo info{
+    vk::ImageCreateInfo const info{
         {},
         vk::ImageType::e2D,
         format,
@@ -193,7 +193,7 @@ auto DepthTarget::recreate(
 
 auto DepthTarget::range() const -> vk::ImageSubresourceRange
 {
-    const auto aspect = depthAspectMask(format);
+    auto const aspect = depthAspectMask(format);
 
     return vk::ImageSubresourceRange{
         aspect,
@@ -205,7 +205,7 @@ auto DepthTarget::range() const -> vk::ImageSubresourceRange
 }
 
 RenderTargets::RenderTargets(
-    Device      &device,
+    Device&      device,
     VmaAllocator vma,
     vk::Extent2D extent_,
     vk::Format   swapchainFormat,
@@ -216,7 +216,7 @@ RenderTargets::RenderTargets(
 }
 
 auto RenderTargets::recreate(
-    Device      &device,
+    Device&      device,
     vk::Extent2D extent_,
     vk::Format   swapchainFormat,
     vk::Format   depthFormat) -> void

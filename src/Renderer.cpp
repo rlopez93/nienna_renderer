@@ -6,8 +6,8 @@
 #include "ShaderInterfaceTypes.hpp"
 
 auto Renderer::createDescriptorPool(
-    Device                           &device,
-    const ShaderInterfaceDescription &shaderInterfaceDescription,
+    Device&                           device,
+    ShaderInterfaceDescription const& shaderInterfaceDescription,
     uint32_t                          maxFramesInFlight) -> vk::raii::DescriptorPool
 {
     std::vector<vk::DescriptorPoolSize> poolSizes;
@@ -15,7 +15,7 @@ auto Renderer::createDescriptorPool(
 
     uint32_t maxSets = maxFramesInFlight;
 
-    for (const auto &binding : shaderInterfaceDescription.bindings) {
+    for (auto const& binding : shaderInterfaceDescription.bindings) {
 
         poolSizes.emplace_back(binding.type, binding.count * maxFramesInFlight);
     }
@@ -41,21 +41,21 @@ auto Renderer::allocateFrameDescriptorSets() -> void
     vk::DescriptorSetAllocateInfo allocInfo{*descriptorPool, layouts};
     auto sets = context.device.handle.allocateDescriptorSets(allocInfo);
 
-    for (auto &set : sets) {
+    for (auto& set : sets) {
         frames.descriptorSets.emplace_back(std::move(set));
     }
 }
 
 auto Renderer::initializePerFrameUniformBuffers(
-    Allocator &allocator,
+    Allocator& allocator,
     uint32_t   nodeInstancesCount) -> void
 {
     frames.initializePerFrameUniformBuffers(allocator, nodeInstancesCount);
 }
 
 Renderer::Renderer(
-    RenderContext        &context_,
-    const RendererConfig &config)
+    RenderContext&        context_,
+    RendererConfig const& config)
     : context{context_},
       shaderInterface{
           context.device,
@@ -66,7 +66,7 @@ Renderer::Renderer(
           config.maxFramesInFlight)},
       pipelineLayout{createPipelineLayout(
           context.device.handle,
-          {*shaderInterface.handle})},
+          {{*shaderInterface.handle}})},
       graphicsPipeline{createPipeline(
           context.device,
           config.shaderPath,
@@ -83,8 +83,8 @@ Renderer::Renderer(
 auto Renderer::beginFrame() -> bool
 {
     if (context.swapchain.needRecreate) {
-        const auto oldSwapImgs = context.swapchain.images;
-        const auto oldRtImgs   = context.renderTargets.images();
+        auto const oldSwapImgs = context.swapchain.images;
+        auto const oldRtImgs   = context.renderTargets.images();
 
         context.recreateRenderTargets();
 
@@ -92,8 +92,8 @@ auto Renderer::beginFrame() -> bool
         imageLayoutState.forgetImages(oldRtImgs);
     }
 
-    const auto &timelineSemaphore = frames.timelineSemaphore();
-    const auto &timelineValue     = frames.timelineValue();
+    auto const& timelineSemaphore = frames.timelineSemaphore();
+    auto const& timelineValue     = frames.timelineValue();
     [[maybe_unused]]
     auto waitResult = context.device.handle.waitSemaphores(
         vk::SemaphoreWaitInfo{{}, timelineSemaphore, timelineValue},
@@ -119,7 +119,7 @@ auto Renderer::beginFrame() -> bool
     return true;
 }
 
-auto Renderer::render(const RenderableResources &renderableResources) -> void
+auto Renderer::render(RenderableResources const& renderableResources) -> void
 {
     auto renderingColorAttachmentInfo = vk::RenderingAttachmentInfo{
         context.swapchain.nextImageView(),
@@ -134,7 +134,7 @@ auto Renderer::render(const RenderableResources &renderableResources) -> void
         },
     };
 
-    auto &depth = context.renderTargets.mainDepth;
+    auto& depth = context.renderTargets.mainDepth;
 
     auto renderingDepthAttachmentInfo = vk::RenderingAttachmentInfo{
         depth.view,
@@ -203,7 +203,7 @@ auto Renderer::render(const RenderableResources &renderableResources) -> void
         frames.currentDescriptorSet(),
         {});
 
-    for (const auto &draw : renderableResources.draws) {
+    for (auto const& draw : renderableResources.draws) {
 
         frames.cmd().bindVertexBuffers(
             0,
@@ -301,17 +301,17 @@ auto Renderer::endFrame() -> void
     frames.advance();
 }
 
-vk::DescriptorSet Renderer::currentDescriptorSet() const
+auto Renderer::currentDescriptorSet() const -> vk::DescriptorSet
 {
     return frames.currentDescriptorSet();
 }
 
-Buffer &Renderer::currentFrameUBO()
+auto Renderer::currentFrameUBO() -> Buffer&
 {
     return frames.frameUBO[frames.current()];
 }
 
-Buffer &Renderer::currentNodeInstancesSSBO()
+auto Renderer::currentNodeInstancesSSBO() -> Buffer&
 {
     return frames.nodeInstancesSSBO[frames.current()];
 }

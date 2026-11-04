@@ -17,11 +17,11 @@
 #include <limits>
 
 // TODO: add SDL event polling
-void processEvents(bool &running)
+void processEvents(bool& running)
 {
 }
 
-auto chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats)
+auto chooseSurfaceFormat(std::vector<vk::SurfaceFormatKHR> const& availableFormats)
     -> vk::SurfaceFormatKHR
 {
     constexpr auto preferredSurfaceFormats = std::array{
@@ -44,11 +44,11 @@ auto chooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableForma
 }
 
 auto updatePerFrameUniformBuffers(
-    const Allocator                     &allocator,
-    Buffer                              &frameUBO,
-    Buffer                              &nodeInstancesSSBO,
-    const FrameUniforms                 &frame,
-    const std::vector<NodeInstanceData> &nodeInstances) -> void
+    Allocator const&                     allocator,
+    Buffer&                              frameUBO,
+    Buffer&                              nodeInstancesSSBO,
+    FrameUniforms const&                 frame,
+    std::vector<NodeInstanceData> const& nodeInstances) -> void
 {
     VK_CHECK(vmaCopyMemoryToAllocation(
         allocator.handle(),
@@ -61,7 +61,7 @@ auto updatePerFrameUniformBuffers(
         return;
     }
 
-    const auto bytes = static_cast<vk::DeviceSize>(sizeof(NodeInstanceData))
+    auto const bytes = static_cast<vk::DeviceSize>(sizeof(NodeInstanceData))
                      * static_cast<vk::DeviceSize>(nodeInstances.size());
 
     VK_CHECK(vmaCopyMemoryToAllocation(
@@ -79,58 +79,45 @@ auto computePerspectiveCameraDistanceToFitSceneHalfExtents(
     float            yfov,
     float            znear,
     float            viewportAspect,
-    const glm::vec3 &sceneHalfExtents) -> float
+    glm::vec3 const& sceneHalfExtents) -> float
 {
-    const float halfYfov = 0.5f * yfov;
-
-    const float halfXfov = std::atan(std::tan(halfYfov) * viewportAspect);
-
-    const float distanceToFitVertical = sceneHalfExtents.y / std::tan(halfYfov);
-
-    const float distanceToFitHorizontal = sceneHalfExtents.x / std::tan(halfXfov);
-
-    const float distanceToFit =
-        std::max(distanceToFitVertical, distanceToFitHorizontal);
-
-    const float distanceToAvoidNearClip = sceneHalfExtents.z + znear;
+    auto const halfYfov                = 0.5f * yfov;
+    auto const halfXfov                = std::atan(std::tan(halfYfov) * viewportAspect);
+    auto const distanceToFitVertical   = sceneHalfExtents.y / std::tan(halfYfov);
+    auto const distanceToFitHorizontal = sceneHalfExtents.x / std::tan(halfXfov);
+    auto const distanceToFit = std::max(distanceToFitVertical, distanceToFitHorizontal);
+    auto const distanceToAvoidNearClip = sceneHalfExtents.z + znear;
 
     return distanceToFit + distanceToAvoidNearClip;
 }
 
 auto upsertDefaultCameraInstance(
-    const RenderAsset &asset,
-    SceneView         &sceneView,
+    RenderAsset const& asset,
+    SceneView&         sceneView,
     float              viewportAspect) -> void
 {
     if (asset.cameras.empty()) {
         throw std::runtime_error{fmt::format("asset.cameras is empty")};
     }
 
-    const auto defaultCameraIndex =
+    auto const defaultCameraIndex =
         static_cast<std::uint32_t>(asset.cameras.size() - 1u);
-
-    const auto sceneAABB = computeSceneAABB(asset, sceneView);
-
-    const auto sceneCenter = 0.5f * (sceneAABB.min + sceneAABB.max);
-
-    const auto sceneHalfExtents = 0.5f * (sceneAABB.max - sceneAABB.min);
-
-    const auto &defaultCamera = asset.cameras[defaultCameraIndex];
-
-    const auto &defaultPerspectiveCamera =
+    auto const  sceneAABB        = computeSceneAABB(asset, sceneView);
+    auto const  sceneCenter      = 0.5f * (sceneAABB.min + sceneAABB.max);
+    auto const  sceneHalfExtents = 0.5f * (sceneAABB.max - sceneAABB.min);
+    auto const& defaultCamera    = asset.cameras[defaultCameraIndex];
+    auto const& defaultPerspectiveCamera =
         std::get<PerspectiveCamera>(defaultCamera.model);
 
-    const float distance = computePerspectiveCameraDistanceToFitSceneHalfExtents(
+    float const distance = computePerspectiveCameraDistanceToFitSceneHalfExtents(
         defaultPerspectiveCamera.yfov,
         defaultPerspectiveCamera.znear,
         viewportAspect,
         sceneHalfExtents);
 
-    const auto defaultCameraTranslation = sceneCenter + glm::vec3{0.0f, 0.0f, distance};
-
-    const auto defaultCameraRotation = glm::quat{1.0f, 0.0f, 0.0f, 0.0f};
-
-    const std::uint32_t invalidNodeIndex = std::numeric_limits<std::uint32_t>::max();
+    auto const defaultCameraTranslation = sceneCenter + glm::vec3{0.0f, 0.0f, distance};
+    auto const defaultCameraRotation    = glm::quat{1.0f, 0.0f, 0.0f, 0.0f};
+    auto const invalidNodeIndex         = std::numeric_limits<std::uint32_t>::max();
 
     sceneView.cameraInstances.push_back(
         CameraInstance{
@@ -149,7 +136,7 @@ auto upsertDefaultCameraInstance(
 } // namespace
 auto main(
     int   argc,
-    char *argv[]) -> int
+    char* argv[]) -> int
 {
     auto gltfPath = [&] -> std::filesystem::path {
         if (argc < 2) {
@@ -186,8 +173,8 @@ auto main(
 
     auto context = RenderContext{window, requiredExtensions};
 
-    const auto colorFormat = context.colorFormat();
-    const auto depthFormat = context.depthFormat();
+    auto const colorFormat = context.colorFormat();
+    auto const depthFormat = context.depthFormat();
 
     Command uploadCmd{context.device, vk::CommandPoolCreateFlagBits::eTransient};
 
@@ -235,8 +222,8 @@ auto main(
     };
     auto renderer = Renderer{context, rendererConfig};
 
-    const auto  initialExtent         = context.extent();
-    const float initialViewportAspect = static_cast<float>(initialExtent.width)
+    auto const  initialExtent         = context.extent();
+    float const initialViewportAspect = static_cast<float>(initialExtent.width)
                                       / static_cast<float>(initialExtent.height);
 
     upsertDefaultCameraInstance(asset, sceneDrawList, initialViewportAspect);
@@ -247,14 +234,14 @@ auto main(
     auto nodeInstancesData = std::vector<NodeInstanceData>{};
     nodeInstancesData.reserve(sceneDrawList.nodeInstances.size());
 
-    for (const auto &nodeInstance : sceneDrawList.nodeInstances) {
+    for (auto const& nodeInstance : sceneDrawList.nodeInstances) {
         nodeInstancesData.push_back(
             NodeInstanceData{
                 .modelMatrix = nodeInstance.modelMatrix,
             });
     }
 
-    const uint32_t nodeInstanceCount = static_cast<uint32_t>(nodeInstancesData.size());
+    auto const nodeInstanceCount = static_cast<uint32_t>(nodeInstancesData.size());
     renderer.initializePerFrameUniformBuffers(context.allocator, nodeInstanceCount);
 
     auto     running        = true;
@@ -295,21 +282,21 @@ auto main(
             frameCount = 0;
         }
 
-        const auto extent = context.extent();
-        const auto viewportAspect =
+        auto const extent = context.extent();
+        auto const viewportAspect =
             static_cast<float>(extent.width) / static_cast<float>(extent.height);
 
-        const auto &activeCameraInstance = sceneDrawList.activeCameraInstance();
+        auto const& activeCameraInstance = sceneDrawList.activeCameraInstance();
 
-        const auto &activeCamera = asset.cameras[activeCameraInstance.cameraIndex];
+        auto const& activeCamera = asset.cameras[activeCameraInstance.cameraIndex];
 
         auto frameUniforms = FrameUniforms{
             .viewProjectionMatrix = activeCamera.getProjectionMatrix(viewportAspect)
                                   * activeCamera.getViewMatrix(
                                       activeCameraInstance.translation,
                                       activeCameraInstance.rotation),
-            .directionalLight = DirectionalLight{},
-            .pointLight       = PointLight{},
+            .directionalLight     = DirectionalLight{},
+            .pointLight           = PointLight{},
         };
 
         updatePerFrameUniformBuffers(

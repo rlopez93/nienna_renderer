@@ -1,0 +1,30 @@
+---
+Checks: "clang-diagnostic-*,clang-analyzer-*,modernize-use-auto,modernize-use-trailing-return-type"
+WarningsAsErrors: ""
+HeaderFileExtensions:
+  - ""
+  - h
+  - hh
+  - hpp
+  - hxx
+ImplementationFileExtensions:
+  - c
+  - cc
+  - cpp
+  - cxx
+HeaderFilterRegex: ""
+ExcludeHeaderFilterRegex: ""
+FormatStyle: file
+User: ricardo
+CheckOptions:
+  - key: modernize-use-auto.MinTypeNameLength
+    value: 0
+  - key: modernize-use-auto.RemoveStars
+    value: false
+  - key: modernize-use-trailing-return-type.TransformFunctions
+    value: true
+  - key: modernize-use-trailing-return-type.TransformLambdas
+    value: all_except_auto
+SystemHeaders: false
+...
+

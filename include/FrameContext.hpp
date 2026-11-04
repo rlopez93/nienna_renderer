@@ -14,7 +14,7 @@ class FrameContext
 {
   public:
     FrameContext(
-        Device  &device,
+        Device&  device,
         uint32_t maxFramesInFlight);
 
     // Current frame slot
@@ -25,12 +25,12 @@ class FrameContext
     // Advance to next frame slot
     auto advance() -> void;
 
-    auto cmd() -> vk::raii::CommandBuffer &;
-    auto cmdPool() -> vk::raii::CommandPool &;
+    auto cmd() -> vk::raii::CommandBuffer&;
+    auto cmdPool() -> vk::raii::CommandPool&;
 
     [[nodiscard]]
-    auto timelineValue() const -> const uint64_t &;
-    auto timelineValue() -> uint64_t &;
+    auto timelineValue() const -> uint64_t const&;
+    auto timelineValue() -> uint64_t&;
 
     [[nodiscard]]
     auto timelineSemaphore() const -> vk::Semaphore;
@@ -41,7 +41,7 @@ class FrameContext
     auto currentDescriptorSet() const -> vk::DescriptorSet;
 
     [[nodiscard]]
-    auto setDescriptorSets(std::vector<vk::raii::DescriptorSet> &&sets);
+    auto setDescriptorSets(std::vector<vk::raii::DescriptorSet>&& sets);
 
     std::vector<Buffer> frameUBO;
     std::vector<Buffer> nodeInstancesSSBO;
@@ -50,12 +50,12 @@ class FrameContext
     std::vector<vk::raii::DescriptorSet> descriptorSets;
 
     auto initializePerFrameUniformBuffers(
-        Allocator &allocator,
+        Allocator& allocator,
         uint32_t   nodeInstanceCount) -> void;
 
   private:
     static auto createTimelineSemaphore(
-        Device  &device,
+        Device&  device,
         uint32_t maxFramesInFlight) -> vk::raii::Semaphore;
     uint32_t frameIndex        = 0;
     uint32_t maxFramesInFlight = 0;

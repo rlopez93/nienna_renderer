@@ -11,11 +11,11 @@
 #define VK_CHECK(vkFnc)                                                                \
     {                                                                                  \
         if (const VkResult checkResult = (vkFnc); checkResult != VK_SUCCESS) {         \
-            const char *errMsg = string_VkResult(checkResult);                         \
+            const char* errMsg = string_VkResult(checkResult);                         \
             fmt::print(stderr, "Vulkan error: {}", errMsg);                            \
             assert(checkResult == VK_SUCCESS);                                         \
         }                                                                              \
     }
 #endif
 
-auto findDepthFormat(vk::raii::PhysicalDevice &physicalDevice) -> vk::Format;
+auto findDepthFormat(vk::raii::PhysicalDevice& physicalDevice) -> vk::Format;

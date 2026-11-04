@@ -9,13 +9,13 @@
 
 struct VertexReflectionData {
 
-    std::vector<SpvReflectInterfaceVariable *> variables;
-    std::vector<SpvReflectDescriptorBinding *> bindings;
-    std::vector<SpvReflectDescriptorSet *>     sets;
+    std::vector<SpvReflectInterfaceVariable*> variables;
+    std::vector<SpvReflectDescriptorBinding*> bindings;
+    std::vector<SpvReflectDescriptorSet*>     sets;
 };
 
-auto readShaders(const std::string &filename) -> std::vector<char>;
-auto reflectShader(const std::vector<char> &code) -> VertexReflectionData;
+auto readShaders(std::string const& filename) -> std::vector<char>;
+auto reflectShader(std::vector<char> const& code) -> VertexReflectionData;
 auto createShaderModule(
-    vk::raii::Device            &device,
-    const std::filesystem::path &path) -> vk::raii::ShaderModule;
+    vk::raii::Device&            device,
+    std::filesystem::path const& path) -> vk::raii::ShaderModule;

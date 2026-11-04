@@ -14,7 +14,7 @@
 auto AABB::invalid() -> AABB
 {
     // Invalid sentinel where min > max component-wise.
-    const auto inf = std::numeric_limits<float>::infinity();
+    auto const inf = std::numeric_limits<float>::infinity();
 
     return AABB{
         .min = glm::vec3{inf},
@@ -28,7 +28,7 @@ auto AABB::isValid() const -> bool
     return min.x <= max.x && min.y <= max.y && min.z <= max.z;
 }
 
-auto AABB::merge(const AABB &other) -> void
+auto AABB::merge(const AABB& other) -> void
 {
     if (!other.isValid()) {
         return;
@@ -45,8 +45,8 @@ auto AABB::merge(const AABB &other) -> void
 }
 
 auto computeWorldAABBFromLocalAABB(
-    const AABB      &localAABB,
-    const glm::mat4 &worldFromLocalTransform) -> AABB
+    const AABB&      localAABB,
+    glm::mat4 const& worldFromLocalTransform) -> AABB
 {
     if (!localAABB.isValid()) {
         return AABB::invalid();
@@ -54,7 +54,7 @@ auto computeWorldAABBFromLocalAABB(
 
     // Transform local AABB via its corners, then enclose.
 
-    const auto cornerLocalPositions = std::array{
+    auto const cornerLocalPositions = std::array{
         glm::vec3{
             localAABB.min.x,
             localAABB.min.y,
@@ -99,18 +99,18 @@ auto computeWorldAABBFromLocalAABB(
 
     auto worldAABB = AABB::invalid();
 
-    for (const auto &cornerLocalPosition : cornerLocalPositions) {
+    for (auto const& cornerLocalPosition : cornerLocalPositions) {
 
         // Promote corner position to homogeneous coordinates (append w = 1)
-        const auto cornerLocalPositionHomogeneous =
+        auto const cornerLocalPositionHomogeneous =
             glm::vec4{cornerLocalPosition, 1.0f};
 
         // Transform the homogenous corner from local to world-space
-        const auto cornerWorldPositionHomogeneous =
+        auto const cornerWorldPositionHomogeneous =
             worldFromLocalTransform * cornerLocalPositionHomogeneous;
 
         // Project back to 3D world-space position by dropping w
-        const auto cornerWorldPosition = glm::vec3{
+        auto const cornerWorldPosition = glm::vec3{
             cornerWorldPositionHomogeneous.x,
             cornerWorldPositionHomogeneous.y,
             cornerWorldPositionHomogeneous.z,
@@ -124,7 +124,7 @@ auto computeWorldAABBFromLocalAABB(
     return worldAABB;
 }
 
-auto computeLocalAABB(const Submesh &submesh) -> AABB
+auto computeLocalAABB(Submesh const& submesh) -> AABB
 {
     // Bounds from vertex positions only.
     if (submesh.vertices.empty()) {
@@ -133,7 +133,7 @@ auto computeLocalAABB(const Submesh &submesh) -> AABB
 
     auto localAABB = AABB::invalid();
 
-    for (const auto &vertex : submesh.vertices) {
+    for (auto const& vertex : submesh.vertices) {
         // Expand AABB to enclose each vertex
         localAABB.min = glm::min(localAABB.min, vertex.position);
         localAABB.max = glm::max(localAABB.max, vertex.position);
@@ -145,23 +145,23 @@ auto computeLocalAABB(const Submesh &submesh) -> AABB
 // Compute a world-space AABB for the scene by iterating draw calls to
 // account for instancing.
 auto computeSceneAABB(
-    const RenderAsset &asset,
-    const SceneView   &sceneView) -> AABB
+    RenderAsset const& asset,
+    SceneView const&   sceneView) -> AABB
 {
     auto sceneAABB = AABB::invalid();
 
-    for (const auto &drawItem : sceneView.draws) {
+    for (auto const& drawItem : sceneView.draws) {
 
-        const auto &submesh =
+        auto const& submesh =
             asset.meshes[drawItem.meshIndex].submeshes[drawItem.submeshIndex];
 
-        const auto localAABB = computeLocalAABB(submesh);
+        auto const localAABB = computeLocalAABB(submesh);
 
         // Use the per-instance transform when producing world bounds.
-        const auto &worldFromLocalTransform =
+        auto const& worldFromLocalTransform =
             sceneView.nodeInstances[drawItem.nodeInstanceIndex].modelMatrix;
 
-        const auto worldAABB =
+        auto const worldAABB =
             computeWorldAABBFromLocalAABB(localAABB, worldFromLocalTransform);
 
         sceneAABB.merge(worldAABB);

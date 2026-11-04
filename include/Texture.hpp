@@ -12,17 +12,17 @@ struct Texture {
 
     vk::SamplerCreateInfo samplerInfo{};
 
-    bool isValid() const
+    auto isValid() const -> bool
     {
         if (extent.width == 0u || extent.height == 0u) {
             return false;
         }
 
-        const std::size_t w = static_cast<std::size_t>(extent.width);
+        auto const w = static_cast<std::size_t>(extent.width);
 
-        const std::size_t h = static_cast<std::size_t>(extent.height);
+        auto const h = static_cast<std::size_t>(extent.height);
 
-        const std::size_t expectedBytes = w * h * 4u;
+        auto const expectedBytes = static_cast<std::size_t>(w * h * 4u);
 
         return rgba8.size() == expectedBytes;
     }
