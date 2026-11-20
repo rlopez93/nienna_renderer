@@ -37,12 +37,16 @@ auto toGlm(fastgltf::math::fquat const& quat) -> glm::quat
 
 auto parseGltfAsset(std::filesystem::path const& gltfPath) -> fastgltf::Asset
 {
-    auto const supportedExtensions = fastgltf::Extensions::KHR_texture_transform
-                                   | fastgltf::Extensions::KHR_materials_unlit
-                                   | fastgltf::Extensions::KHR_lights_punctual
-                                   | fastgltf::Extensions::KHR_materials_specular
-                                   | fastgltf::Extensions::KHR_materials_ior
-                                   | fastgltf::Extensions::KHR_materials_clearcoat;
+    auto const supportedExtensions =
+        fastgltf::Extensions::KHR_materials_unlit
+        | fastgltf::Extensions::KHR_materials_dispersion
+        | fastgltf::Extensions::KHR_materials_volume
+        | fastgltf::Extensions::KHR_materials_emissive_strength
+        | fastgltf::Extensions::KHR_materials_transmission
+        | fastgltf::Extensions::KHR_lights_punctual
+        | fastgltf::Extensions::KHR_materials_specular
+        | fastgltf::Extensions::KHR_materials_ior
+        | fastgltf::Extensions::KHR_materials_clearcoat;
 
     auto parser = fastgltf::Parser{supportedExtensions};
 

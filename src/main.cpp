@@ -176,14 +176,14 @@ auto main(
     auto const colorFormat = context.colorFormat();
     auto const depthFormat = context.depthFormat();
 
-    Command uploadCmd{context.device, vk::CommandPoolCreateFlagBits::eTransient};
+    auto uploadCmd = Command{context.device, vk::CommandPoolCreateFlagBits::eTransient};
 
     auto asset         = getAsset(gltfPath);
     auto sceneDrawList = buildSceneView(asset);
 
     auto textureCount = static_cast<uint32_t>(asset.textures.size());
 
-    RendererConfig rendererConfig{
+    auto rendererConfig = RendererConfig{
         .shaderInterfaceDescription = ShaderInterfaceDescription{{
             {kBindingFrameUniforms,
              vk::DescriptorType::eUniformBuffer,
@@ -222,9 +222,9 @@ auto main(
     };
     auto renderer = Renderer{context, rendererConfig};
 
-    auto const  initialExtent         = context.extent();
-    float const initialViewportAspect = static_cast<float>(initialExtent.width)
-                                      / static_cast<float>(initialExtent.height);
+    auto const initialExtent         = context.extent();
+    auto const initialViewportAspect = static_cast<float>(initialExtent.width)
+                                     / static_cast<float>(initialExtent.height);
 
     upsertDefaultCameraInstance(asset, sceneDrawList, initialViewportAspect);
     auto renderableResources = RenderableResources{};
@@ -313,7 +313,6 @@ auto main(
             renderer.currentNodeInstancesSSBO());
 
         renderer.render(renderableResources);
-
         renderer.endFrame();
     }
 
