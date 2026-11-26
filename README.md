@@ -38,7 +38,7 @@ Assets from KhronosGroup/glTF-Sample-Assets:
 
 * C++26
 * Vulkan 1.4
-* VulkanSDK 1.4.335
+* VulkanSDK 1.4.363
 * Vulkan-Hpp RAII bindings
 * shaders written in Slang
 * SDL3 windowing and event handling
@@ -47,14 +47,14 @@ Assets from KhronosGroup/glTF-Sample-Assets:
 * texture loading with stb_image
 * glm for math, fmt for formatting
 
-Tested on Manjaro KDE Linux 25.0 with:
+Tested on Manjaro KDE Linux 26.1.3 with:
 
-* GCC 15.2.1 with C++26
-* CMake 4.2.1
-* VulkanSDK 1.4.335.0
-* SDL3 3.2.28-1
-* fmt 12.1.0-1
-* glm 1.0.2-1
+* GCC 16.2.1 with C++26
+* CMake 4.4.4
+* VulkanSDK 1.4.363.1
+* SDL3 3.4.18-1
+* fmt 12.2.0-1
+* glm 1.0.3-1
 
 ## Acknowledgements
 
