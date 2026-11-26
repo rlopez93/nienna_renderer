@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
-#include <spirv_reflect.h>
+#include <SPIRV-Reflect/spirv_reflect.h>
 
 #include <filesystem>
 #include <vector>

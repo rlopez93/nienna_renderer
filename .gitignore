@@ -7,3 +7,6 @@ scratch/
 *.gfxr
 *.log
 imgui.ini
+*.spv
+shaders/*.slang.vert
+shaders/*.slang.frag

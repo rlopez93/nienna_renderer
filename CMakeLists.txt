@@ -1,26 +1,20 @@
 cmake_minimum_required(VERSION 3.25)
-project(nienna LANGUAGES C CXX)
+project(nienna LANGUAGES CXX)
 
-add_subdirectory(third_party/fastgltf)
-
-
-set(CMAKE_CXX_STANDARD 26)
-set(CMAKE_PREFIX_PATH $ENV{VULKAN_SDK})
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Debug)
+if(NOT DEFINED ENV{VULKAN_SDK})
+  message(FATAL_ERROR "VULKAN_SDK is not set; source the Vulkan SDK's setup-env.sh first")
 endif()
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(Vulkan REQUIRED)
-find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
+find_package(Vulkan 1.4 REQUIRED)
+find_package(slang REQUIRED)
+find_package(SDL3 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(glm REQUIRED)
+add_subdirectory(third_party/fastgltf)
 
-add_executable(nienna)
+file(GLOB IMGUI_SOURCES third_party/imgui/*.cpp)
 
-target_compile_definitions(nienna PRIVATE VULKAN_HPP_HANDLE_ERROR_OUT_OF_DATE_AS_SUCCESS)
-
-target_sources(nienna PRIVATE
+add_executable(nienna
     src/AABB.cpp
     src/Allocator.cpp
     src/Camera.cpp
@@ -48,88 +42,49 @@ target_sources(nienna PRIVATE
     src/Utility.cpp
     src/Window.cpp
     src/main.cpp
-    src/spirv_reflect.c
     src/stb_image.cpp
     src/vma.cpp
+    ${IMGUI_SOURCES}
+    third_party/imgui/backends/imgui_impl_vulkan.cpp
+    third_party/imgui/backends/imgui_impl_sdl3.cpp
 )
 
-file(GLOB IMGUI_SOURCES "third_party/imgui/*.cpp")
+target_compile_features(nienna PRIVATE cxx_std_26)
 
-target_sources(nienna PRIVATE
-${IMGUI_SOURCES}
-third_party/imgui/backends/imgui_impl_vulkan.cpp
-third_party/imgui/backends/imgui_impl_sdl3.cpp)
+target_compile_definitions(nienna PRIVATE VULKAN_HPP_HANDLE_ERROR_OUT_OF_DATE_AS_SUCCESS)
 
 target_include_directories(nienna PRIVATE
     include
     third_party/imgui
     third_party/imgui/backends
-    ${Vulkan_INCLUDE_DIRS}
 )
 
-
 target_link_libraries(nienna PRIVATE
-    SDL3::SDL3
     Vulkan::Vulkan
+    SDL3::SDL3
     fastgltf::fastgltf
     fmt::fmt
     glm::glm
+    $ENV{VULKAN_SDK}/lib/libspirv-reflect-static.a
 )
 
-
-if(NOT Vulkan_SLANGC_EXECUTABLE)
-    get_filename_component(_Vulkan_LIB_DIR ${Vulkan_LIBRARY} DIRECTORY)
-    find_program(Vulkan_SLANGC_EXECUTABLE
-        NAMES slangc
-        HINTS ${_Vulkan_LIB_DIR}/../Bin
-    )
-endif()
-
-if(Vulkan_SLANGC_EXECUTABLE)
-
-    set(SLANG_FLAGS
-        -I ${CMAKE_SOURCE_DIR}/include
-        -profile sm_6_6+spirv_1_6
-        -target spirv
-        -emit-spirv-directly
-        -force-glsl-scalar-layout
-        -fvk-use-entrypoint-name
-        -g3  # Enable debug information
-        -O0  # Disable optimization (spirv-opt)
-    )
-
-    # Compile Slang shaders using slangc
-    file(GLOB SHADER_SLANG_FILES "shaders/*.slang")
-    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/_autogen)
-    foreach(SHADER ${SHADER_SLANG_FILES})
-        get_filename_component(SHADER_NAME ${SHADER} NAME)
-        set(OUTPUT_FILE "${CMAKE_BINARY_DIR}/_autogen/${SHADER_NAME}.spv")
-        set(_COMMAND ${Vulkan_SLANGC_EXECUTABLE}
-        ${SLANG_FLAGS}
-        -o ${OUTPUT_FILE} ${SHADER})
-
-        add_custom_command(
+file(GLOB SHADER_SOURCES shaders/*.slang)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/_autogen)
+foreach(SHADER ${SHADER_SOURCES})
+  get_filename_component(SHADER_NAME ${SHADER} NAME)
+  set(OUTPUT_FILE ${CMAKE_BINARY_DIR}/_autogen/${SHADER_NAME}.spv)
+  add_custom_command(
         OUTPUT ${OUTPUT_FILE}
-        COMMAND ${_COMMAND}
+        COMMAND ${SLANG_EXECUTABLE}
+            -I ${CMAKE_SOURCE_DIR}/include
+            -profile sm_6_6+spirv_1_6
+            -target spirv
+            -force-glsl-scalar-layout
+            -fvk-use-entrypoint-name
+            -g3 -O0
+            -o ${OUTPUT_FILE} ${SHADER}
         MAIN_DEPENDENCY ${SHADER}
-        # DEPENDS slangc
-        COMMENT "Compiling Slang shader ${SHADER_NAME} with slangc"
         VERBATIM
-        )
-        list(APPEND SHADER_HEADERS ${OUTPUT_FILE})
-    endforeach()
-else()
-    message(FATAL_ERROR "slangc executable not found")
-endif()
-
-# Add shader files to the project
-file(GLOB SHADER_H_FILES "shaders/*.spv")
-source_group("Shaders" FILES ${SHADER_SLANG_FILES} ${SHADER_H_FILES})
-target_sources(nienna PRIVATE ${SHADER_H_FILES})
-
-# Add the shader headers directly to the executable target
-target_sources(nienna PRIVATE ${SHADER_HEADERS})
-
-# Include the shader and _autogen directory
-target_include_directories(nienna PRIVATE "${CMAKE_BINARY_DIR}")
-target_include_directories(nienna PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    )
+  target_sources(nienna PRIVATE ${OUTPUT_FILE})
+endforeach()
