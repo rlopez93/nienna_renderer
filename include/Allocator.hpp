@@ -151,7 +151,8 @@ inline auto Allocator::createBufferAndUploadData(
     auto buffer = createBuffer(
         bufferSize,
         usageFlags | vk::BufferUsageFlagBits2::eTransferDst,
-        VMA_MEMORY_USAGE_GPU_ONLY);
+        false,
+        VMA_MEMORY_USAGE_AUTO);
 
     // fmt::print(stderr, "\n\ncalling cmd.copyBuffer()...\n\n");
     cmd.buffer.copyBuffer(

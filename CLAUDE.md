@@ -50,7 +50,7 @@ When changing these structs or bindings, keep the following in sync:
 
 ## Known issues
 
-- `Allocator::createBufferAndUploadData` passes `VMA_MEMORY_USAGE_GPU_ONLY` as the `bool isStagingBuffer` argument, so device-local buffers are tracked as staging buffers. `freeStagingBuffers()` is never called; once it is, it will destroy vertex, index and material buffers unless this is fixed first.
+- `Allocator::freeStagingBuffers()` is never called after upload, so staging buffers live for the whole run. It is safe to call after `RenderableResources::create()`, which waits on a fence.
 - `Renderer::beginFrame` treats `eSuboptimalKHR` from acquire as failure and returns without waiting on the acquire semaphore, leaving it pending; the next acquire reuses it.
 - The pipeline bakes in back-face culling and no blending; materials' `cullMode`, `alphaBlendEnable` and `alphaMaskEnable` are loaded but never applied, and the shader doesn't discard below alpha cutoff.
 - The shader transforms normals by the plain model matrix (wrong under non-uniform scale).
