@@ -27,6 +27,7 @@ WIP C++26 real-time 3D renderer and glTF 2.0 viewer targeting Vulkan 1.4
 * ImGui integration for on-screen debug UI
 
 ## Rendered with Nienna
+
 Assets from KhronosGroup/glTF-Sample-Assets:
 <img width="800" height="600" alt="Screenshot_20260101_225749" src="https://github.com/user-attachments/assets/0e41b681-5c1a-4bb2-9c79-e725db569e1b" />
 <img width="800" height="600" alt="Screenshot_20260101_225753" src="https://github.com/user-attachments/assets/89a1ab9e-9f4d-4e9b-846e-0739a2c739c3" />
@@ -58,7 +59,7 @@ Tested on Manjaro KDE Linux 26.1.3 with:
 
 ## Acknowledgements
 
-This project builds on the following resources:
+This project leans on (and borrows heavily from) the following resources:
 
 * the Khronos Vulkan Tutorial
 * the Vulkan documentation at docs.vulkan.org
