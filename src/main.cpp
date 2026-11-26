@@ -149,7 +149,7 @@ auto main(
     auto gltfDirectory = gltfPath.parent_path();
     auto shaderPath    = [&] -> std::filesystem::path {
         if (argc < 3) {
-            return "build/_autogen/mesh_basepass.slang.spv";
+            return "build/debug/_autogen/mesh_basepass.slang.spv";
         } else {
             return std::string{argv[2]};
         }

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.25)
 project(nienna LANGUAGES C CXX)
 
 add_subdirectory(third_party/fastgltf)
@@ -6,7 +6,9 @@ add_subdirectory(third_party/fastgltf)
 
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_PREFIX_PATH $ENV{VULKAN_SDK})
-set(CMAKE_BUILD_TYPE Debug)
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug)
+endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(Vulkan REQUIRED)
@@ -65,9 +67,6 @@ target_include_directories(nienna PRIVATE
     ${Vulkan_INCLUDE_DIRS}
 )
 
-target_link_directories(nienna PRIVATE
-    ${Vulkan_LIBRARIES}
-)
 
 target_link_libraries(nienna PRIVATE
     SDL3::SDL3
@@ -77,7 +76,6 @@ target_link_libraries(nienna PRIVATE
     glm::glm
 )
 
-set(Vulkan_SLANGC_EXECUTABLE "slangc")
 
 if(NOT Vulkan_SLANGC_EXECUTABLE)
     get_filename_component(_Vulkan_LIB_DIR ${Vulkan_LIBRARY} DIRECTORY)
@@ -98,7 +96,6 @@ if(Vulkan_SLANGC_EXECUTABLE)
         -fvk-use-entrypoint-name
         -g3  # Enable debug information
         -O0  # Disable optimization (spirv-opt)
-        -source-embed-style text
     )
 
     # Compile Slang shaders using slangc
@@ -106,11 +103,9 @@ if(Vulkan_SLANGC_EXECUTABLE)
     file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/_autogen)
     foreach(SHADER ${SHADER_SLANG_FILES})
         get_filename_component(SHADER_NAME ${SHADER} NAME)
-        string(REPLACE "." "_" VN_SHADER_NAME ${SHADER_NAME})
         set(OUTPUT_FILE "${CMAKE_BINARY_DIR}/_autogen/${SHADER_NAME}.spv")
         set(_COMMAND ${Vulkan_SLANGC_EXECUTABLE}
-        ${_SLANG_FLAGS}
-        -source-embed-name ${VN_SHADER_NAME}
+        ${SLANG_FLAGS}
         -o ${OUTPUT_FILE} ${SHADER})
 
         add_custom_command(
@@ -124,7 +119,7 @@ if(Vulkan_SLANGC_EXECUTABLE)
         list(APPEND SHADER_HEADERS ${OUTPUT_FILE})
     endforeach()
 else()
-    message(ERROR "slangc executable not found")
+    message(FATAL_ERROR "slangc executable not found")
 endif()
 
 # Add shader files to the project
@@ -138,5 +133,3 @@ target_sources(nienna PRIVATE ${SHADER_HEADERS})
 # Include the shader and _autogen directory
 target_include_directories(nienna PRIVATE "${CMAKE_BINARY_DIR}")
 target_include_directories(nienna PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-
-

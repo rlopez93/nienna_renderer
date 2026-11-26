@@ -5,20 +5,24 @@ WIP C++26 real-time 3D renderer and glTF 2.0 viewer targeting Vulkan 1.4
 ## Current features
 
 * full Vulkan dynamic rendering pipeline
+  * frames in flight synchronized with a timeline semaphore
+  * swapchain recreation on window resize
 * basic glTF 2.0 scene loading
-  * mesh primitives
-  * baseColorFactor/baseColorTexture
-  * cameras
-* camera movement (currently buggy)
+  * node hierarchies with TRS transforms
+  * meshes with multiple primitives
+  * baseColorFactor/baseColorTexture, vertex colors, two UV sets
+  * texture samplers (wrap and filter modes)
+  * embedded and external images
+  * perspective and orthographic cameras, plus a default camera that frames the whole scene
 * Lambert diffuse directional light
-* simple debug views (normals, wireframe)
+* simple debug views (normals, wireframe), cycled with `]`
 * puts triangles on screen
   * many of them, in fact
 
 ## Planned features
 
 * support for multi-scene glTF files
-* support for multi-primitive meshes
+* camera movement
 * core glTF PBR support + KHR extensions
 * ImGui integration for on-screen debug UI
 
@@ -41,6 +45,7 @@ Assets from KhronosGroup/glTF-Sample-Assets:
 * glTF 2.0 loading with fastgltf
 * VulkanMemoryAllocator
 * texture loading with stb_image
+* glm for math, fmt for formatting
 
 Tested on Manjaro KDE Linux 25.0 with:
 
@@ -53,18 +58,38 @@ Tested on Manjaro KDE Linux 25.0 with:
 
 ## Acknowledgements
 
-Wouldn't have made it this far without:
+This project builds on the following resources:
 
-* Khronos Vulkan tutorial (I did it BEFORE it used dynamic rendering *hmm*)
-* docs.vulkan.org
-* so many KhronosGroup repos, but in particular Vulkan-Samples, glTF-Sample-Assets, Vulkan-Hpp (of course) and Vulkan-Docs
-* the LunarG VulkanSDK
-* HEAVY use of Vulkan Configurator validation layers
+* the Khronos Vulkan Tutorial
+* the Vulkan documentation at docs.vulkan.org
+* KhronosGroup repositories, in particular Vulkan-Samples, glTF-Sample-Assets, Vulkan-Hpp and Vulkan-Docs
+* the LunarG Vulkan SDK
+* the Vulkan validation layers, configured through Vulkan Configurator
 * nvpro-samples/vk_minimal_latest
-* and just Sascha Willems, in general
+* Sascha Willems' Vulkan examples
 
 ## Build
 
+Requirements:
+
+* the Vulkan SDK (1.4.x), set up so `VULKAN_SDK` is set and `slangc` is on your `PATH` (e.g. by sourcing the SDK's `setup-env.sh`)
+* SDL3, fmt and glm (system packages)
+* CMake 3.25 or newer, a C++26 compiler, and Ninja
+
 ```bash
-cmake -B build -S .
-cmake --build build
+git submodule update --init --recursive
+cmake --preset debug
+cmake --build --preset debug
+```
+
+Debug builds go in `build/debug/`. A `release` preset is also available; it builds into `build/release/`.
+
+## Run
+
+From the repository root:
+
+```bash
+./build/debug/nienna [path/to/model.gltf] [path/to/shader.spv]
+```
+
+With no arguments it loads the Duck from glTF-Sample-Assets and the default shader from `build/debug/_autogen/`. For a release build, pass the shader path, e.g. `build/release/_autogen/mesh_basepass.slang.spv`. Press `]` to cycle between the shaded, normals and wireframe views.
