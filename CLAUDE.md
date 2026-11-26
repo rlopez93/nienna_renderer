@@ -32,7 +32,7 @@ Ownership flows top-down from `src/main.cpp`, which currently wires everything t
    - `GltfLoader` (`getAsset`) converts fastgltf data into a CPU-side **`RenderAsset`**: nodes with TRS, meshes and primitives, materials, textures and cameras.
    - `buildSceneView` flattens the active scene's node hierarchy into a **`SceneView`**: `NodeInstance`s with world matrices, `DrawItem`s and `CameraInstance`s. `main.cpp` then appends a default camera framed on the scene AABB, which is always the last entry in `asset.cameras`.
 3. **`RenderableResources`** uploads a `RenderAsset` and `SceneView` to the GPU. It creates vertex and index buffers, texture images with both sRGB and linear views, deduplicated samplers (via `samplerCache`), and the materials SSBO (see `MaterialPacking`). It also writes each frame's descriptor set.
-4. **`Renderer`** owns the pipeline, descriptor pool and layout (`ShaderInterface`), plus a **`FrameContext`**. `FrameContext` holds frames-in-flight state: per-frame command buffers, a frame UBO and node-instance SSBO, and descriptor sets, synchronized by a single timeline semaphore. Each frame runs `beginFrame()` (which returns false to skip, e.g. when the swapchain is out of date or the window is minimized), then the app updates the UBO, SSBO and descriptors, then `render()` and `endFrame()` (submit and present). It uses dynamic rendering, with no render passes. `ImageLayoutState` tracks image layouts for barriers.
+4. **`Renderer`** owns the pipeline, descriptor pool and layout (`ShaderInterface`), plus a **`FrameContext`**. `FrameContext` holds frames-in-flight state: per-frame command buffers, a frame UBO and node-instance SSBO, and descriptor sets, synchronized by a single timeline semaphore. Each frame runs `beginFrame()` (which recreates the swapchain if flagged, then returns false to skip the frame when acquire fails, e.g. out of date), then the app updates the UBO, SSBO and descriptors, then `render()` and `endFrame()` (submit and present). It uses dynamic rendering, with no render passes. `ImageLayoutState` tracks image layouts for barriers.
 
 ### CPU/GPU shared interface
 
@@ -49,6 +49,11 @@ When changing these structs or bindings, keep the following in sync:
 `include/Application.hpp`, `shaders/shader.vert` and `shader.frag`, and the other `.slang` files besides `mesh_basepass.slang` are unused leftovers or experiments, kept intentionally. Don't delete or edit them unless asked.
 
 ## Known issues
+
+- `ImageLayoutState::transition` returns early (no barrier) when an image's use is unchanged. The single shared `mainDepth` therefore gets no barrier between frames in flight: a write-after-write hazard between one frame's depth writes and the next frame's clear.
+- The swapchain image's transition to color attachment uses `srcStage = eNone` (first use and from `kPresent`), so it doesn't chain with the acquire semaphore wait (`eAllCommands`), and the layout transition isn't ordered after the acquire. Fix: wait at `eColorAttachmentOutput` and use that as the barrier's source stage.
+- The shader's missing-normal fallback (`dot(N, N) < 1e-5`) runs after `normalize()`, which gives NaN for a zero normal, so it never fires; models without `NORMAL` get NaN lighting.
+- `Swapchain::createSwapchain` throws on a zero extent, and nothing catches it. Minimizing (on Windows) or resizing to zero height crashes when the swapchain is recreated.
 
 - `Allocator::freeStagingBuffers()` is never called after upload, so staging buffers live for the whole run. It is safe to call after `RenderableResources::create()`, which waits on a fence.
 - `Renderer::beginFrame` treats `eSuboptimalKHR` from acquire as failure and returns without waiting on the acquire semaphore, leaving it pending; the next acquire reuses it.
