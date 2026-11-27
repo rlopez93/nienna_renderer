@@ -76,6 +76,10 @@ When changing these structs or bindings, keep the following in sync:
 - Device creation requires unused extensions (e.g. `VK_EXT_host_image_copy`) and enables every supported feature.
 - The glTF parser declares IOR, specular and clearcoat but the loader never reads them; `KHR_texture_transform` isn't parsed.
 - On Windows the debug callback shows a message box instead of printing.
+- Running ImGui every frame (even with no windows) dropped the debug build from about 3,650 to about 500 FPS with validation on. Cause not investigated.
+- ImGui colors look washed out: the swapchain is sRGB, and ImGui's colors assume a non-sRGB target.
+- An empty scene (no draws) gives a NaN default camera: `computeSceneAABB` returns an empty `AABB` (min +∞, max −∞), which `addDefaultCameraInstance` uses as-is.
+- The swapchain color format is read once at startup by both the main pipeline and `ImGuiLayer`. If swapchain recreation picked a different format, neither would be rebuilt.
 - The shared depth image (`mainDepth`) gets no barrier after the first frame. `ImageLayoutState::transition` skips a barrier when an image's use is unchanged, so one frame's depth writes aren't ordered before the next frame's depth clear and writes (a write-after-write hazard). Reusing a depth attachment in a later render pass, "same or a different frame", "always requires a memory dependency": src `LATE_FRAGMENT_TESTS` / `DEPTH_STENCIL_ATTACHMENT_WRITE`, dst `EARLY_FRAGMENT_TESTS` / `DEPTH_STENCIL_ATTACHMENT_READ | WRITE`.
   - Khronos Vulkan Guide, Synchronization Examples, "First render-pass writes to a depth attachment. Second render-pass re-uses the same depth attachment.": https://github.com/KhronosGroup/Vulkan-Guide/blob/main/chapters/synchronization_examples.adoc
   - Vulkan spec, note under `vkCmdEndRendering` (local: `/usr/share/doc/vulkan/vkspec.html`): "There is no implicit ordering between separate render passes, even in the same command buffer, and even when the attachments match."
