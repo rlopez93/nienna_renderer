@@ -75,78 +75,38 @@ auto updatePerFrameUniformBuffers(
 namespace
 {
 
-auto computePerspectiveCameraDistanceToFitSceneHalfExtents(
-    float            yfov,
-    float            znear,
-    float            viewportAspect,
-    glm::vec3 const& sceneHalfExtents) -> float
-{
-    auto const halfYfov                = 0.5f * yfov;
-    auto const halfXfov                = std::atan(std::tan(halfYfov) * viewportAspect);
-    auto const distanceToFitVertical   = sceneHalfExtents.y / std::tan(halfYfov);
-    auto const distanceToFitHorizontal = sceneHalfExtents.x / std::tan(halfXfov);
-    auto const distanceToFit = std::max(distanceToFitVertical, distanceToFitHorizontal);
-    auto const distanceToAvoidNearClip = sceneHalfExtents.z + znear;
-
-    return distanceToFit + distanceToAvoidNearClip;
-}
-
-auto upsertDefaultCameraInstance(
+// Distance fit from nvpro_core2 CameraManipulator::fit (Apache-2.0):
+// https://github.com/nvpro-samples/nvpro_core2/blob/main/nvutils/camera_manipulator.cpp
+auto addDefaultCameraInstance(
     RenderAsset const& asset,
     SceneView&         sceneView,
     float              viewportAspect) -> void
 {
-    if (asset.cameras.empty()) {
-        throw std::runtime_error{fmt::format("asset.cameras is empty")};
-    }
+    auto const  cameraIndex = static_cast<std::uint32_t>(asset.cameras.size() - 1u);
+    auto const& camera = std::get<PerspectiveCamera>(asset.cameras[cameraIndex].model);
 
-    auto const defaultCameraIndex =
-        static_cast<std::uint32_t>(asset.cameras.size() - 1u);
-    auto const  sceneAABB        = computeSceneAABB(asset, sceneView);
-    auto const  sceneCenter      = 0.5f * (sceneAABB.min + sceneAABB.max);
-    auto const  sceneHalfExtents = 0.5f * (sceneAABB.max - sceneAABB.min);
-    auto const& defaultCamera    = asset.cameras[defaultCameraIndex];
-    auto const& defaultPerspectiveCamera =
-        std::get<PerspectiveCamera>(defaultCamera.model);
+    auto const bounds      = computeSceneAABB(asset, sceneView);
+    auto const boxHalfSize = 0.5f * (bounds.max - bounds.min);
+    auto const boxCenter   = 0.5f * (bounds.min + bounds.max);
 
-    // Pitch the camera down so flat, horizontal models (y-extent 0) aren't
-    // viewed edge-on. A negative rotation about +X tilts the -Z forward axis down.
-    constexpr auto defaultCameraPitch = glm::radians(30.0f);
-    auto const     defaultCameraRotation =
-        glm::angleAxis(-defaultCameraPitch, glm::vec3{1.0f, 0.0f, 0.0f});
+    auto const tanHalfFovY = std::tan(0.5f * camera.yfov);
+    auto const tanHalfFovX = tanHalfFovY * viewportAspect;
 
-    // Fit against the scene's half extents measured along the camera's axes:
-    // the AABB of the rotated box has half extents |R^T| * h.
-    auto const cameraFromWorld = glm::transpose(glm::mat3_cast(defaultCameraRotation));
-    auto const absCameraFromWorld = glm::mat3{
-        glm::abs(cameraFromWorld[0]),
-        glm::abs(cameraFromWorld[1]),
-        glm::abs(cameraFromWorld[2])};
-    auto const cameraSpaceHalfExtents = absCameraFromWorld * sceneHalfExtents;
+    auto const radius        = glm::length(boxHalfSize);
+    auto const idealDistance = std::max(radius / tanHalfFovX, radius / tanHalfFovY);
 
-    auto const distance = computePerspectiveCameraDistanceToFitSceneHalfExtents(
-        defaultPerspectiveCamera.yfov,
-        defaultPerspectiveCamera.znear,
-        viewportAspect,
-        cameraSpaceHalfExtents);
-
-    // Back the camera away from the scene center along its own +Z axis.
-    auto const defaultCameraTranslation =
-        sceneCenter + defaultCameraRotation * glm::vec3{0.0f, 0.0f, distance};
-    auto const invalidNodeIndex = std::numeric_limits<std::uint32_t>::max();
+    auto const rotation =
+        glm::angleAxis(glm::radians(-30.0f), glm::vec3{1.0f, 0.0f, 0.0f});
+    auto const translation =
+        boxCenter + rotation * glm::vec3{0.0f, 0.0f, idealDistance};
 
     sceneView.cameraInstances.push_back(
         CameraInstance{
-            .translation = defaultCameraTranslation,
-            .rotation    = defaultCameraRotation,
-            .nodeIndex   = invalidNodeIndex,
-            .cameraIndex = defaultCameraIndex,
+            .translation = translation,
+            .rotation    = rotation,
+            .nodeIndex   = std::numeric_limits<std::uint32_t>::max(),
+            .cameraIndex = cameraIndex,
         });
-
-    // If no cameras existed, make the inserted one active.
-    if (sceneView.cameraInstances.size() == 1u) {
-        sceneView.activeCameraInstanceIndex = 0u;
-    }
 }
 
 } // namespace
@@ -242,7 +202,7 @@ auto main(
     auto const initialViewportAspect = static_cast<float>(initialExtent.width)
                                      / static_cast<float>(initialExtent.height);
 
-    upsertDefaultCameraInstance(asset, sceneDrawList, initialViewportAspect);
+    addDefaultCameraInstance(asset, sceneDrawList, initialViewportAspect);
     auto renderableResources = RenderableResources{};
     renderableResources
         .create(asset, sceneDrawList, context.device, uploadCmd, context.allocator);
