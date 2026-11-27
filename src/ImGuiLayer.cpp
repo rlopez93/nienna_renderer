@@ -21,7 +21,10 @@ auto checkVkResult(VkResult result) -> void
         return;
     }
 
-    fmt::println(stderr, "[imgui vulkan] VkResult = {}", static_cast<int>(result));
+    fmt::println(
+        stderr,
+        "[imgui vulkan] {}",
+        vk::to_string(static_cast<vk::Result>(result)));
 
     if (result < 0) {
         std::abort();
@@ -40,7 +43,6 @@ ImGuiLayer::ImGuiLayer(
 
     auto& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     ImGui::StyleColorsDark();
 
@@ -49,27 +51,25 @@ ImGuiLayer::ImGuiLayer(
         throw std::runtime_error{"ImGui_ImplSDL3_InitForVulkan failed"};
     }
 
-    auto const colorFormat = static_cast<VkFormat>(context.colorFormat());
+    auto const colorFormat = context.colorFormat();
 
-    auto initInfo                = ImGui_ImplVulkan_InitInfo{};
-    initInfo.ApiVersion          = VK_API_VERSION_1_4;
-    initInfo.Instance            = *context.instance.handle;
-    initInfo.PhysicalDevice      = *context.physicalDevice.handle;
-    initInfo.Device              = *context.device.handle;
-    initInfo.QueueFamily         = context.device.queueFamilyIndices.graphicsIndex;
-    initInfo.Queue               = *context.device.graphicsQueue;
-    initInfo.DescriptorPoolSize  = IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE;
-    initInfo.MinImageCount       = 2u;
-    initInfo.ImageCount          = std::max(framesInFlight, initInfo.MinImageCount);
-    initInfo.MSAASamples         = VK_SAMPLE_COUNT_1_BIT;
-    initInfo.UseDynamicRendering = true;
-    initInfo.PipelineRenderingCreateInfo = VkPipelineRenderingCreateInfo{
-        .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount    = 1u,
-        .pColorAttachmentFormats = &colorFormat,
+    auto initInfo = ImGui_ImplVulkan_InitInfo{
+        .ApiVersion     = vk::ApiVersion14,
+        .Instance       = *context.instance.handle,
+        .PhysicalDevice = *context.physicalDevice.handle,
+        .Device         = *context.device.handle,
+        .QueueFamily    = context.device.queueFamilyIndices.graphicsIndex,
+        .Queue          = *context.device.graphicsQueue,
+        .MinImageCount  = 2u,
+        .ImageCount     = std::max(framesInFlight, 2u),
+        .MSAASamples = static_cast<VkSampleCountFlagBits>(vk::SampleCountFlagBits::e1),
+        .DescriptorPoolSize  = IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE,
+        .UseDynamicRendering = true,
+        .PipelineRenderingCreateInfo =
+            vk::PipelineRenderingCreateInfo{}.setColorAttachmentFormats(colorFormat),
+        .CheckVkResultFn   = checkVkResult,
+        .MinAllocationSize = 1024u * 1024u,
     };
-    initInfo.MinAllocationSize = 1024u * 1024u;
-    initInfo.CheckVkResultFn   = checkVkResult;
 
     if (!ImGui_ImplVulkan_Init(&initInfo)) {
         ImGui_ImplSDL3_Shutdown();

@@ -7,9 +7,7 @@
 
 struct RenderContext;
 
-class ImGuiLayer
-{
-  public:
+struct ImGuiLayer {
     ImGuiLayer(
         SDL_Window*    window,
         RenderContext& context,
