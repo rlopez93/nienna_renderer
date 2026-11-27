@@ -22,6 +22,19 @@ cmake --preset debug && cmake --build --preset debug   # or the release preset
 - Use trailing return types (`auto f() -> T`) and `auto` for locals. This is enforced by `.clang-tidy`'s `modernize-use-trailing-return-type` and `modernize-use-auto` checks.
 - Use designated initializers for config and data structs.
 - Prefer Vulkan-Hpp RAII types (`vk::raii::*`). Wrap raw VMA calls with `VK_CHECK` (see `Utility.hpp`).
+- Code is largely uncommented. Don't add doc comments or comments that restate the code; comment only facts the code can't show (a precondition, a cross-file invariant, a spec reference, a license attribution).
+- No speculative code: no unused enum values, helpers, or abstraction layers for things that don't exist yet.
+
+## Working conventions
+
+- Work in small, reviewable steps. For a multi-part change, propose an ordered list of steps first; each step touches few files and leaves the app building and running. Stop after each step for review.
+- Commit only when asked. Commit messages are a single short subject line (e.g. `simplify camera transform extraction`), no body.
+- One branch per topic. Don't merge or push; the user does that.
+- Base non-obvious code (math, API integration, synchronization) on a readable, non-LLM reference: official examples (`third_party/imgui/examples/`), maintained libraries (nvpro_core2, thsvs), the Vulkan spec or the Khronos Vulkan Guide. Cite file:line in the plan or conversation, not in code, and point out deviations.
+- Use local docs from the Vulkan SDK (`$VULKAN_SDK/../source/`): validation layer docs in `Vulkan-ValidationLayers/docs/`, VMA docs in `VulkanMemoryAllocator/docs/`. The SDK doesn't ship the spec; it's at `/usr/share/doc/vulkan/vkspec.html` (same version), with reference pages in `/usr/share/doc/vulkan/man/html/`. Prefer local docs over the web.
+- Validation layer settings come from Vulkan Configurator (synchronization validation is on); environment-variable overrides are ignored. A clean syncval run doesn't prove there is no hazard (see Known issues); check the spec.
+- Smoke test: `timeout --preserve-status 5 ./build/debug/nienna [model]` should exit 0, with no `Validation Error` or `SYNC-HAZARD` in the output. The user checks visuals.
+- Synchronization: write barriers inline for now; don't add new synchronization abstractions. `ImageLayoutState` and `Sync.hpp/.cpp` are holdovers slated for replacement.
 
 ## Architecture
 
