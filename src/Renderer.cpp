@@ -235,6 +235,52 @@ auto Renderer::render(RenderableResources const& renderableResources) -> void
     frames.cmd().endRendering();
 }
 
+auto Renderer::beginUiPass() -> void
+{
+    // No implicit ordering between render passes (spec: note under vkCmdEndRendering)
+    auto const uiPassBarrier = vk::ImageMemoryBarrier2{
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::AccessFlagBits2::eColorAttachmentWrite,
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::AccessFlagBits2::eColorAttachmentRead
+            | vk::AccessFlagBits2::eColorAttachmentWrite,
+        vk::ImageLayout::eColorAttachmentOptimal,
+        vk::ImageLayout::eColorAttachmentOptimal,
+        vk::QueueFamilyIgnored,
+        vk::QueueFamilyIgnored,
+        context.swapchain.nextImage(),
+        vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+    };
+
+    frames.cmd().pipelineBarrier2(
+        vk::DependencyInfo{}.setImageMemoryBarriers(uiPassBarrier));
+
+    auto const colorAttachmentInfo = vk::RenderingAttachmentInfo{
+        context.swapchain.nextImageView(),
+        vk::ImageLayout::eColorAttachmentOptimal,
+        {},
+        {},
+        {},
+        vk::AttachmentLoadOp::eLoad,
+        vk::AttachmentStoreOp::eStore,
+    };
+
+    auto const renderingInfo = vk::RenderingInfo{
+        {},
+        vk::Rect2D{{}, context.extent()},
+        1,
+        {},
+        colorAttachmentInfo,
+    };
+
+    frames.cmd().beginRendering(renderingInfo);
+}
+
+auto Renderer::endUiPass() -> void
+{
+    frames.cmd().endRendering();
+}
+
 auto Renderer::submit() -> void
 {
     imageLayoutState.transition(

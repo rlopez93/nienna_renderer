@@ -289,6 +289,8 @@ auto main(
             renderer.currentNodeInstancesSSBO());
 
         renderer.render(renderableResources);
+        renderer.beginUiPass();
+        renderer.endUiPass();
         renderer.endFrame();
     }
 

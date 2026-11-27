@@ -24,6 +24,9 @@ struct Renderer {
     // Records rendering commands into the current frame command buffer
     auto render(RenderableResources const& renderableResources) -> void;
 
+    auto beginUiPass() -> void;
+    auto endUiPass() -> void;
+
     // Submits + presents + advances frame
     auto endFrame() -> void;
 
