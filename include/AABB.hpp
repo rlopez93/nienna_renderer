@@ -3,15 +3,15 @@
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/vector_float3.hpp>
 
+#include <limits>
+
 struct Submesh;
 struct RenderAsset;
 struct SceneView;
 
 struct AABB {
-    glm::vec3 min{0.0f};
-    glm::vec3 max{0.0f};
-
-    static auto invalid() -> AABB;
+    glm::vec3 min{std::numeric_limits<float>::infinity()};
+    glm::vec3 max{-std::numeric_limits<float>::infinity()};
 
     auto isValid() const -> bool;
 
