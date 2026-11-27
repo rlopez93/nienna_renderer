@@ -109,15 +109,31 @@ auto upsertDefaultCameraInstance(
     auto const& defaultPerspectiveCamera =
         std::get<PerspectiveCamera>(defaultCamera.model);
 
-    float const distance = computePerspectiveCameraDistanceToFitSceneHalfExtents(
+    // Pitch the camera down so flat, horizontal models (y-extent 0) aren't
+    // viewed edge-on. A negative rotation about +X tilts the -Z forward axis down.
+    constexpr auto defaultCameraPitch = glm::radians(30.0f);
+    auto const     defaultCameraRotation =
+        glm::angleAxis(-defaultCameraPitch, glm::vec3{1.0f, 0.0f, 0.0f});
+
+    // Fit against the scene's half extents measured along the camera's axes:
+    // the AABB of the rotated box has half extents |R^T| * h.
+    auto const cameraFromWorld = glm::transpose(glm::mat3_cast(defaultCameraRotation));
+    auto const absCameraFromWorld = glm::mat3{
+        glm::abs(cameraFromWorld[0]),
+        glm::abs(cameraFromWorld[1]),
+        glm::abs(cameraFromWorld[2])};
+    auto const cameraSpaceHalfExtents = absCameraFromWorld * sceneHalfExtents;
+
+    auto const distance = computePerspectiveCameraDistanceToFitSceneHalfExtents(
         defaultPerspectiveCamera.yfov,
         defaultPerspectiveCamera.znear,
         viewportAspect,
-        sceneHalfExtents);
+        cameraSpaceHalfExtents);
 
-    auto const defaultCameraTranslation = sceneCenter + glm::vec3{0.0f, 0.0f, distance};
-    auto const defaultCameraRotation    = glm::quat{1.0f, 0.0f, 0.0f, 0.0f};
-    auto const invalidNodeIndex         = std::numeric_limits<std::uint32_t>::max();
+    // Back the camera away from the scene center along its own +Z axis.
+    auto const defaultCameraTranslation =
+        sceneCenter + defaultCameraRotation * glm::vec3{0.0f, 0.0f, distance};
+    auto const invalidNodeIndex = std::numeric_limits<std::uint32_t>::max();
 
     sceneView.cameraInstances.push_back(
         CameraInstance{
