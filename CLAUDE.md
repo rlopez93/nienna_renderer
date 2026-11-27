@@ -22,6 +22,19 @@ cmake --preset debug && cmake --build --preset debug   # or the release preset
 - Use trailing return types (`auto f() -> T`) and `auto` for locals. This is enforced by `.clang-tidy`'s `modernize-use-trailing-return-type` and `modernize-use-auto` checks.
 - Use designated initializers for config and data structs.
 - Prefer Vulkan-Hpp RAII types (`vk::raii::*`). Wrap raw VMA calls with `VK_CHECK` (see `Utility.hpp`).
+- Code is largely uncommented. Don't add doc comments or comments that restate the code; comment only facts the code can't show (a precondition, a cross-file invariant, a spec reference, a license attribution).
+- No speculative code: no unused enum values, helpers, or abstraction layers for things that don't exist yet.
+
+## Working conventions
+
+- Work in small, reviewable steps. For a multi-part change, propose an ordered list of steps first; each step touches few files and leaves the app building and running. Stop after each step for review.
+- Commit only when asked. Commit messages are a single short subject line (e.g. `simplify camera transform extraction`), no body.
+- One branch per topic. Don't merge or push; the user does that.
+- Base non-obvious code (math, API integration, synchronization) on a readable, non-LLM reference: official examples (`third_party/imgui/examples/`), maintained libraries (nvpro_core2, thsvs), the Vulkan spec or the Khronos Vulkan Guide. Cite file:line in the plan or conversation, not in code, and point out deviations.
+- Use local docs from the Vulkan SDK (`$VULKAN_SDK/../source/`): validation layer docs in `Vulkan-ValidationLayers/docs/`, VMA docs in `VulkanMemoryAllocator/docs/`. The SDK doesn't ship the spec; it's at `/usr/share/doc/vulkan/vkspec.html` (same version), with reference pages in `/usr/share/doc/vulkan/man/html/`. Prefer local docs over the web.
+- Validation layer settings come from Vulkan Configurator (synchronization validation is on); environment-variable overrides are ignored. A clean syncval run doesn't prove there is no hazard (see Known issues); check the spec.
+- Smoke test: `timeout --preserve-status 5 ./build/debug/nienna [model]` should exit 0, with no `Validation Error` or `SYNC-HAZARD` in the output. The user checks visuals.
+- Synchronization: write barriers inline for now; don't add new synchronization abstractions. `ImageLayoutState` and `Sync.hpp/.cpp` are holdovers slated for replacement.
 
 ## Architecture
 
@@ -32,7 +45,7 @@ Ownership flows top-down from `src/main.cpp`, which currently wires everything t
    - `GltfLoader` (`getAsset`) converts fastgltf data into a CPU-side **`RenderAsset`**: nodes with TRS, meshes and primitives, materials, textures and cameras.
    - `buildSceneView` flattens the active scene's node hierarchy into a **`SceneView`**: `NodeInstance`s with world matrices, `DrawItem`s and `CameraInstance`s. `main.cpp` then appends a default camera framed on the scene AABB, which is always the last entry in `asset.cameras`.
 3. **`RenderableResources`** uploads a `RenderAsset` and `SceneView` to the GPU. It creates vertex and index buffers, texture images with both sRGB and linear views, deduplicated samplers (via `samplerCache`), and the materials SSBO (see `MaterialPacking`). It also writes each frame's descriptor set.
-4. **`Renderer`** owns the pipeline, descriptor pool and layout (`ShaderInterface`), plus a **`FrameContext`**. `FrameContext` holds frames-in-flight state: per-frame command buffers, a frame UBO and node-instance SSBO, and descriptor sets, synchronized by a single timeline semaphore. Each frame runs `beginFrame()` (which returns false to skip, e.g. when the swapchain is out of date or the window is minimized), then the app updates the UBO, SSBO and descriptors, then `render()` and `endFrame()` (submit and present). It uses dynamic rendering, with no render passes. `ImageLayoutState` tracks image layouts for barriers.
+4. **`Renderer`** owns the pipeline, descriptor pool and layout (`ShaderInterface`), plus a **`FrameContext`**. `FrameContext` holds frames-in-flight state: per-frame command buffers, a frame UBO and node-instance SSBO, and descriptor sets, synchronized by a single timeline semaphore. Each frame runs `beginFrame()` (which recreates the swapchain if flagged, then returns false to skip the frame when acquire fails, e.g. out of date), then the app updates the UBO, SSBO and descriptors, then `render()` and `endFrame()` (submit and present). It uses dynamic rendering, with no render passes. `ImageLayoutState` tracks image layouts for barriers.
 
 ### CPU/GPU shared interface
 
@@ -50,6 +63,8 @@ When changing these structs or bindings, keep the following in sync:
 
 ## Known issues
 
+- The shader's missing-normal fallback (`dot(N, N) < 1e-5`) runs after `normalize()`, which gives NaN for a zero normal, so it never fires; models without `NORMAL` get NaN lighting.
+- `Swapchain::createSwapchain` throws on a zero extent, and nothing catches it. Minimizing (on Windows) or resizing to zero height crashes when the swapchain is recreated.
 - `Allocator::freeStagingBuffers()` is never called after upload, so staging buffers live for the whole run. It is safe to call after `RenderableResources::create()`, which waits on a fence.
 - `Renderer::beginFrame` treats `eSuboptimalKHR` from acquire as failure and returns without waiting on the acquire semaphore, leaving it pending; the next acquire reuses it.
 - The pipeline bakes in back-face culling and no blending; materials' `cullMode`, `alphaBlendEnable` and `alphaMaskEnable` are loaded but never applied, and the shader doesn't discard below alpha cutoff.
@@ -61,3 +76,7 @@ When changing these structs or bindings, keep the following in sync:
 - Device creation requires unused extensions (e.g. `VK_EXT_host_image_copy`) and enables every supported feature.
 - The glTF parser declares IOR, specular and clearcoat but the loader never reads them; `KHR_texture_transform` isn't parsed.
 - On Windows the debug callback shows a message box instead of printing.
+- The shared depth image (`mainDepth`) gets no barrier after the first frame. `ImageLayoutState::transition` skips a barrier when an image's use is unchanged, so one frame's depth writes aren't ordered before the next frame's depth clear and writes (a write-after-write hazard). Reusing a depth attachment in a later render pass, "same or a different frame", "always requires a memory dependency": src `LATE_FRAGMENT_TESTS` / `DEPTH_STENCIL_ATTACHMENT_WRITE`, dst `EARLY_FRAGMENT_TESTS` / `DEPTH_STENCIL_ATTACHMENT_READ | WRITE`.
+  - Khronos Vulkan Guide, Synchronization Examples, "First render-pass writes to a depth attachment. Second render-pass re-uses the same depth attachment.": https://github.com/KhronosGroup/Vulkan-Guide/blob/main/chapters/synchronization_examples.adoc
+  - Vulkan spec, note under `vkCmdEndRendering` (local: `/usr/share/doc/vulkan/vkspec.html`): "There is no implicit ordering between separate render passes, even in the same command buffer, and even when the attachments match."
+  - Synchronization validation does not report this hazard (checked 2026-11-26), so a clean syncval run doesn't rule it out.
