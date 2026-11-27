@@ -27,6 +27,8 @@ struct Renderer {
     auto beginUiPass() -> void;
     auto endUiPass() -> void;
 
+    auto commandBuffer() -> vk::raii::CommandBuffer&;
+
     // Submits + presents + advances frame
     auto endFrame() -> void;
 

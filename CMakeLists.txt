@@ -22,6 +22,7 @@ add_executable(nienna
     src/Device.cpp
     src/FrameContext.cpp
     src/GltfLoader.cpp
+    src/ImGuiLayer.cpp
     src/ImageLayoutState.cpp
     src/Instance.cpp
     src/MaterialPacking.cpp

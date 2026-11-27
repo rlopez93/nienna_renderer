@@ -281,6 +281,11 @@ auto Renderer::endUiPass() -> void
     frames.cmd().endRendering();
 }
 
+auto Renderer::commandBuffer() -> vk::raii::CommandBuffer&
+{
+    return frames.cmd();
+}
+
 auto Renderer::submit() -> void
 {
     imageLayoutState.transition(

@@ -1,6 +1,7 @@
 #include "AABB.hpp"
 #include "Camera.hpp"
 #include "GltfLoader.hpp"
+#include "ImGuiLayer.hpp"
 #include "RenderContext.hpp"
 #include "RenderableResources.hpp"
 #include "Renderer.hpp"
@@ -10,6 +11,7 @@
 #include "Window.hpp"
 
 #include <SDL3/SDL_events.h>
+#include <imgui.h>
 
 #include <algorithm>
 #include <cmath>
@@ -198,6 +200,8 @@ auto main(
     };
     auto renderer = Renderer{context, rendererConfig};
 
+    auto ui = ImGuiLayer{window.get(), context, rendererConfig.maxFramesInFlight};
+
     auto const initialExtent         = context.extent();
     auto const initialViewportAspect = static_cast<float>(initialExtent.width)
                                      / static_cast<float>(initialExtent.height);
@@ -240,6 +244,9 @@ auto main(
         if (!renderer.beginFrame()) {
             continue;
         }
+
+        ui.beginFrame();
+        ImGui::ShowDemoWindow();
 
         auto currentTime = std::chrono::high_resolution_clock::now();
         auto dt          = currentTime - previousTime;
@@ -290,6 +297,7 @@ auto main(
 
         renderer.render(renderableResources);
         renderer.beginUiPass();
+        ui.record(renderer.commandBuffer());
         renderer.endUiPass();
         renderer.endFrame();
     }
