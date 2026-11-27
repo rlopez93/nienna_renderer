@@ -2,11 +2,8 @@
 
 #include <cstdint>
 #include <numeric>
-#include <optional>
 #include <ranges>
 #include <stdexcept>
-
-#include <fmt/format.h>
 
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/geometric.hpp>
@@ -26,68 +23,6 @@ auto makeLocalTransform(SceneNode const& node) -> glm::mat4
     return t * r * s;
 }
 
-// b must be normalized
-auto reject(
-    glm::vec3 const& a,
-    glm::vec3 const& b) -> glm::vec3
-{
-    return a - b * glm::dot(a, b);
-}
-
-auto safeNormalize(
-    glm::vec3 const& v,
-    float const      eps) -> std::optional<glm::vec3>
-{
-    auto const length_v = glm::length(v);
-    if (length_v < eps) {
-        return std::nullopt;
-    }
-
-    return v / length_v;
-}
-
-auto extractBasisColumns(glm::mat4 const& m) -> glm::mat3
-{
-    return glm::mat3{
-        glm::vec3{m[0]},
-        glm::vec3{m[1]},
-        glm::vec3{m[2]},
-    };
-}
-
-auto makeRightHanded(
-    glm::vec3 const& x,
-    glm::vec3 const& y) -> glm::mat3
-{
-    auto const z = glm::cross(x, y);
-    return glm::mat3{x, y, z};
-}
-
-auto orthonormalize(
-    glm::vec3 x,
-    glm::vec3 y) -> glm::mat3
-{
-    constexpr auto eps = 1e-8f;
-
-    auto const xOpt = safeNormalize(x, eps);
-    if (!xOpt.has_value()) {
-        throw std::runtime_error{fmt::format("camera basis degenerate (x)")};
-    }
-
-    x = xOpt.value();
-
-    y = reject(y, x);
-
-    auto const yOpt = safeNormalize(y, eps);
-    if (!yOpt.has_value()) {
-        throw std::runtime_error{fmt::format("camera basis degenerate (y)")};
-    }
-
-    y = yOpt.value();
-
-    return makeRightHanded(x, y);
-}
-
 struct CameraTR {
     glm::vec3 translation{0.0f};
     glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
@@ -95,15 +30,28 @@ struct CameraTR {
 
 auto extractCameraTranslationRotation(glm::mat4 const& worldTransform) -> CameraTR
 {
-    auto const translation = glm::vec3{worldTransform[3]};
+    constexpr auto eps = 1e-8f;
 
-    auto const basis = extractBasisColumns(worldTransform);
-    auto const rotM  = orthonormalize(basis[0], basis[1]);
-    auto const rotQ  = glm::normalize(glm::quat_cast(rotM));
+    auto const column0 = glm::vec3{worldTransform[0]};
+    auto const column1 = glm::vec3{worldTransform[1]};
+
+    if (glm::length(column0) < eps) {
+        throw std::runtime_error{"camera basis degenerate (x)"};
+    }
+
+    auto const x = glm::normalize(column0);
+
+    auto const yOrthogonal = column1 - x * glm::dot(column1, x);
+
+    if (glm::length(yOrthogonal) < eps) {
+        throw std::runtime_error{"camera basis degenerate (y)"};
+    }
+
+    auto const y = glm::normalize(yOrthogonal);
 
     return CameraTR{
-        .translation = translation,
-        .rotation    = rotQ,
+        .translation = glm::vec3{worldTransform[3]},
+        .rotation = glm::normalize(glm::quat_cast(glm::mat3{x, y, glm::cross(x, y)})),
     };
 }
 
