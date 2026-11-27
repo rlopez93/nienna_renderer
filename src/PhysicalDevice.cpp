@@ -17,14 +17,10 @@ PhysicalDevice::PhysicalDevice(
 {
 }
 
-// --------------------------------------------------------------
-// Helper: return a list of missing extensions for this device
-// --------------------------------------------------------------
 auto PhysicalDevice::getMissingExtensions(
     vk::raii::PhysicalDevice const& physicalDevice,
     std::vector<char const*> const& requiredExtensions) -> std::vector<std::string>
 {
-    // Collect device extension names into a vector<string>
     auto deviceExtensions =
         physicalDevice.enumerateDeviceExtensionProperties()
         | std::views::transform(
@@ -33,7 +29,6 @@ auto PhysicalDevice::getMissingExtensions(
             })
         | std::ranges::to<std::vector>();
 
-    // Find all required extensions that the device does not support
     auto missingExtensions = requiredExtensions
                            | std::views::filter([&](std::string_view s) {
                                  return !std::ranges::contains(deviceExtensions, s);
@@ -53,7 +48,6 @@ auto PhysicalDevice::choosePhysicalDevice(
         throw std::runtime_error{"No Vulkan-capable devices found."};
     }
 
-    // collect diagnostic information for if no device is found
     std::stringstream diagnostic;
 
     for (auto const& physicalDevice : physicalDevices) {

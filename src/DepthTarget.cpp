@@ -1,4 +1,3 @@
-// ==> src/DepthTarget.cpp <==
 #include "DepthTarget.hpp"
 
 #include "Allocator.hpp"

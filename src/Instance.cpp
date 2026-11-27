@@ -100,7 +100,6 @@ auto Instance::createInstance(vk::raii::Context const& context) -> vk::raii::Ins
 {
     auto instanceLayers = std::vector{"VK_LAYER_KHRONOS_validation"};
 
-    // Get available validation layers' names as vector<string>
     auto availableLayers =
         context.enumerateInstanceLayerProperties()
         | std::views::transform(
@@ -109,7 +108,6 @@ auto Instance::createInstance(vk::raii::Context const& context) -> vk::raii::Ins
             })
         | std::ranges::to<std::vector>();
 
-    // Drop validation layer if not present
     if (!std::ranges::contains(
             availableLayers,
             std::string{"VK_LAYER_KHRONOS_validation"})) {
@@ -120,12 +118,11 @@ auto Instance::createInstance(vk::raii::Context const& context) -> vk::raii::Ins
     }
 
     auto instanceExtensions = std::vector{
-        VK_EXT_DEBUG_UTILS_EXTENSION_NAME, // debug messenger
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
         VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
         VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
     };
 
-    // Add SDL platform extensions
     Uint32 sdlExtensionCount     = 0;
     auto   sdlInstanceExtensions = SDL_Vulkan_GetInstanceExtensions(&sdlExtensionCount);
     if (!sdlInstanceExtensions) {
@@ -145,7 +142,6 @@ auto Instance::createInstance(vk::raii::Context const& context) -> vk::raii::Ins
     //     fmt::println(stderr, "{}", std::string{instanceExtension});
     // }
 
-    // Validate that all instance extensions are available
     auto availableExtensions =
         context.enumerateInstanceExtensionProperties()
         | std::views::transform(
@@ -173,6 +169,5 @@ auto Instance::createInstance(vk::raii::Context const& context) -> vk::raii::Ins
         instanceLayers,
         instanceExtensions};
 
-    // construct vk::raii::Instance
     return {context, instanceCreateInfo};
 }

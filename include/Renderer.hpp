@@ -16,12 +16,10 @@ struct Renderer {
         RenderContext&        context,
         RendererConfig const& config);
 
-    // Returns false if the frame should be skipped (e.g. swapchain
-    // out-of-date/minimized)
+    // false: skip this frame (swapchain acquire failed, e.g. out of date)
     [[nodiscard]]
     auto beginFrame() -> bool;
 
-    // Records rendering commands into the current frame command buffer
     auto render(RenderableResources const& renderableResources) -> void;
 
     auto beginUiPass() -> void;
@@ -29,10 +27,8 @@ struct Renderer {
 
     auto commandBuffer() -> vk::raii::CommandBuffer&;
 
-    // Submits + presents + advances frame
     auto endFrame() -> void;
 
-    // Frame-relative resource access (read/write by application)
     auto currentDescriptorSet() const -> vk::DescriptorSet;
     auto currentFrameUBO() -> Buffer&;
     auto currentNodeInstancesSSBO() -> Buffer&;
@@ -52,7 +48,6 @@ struct Renderer {
     vk::raii::PipelineLayout pipelineLayout;
     vk::raii::Pipeline       graphicsPipeline;
 
-    // Renderer-owned execution state
     FrameContext frames;
 
     DebugView debugView = DebugView::Shaded;

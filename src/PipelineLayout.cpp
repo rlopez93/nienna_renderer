@@ -1,4 +1,3 @@
-// PipelineLayout.cpp
 #include "PipelineLayout.hpp"
 #include "ShaderInterfaceTypes.hpp"
 

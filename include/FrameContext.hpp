@@ -17,12 +17,10 @@ class FrameContext
         Device&  device,
         uint32_t maxFramesInFlight);
 
-    // Current frame slot
     [[nodiscard]]
     auto current() const -> uint32_t;
     auto maxFrames() const -> uint32_t;
 
-    // Advance to next frame slot
     auto advance() -> void;
 
     auto cmd() -> vk::raii::CommandBuffer&;
@@ -46,7 +44,6 @@ class FrameContext
     std::vector<Buffer> frameUBO;
     std::vector<Buffer> nodeInstancesSSBO;
 
-    // Per-frame descriptor sets
     std::vector<vk::raii::DescriptorSet> descriptorSets;
 
     auto initializePerFrameUniformBuffers(
@@ -60,13 +57,10 @@ class FrameContext
     uint32_t frameIndex        = 0;
     uint32_t maxFramesInFlight = 0;
 
-    // Timeline synchronization
     vk::raii::Semaphore timelineSemaphoreHandle;
 
-    // Per-frame timeline values
     std::vector<uint64_t> timelineValues;
 
-    // Per-frame command pools + buffers
     std::vector<Command> commands;
 
     std::vector<vk::raii::Semaphore> imageAvailableSemaphores;

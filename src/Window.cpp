@@ -17,18 +17,15 @@ auto createWindow(
 
 #define SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS 1
 
-    // init SDL3
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         throw std::runtime_error{fmt::format("SDL_Init Error: {}\n", SDL_GetError())};
     }
 
-    // Dynamically load Vulkan loader library
     if (!SDL_Vulkan_LoadLibrary(nullptr)) {
         throw std::runtime_error{
             fmt::format("SDL_Vulkan_LoadLibrary Error: {}\n", SDL_GetError())};
     }
 
-    // create Vulkan window
     auto window = SDL_CreateWindow(
         "Vulkan + SDL3",
         800,

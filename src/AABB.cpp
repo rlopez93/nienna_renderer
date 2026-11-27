@@ -1,4 +1,3 @@
-// src/AABB.cpp
 #include "AABB.hpp"
 
 #include <array>
@@ -13,7 +12,6 @@
 
 auto AABB::invalid() -> AABB
 {
-    // Invalid sentinel where min > max component-wise.
     auto const inf = std::numeric_limits<float>::infinity();
 
     return AABB{
@@ -24,7 +22,6 @@ auto AABB::invalid() -> AABB
 
 auto AABB::isValid() const -> bool
 {
-    // Valid iff min <= max component-wise.
     return min.x <= max.x && min.y <= max.y && min.z <= max.z;
 }
 
@@ -39,7 +36,6 @@ auto AABB::merge(const AABB& other) -> void
         return;
     }
 
-    // Expand *this AABB to enclose other AABB as well
     min = glm::min(min, other.min);
     max = glm::max(max, other.max);
 }
@@ -51,8 +47,6 @@ auto computeWorldAABBFromLocalAABB(
     if (!localAABB.isValid()) {
         return AABB::invalid();
     }
-
-    // Transform local AABB via its corners, then enclose.
 
     auto const cornerLocalPositions = std::array{
         glm::vec3{
@@ -101,22 +95,18 @@ auto computeWorldAABBFromLocalAABB(
 
     for (auto const& cornerLocalPosition : cornerLocalPositions) {
 
-        // Promote corner position to homogeneous coordinates (append w = 1)
         auto const cornerLocalPositionHomogeneous =
             glm::vec4{cornerLocalPosition, 1.0f};
 
-        // Transform the homogenous corner from local to world-space
         auto const cornerWorldPositionHomogeneous =
             worldFromLocalTransform * cornerLocalPositionHomogeneous;
 
-        // Project back to 3D world-space position by dropping w
         auto const cornerWorldPosition = glm::vec3{
             cornerWorldPositionHomogeneous.x,
             cornerWorldPositionHomogeneous.y,
             cornerWorldPositionHomogeneous.z,
         };
 
-        // Expand the world-space AABB to enclose the transformed corner
         worldAABB.min = glm::min(worldAABB.min, cornerWorldPosition);
         worldAABB.max = glm::max(worldAABB.max, cornerWorldPosition);
     }
@@ -126,7 +116,6 @@ auto computeWorldAABBFromLocalAABB(
 
 auto computeLocalAABB(Submesh const& submesh) -> AABB
 {
-    // Bounds from vertex positions only.
     if (submesh.vertices.empty()) {
         return AABB::invalid();
     }
@@ -134,7 +123,6 @@ auto computeLocalAABB(Submesh const& submesh) -> AABB
     auto localAABB = AABB::invalid();
 
     for (auto const& vertex : submesh.vertices) {
-        // Expand AABB to enclose each vertex
         localAABB.min = glm::min(localAABB.min, vertex.position);
         localAABB.max = glm::max(localAABB.max, vertex.position);
     }
@@ -142,8 +130,6 @@ auto computeLocalAABB(Submesh const& submesh) -> AABB
     return localAABB;
 }
 
-// Compute a world-space AABB for the scene by iterating draw calls to
-// account for instancing.
 auto computeSceneAABB(
     RenderAsset const& asset,
     SceneView const&   sceneView) -> AABB
@@ -157,7 +143,6 @@ auto computeSceneAABB(
 
         auto const localAABB = computeLocalAABB(submesh);
 
-        // Use the per-instance transform when producing world bounds.
         auto const& worldFromLocalTransform =
             sceneView.nodeInstances[drawItem.nodeInstanceIndex].modelMatrix;
 

@@ -30,10 +30,8 @@ struct RenderableResources {
         Buffer const&     frameUBO,
         Buffer const&     nodeInstancesSSBO) const;
 
-    // draw list consumed by Renderer
     std::vector<DrawItem> draws;
 
-    // static GPU data consumed by Renderer
     std::vector<Buffer> indexBuffers;
     std::vector<Buffer> vertexBuffers;
 

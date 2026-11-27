@@ -62,7 +62,6 @@ auto ShaderInterface::create(
 //             vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment);
 //     }
 //
-//     // Light UBO (always 1 in your code)
 //     bindings.emplace_back(
 //         2,
 //         vk::DescriptorType::eUniformBuffer,

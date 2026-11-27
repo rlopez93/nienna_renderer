@@ -35,19 +35,15 @@ auto Device::createDevice(
 {
 
     auto features2 = physicalDevice.handle.getFeatures2<
-        // Core container
         vk::PhysicalDeviceFeatures2,
 
-        // Core Vulkan versions
         vk::PhysicalDeviceVulkan11Features,
         vk::PhysicalDeviceVulkan12Features,
         vk::PhysicalDeviceVulkan13Features,
         vk::PhysicalDeviceVulkan14Features,
 
-        // Descriptor model
         vk::PhysicalDeviceDescriptorBufferFeaturesEXT,
 
-        // Dynamic state
         vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
         vk::PhysicalDeviceExtendedDynamicState2FeaturesEXT,
         vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT>();

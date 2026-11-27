@@ -1,4 +1,3 @@
-// src/Sync.cpp
 #include "Sync.hpp"
 
 namespace

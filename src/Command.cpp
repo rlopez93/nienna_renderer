@@ -23,10 +23,8 @@ auto Command::beginSingleTime() -> void
 }
 auto Command::endSingleTime(Device& device) -> void
 {
-    // submit command buffer
     buffer.end();
 
-    // create fence for synchronization
     auto fenceCreateInfo         = vk::FenceCreateInfo{};
     auto fence                   = vk::raii::Fence{device.handle, fenceCreateInfo};
     auto commandBufferSubmitInfo = vk::CommandBufferSubmitInfo{buffer};

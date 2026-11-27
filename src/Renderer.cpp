@@ -195,7 +195,6 @@ auto Renderer::render(RenderableResources const& renderableResources) -> void
 
     frames.cmd().bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
-    // bind texture resources passed to shader
     frames.cmd().bindDescriptorSets(
         vk::PipelineBindPoint::eGraphics,
         *pipelineLayout,
@@ -296,11 +295,6 @@ auto Renderer::submit() -> void
 
     frames.cmd().end();
 
-    // end frame
-
-    // prepare to submit the current frame for rendering
-    // add the swapchain semaphore to wait for the image to be available
-
     uint64_t signalFrameValue = frames.timelineValue() + frames.maxFrames();
     frames.timelineValue()    = signalFrameValue;
 
@@ -348,7 +342,6 @@ auto Renderer::endFrame() -> void
 {
     submit();
     present();
-    // advance to the next frame
     frames.advance();
 }
 
