@@ -280,7 +280,7 @@ auto Renderer::endUiPass() -> void
     frames.cmd().endRendering();
 }
 
-auto Renderer::commandBuffer() -> vk::raii::CommandBuffer&
+auto Renderer::cmd() -> vk::raii::CommandBuffer&
 {
     return frames.cmd();
 }

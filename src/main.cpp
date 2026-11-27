@@ -297,7 +297,7 @@ auto main(
 
         renderer.render(renderableResources);
         renderer.beginUiPass();
-        ui.record(renderer.commandBuffer());
+        ui.record(renderer.cmd());
         renderer.endUiPass();
         renderer.endFrame();
     }
